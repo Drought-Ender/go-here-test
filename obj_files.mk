@@ -15,6 +15,7 @@ PLUGPROJECT:=\
 	$(BUILD_DIR)/src/plugProjectMorimuraU/plugProjectMorimuraU.a\
 	$(BUILD_DIR)/src/plugProjectEbisawaU/plugProjectEbisawaU.a\
 	$(BUILD_DIR)/src/plugProjectKonoU/plugProjectKonoU.a\
+	$(BUILD_DIR)/src/plugProjectDroughtU/plugProjectDroughtU.a\
 
 SYS:=\
 	$(BUILD_DIR)/src/sysBootupU/sysBootupU.a\

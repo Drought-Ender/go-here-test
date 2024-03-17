@@ -60,3 +60,4 @@
 -include src/sysCommonU/Makefile
 -include src/sysGCU/Makefile
 -include src/utilityU/Makefile
+-include src/plugProjectDroughtU/Makefile

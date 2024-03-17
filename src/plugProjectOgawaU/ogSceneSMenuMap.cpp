@@ -1,4 +1,4 @@
-#include "og/newScreen/SMenu.h"
+#include "og/newScreen/AlteredMapMenu.h"
 #include "LoadResource.h"
 #include "nans.h"
 
@@ -65,7 +65,7 @@ void SMenuMap::doUserCallBackFunc(Resource::MgrCommand* command)
  */
 void SMenuMap::doCreateObj(JKRArchive* archive)
 {
-	registObj(new ObjSMenuMap("SMenuMap screen"), archive);
+	registObj(new Drought::Screen::AlteredMapMenu("SMenuMap screen"), archive);
 	setColorBG(0, 0, 0, ObjSMenuMap::msVal._1B);
 }
 
