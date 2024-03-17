@@ -38,7 +38,7 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mPathfindState = PATHFIND_INACTIVE;
 
 	og::newScreen::ObjSMenuMap::doCreate(rarc);
-	mMapAngle = 0.0f;
+	// mMapAngle = 0.0f;
 
 }
 
@@ -53,7 +53,7 @@ Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 	rotated -= center;
 	rotated /= mCurrentZoom;
 
-	f32 angle    = TAU - (mMapAngle * TAU) / 360.0f;
+	f32 angle = (mMapAngle * TAU) / 360.0f;
 
 	f32 anglecos = cosf(angle);
 	f32 anglesin = sinf(angle);
@@ -63,13 +63,13 @@ Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 		rotated.y * anglecos + rotated.x * anglesin
 	);
 
-	rotated.x -= 22.1112399998f;
-	rotated.x /= 0.052355f;
+	unrotated.x -= 22.1112399998f;
+	unrotated.x /= 0.052355f;
 
-	rotated.y += 7.34816666659f;
-	rotated.y /= 0.048157f;
+	unrotated.y += 7.34816666659f;
+	unrotated.y /= 0.048157f;
 
-	Vector3f output(rotated.x, 0.0f, rotated.y);
+	Vector3f output(unrotated.x, 0.0f, unrotated.y);
 	output.y = Game::mapMgr->getMinY(output);
 	return output;
 }
