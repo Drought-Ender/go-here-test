@@ -151,6 +151,8 @@ void AlteredMapMenu::doDraw(Graphics& gfx)
 	Graphics gfx2;
 	mIconScreen->draw(gfx2, *graf);
 
+	drawPath(gfx);
+
 	if (mCompassPic && mPane_Ncompas) {
 		PSMTXCopy(mPane_Ncompas->mGlobalMtx, mCompassPic->mPositionMtx);
 	}
@@ -159,7 +161,6 @@ void AlteredMapMenu::doDraw(Graphics& gfx)
 	mIconScreen2->draw(gfx, *graf);
 	graf->setPort();
 	drawYaji(gfx);
-	drawPath(gfx);
 }
 
 bool AlteredMapMenu::doUpdate() {
@@ -431,29 +432,44 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	const u8 oldWidth = graf->mLineWidth;
 
+	graf->setPort();
+	GXSetZCompLoc(GX_TRUE);
+	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
+
 	graf->setLineWidth(10);
 	graf->setColor(color1);
 
 	JGeometry::TVec2f naviFirst = GetPositionOnTex(naviPos);
 
+	Vector3f previousPos = naviPos;
+
 	graf->moveTo(naviFirst);
 
 	FOREACH_NODE(Game::PathNode, mRootNode, node) {
 		Game::WayPoint* wp = Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIndex);
-		Vector3f firstPos = (wp->getPosition());
+		Vector3f currPos = (wp->getPosition());
+
+		if (!wp->isFlag(Game::WPF_Closed)) {
+			Vector3f diffVec = currPos - previousPos;
+			f32 magnitude = diffVec.normalise2D();
+
+			currPos -= diffVec * wp->mRadius;
+		}
 
 		
 
 
-		JGeometry::TVec2f first = GetPositionOnTex(firstPos);
+		JGeometry::TVec2f point = GetPositionOnTex(currPos);
 
 		
-		graf->lineTo(first);
+		graf->lineTo(point);
 
 		if (wp->isFlag(Game::WPF_Closed)) {
 			isImpossible = true;
 			graf->setColor(color2);
 		}
+
+		previousPos = currPos;
 		
 	}
 
