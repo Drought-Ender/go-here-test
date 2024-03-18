@@ -1,5 +1,6 @@
 DROUGHT_FILES:=\
-	$(BUILD_DIR)/src/plugProjectDroughtU/GoHere.o\
+	$(BUILD_DIR)/src/plugProjectDroughtU/GoHereMap.o\
+	$(BUILD_DIR)/src/plugProjectDroughtU/GoHereNavi.o\
 
 DEPENDS += $(DROUGHT_FILES:.o=.d)
 

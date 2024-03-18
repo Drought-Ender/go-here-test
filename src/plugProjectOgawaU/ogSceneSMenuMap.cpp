@@ -1,4 +1,4 @@
-#include "og/newScreen/AlteredMapMenu.h"
+#include "Drought/Screen/AlteredMapMenu.h"
 #include "LoadResource.h"
 #include "nans.h"
 

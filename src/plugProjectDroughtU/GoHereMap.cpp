@@ -1,5 +1,6 @@
-#include "og/newScreen/AlteredMapMenu.h"
+#include "Drought/Screen/AlteredMapMenu.h"
 #include "Game/Navi.h"
+#include "Game/NaviState.h"
 #include "Game/Cave/RandMapMgr.h"
 #include "Game/Piki.h"
 #include "Game/CPlate.h"
@@ -13,7 +14,6 @@ namespace Screen
 
 AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(name)
 {
-	mLinks = new WayPointLinks;
 	mStartWPIndex = -1;
 
 	if (Game::naviMgr->getActiveNavi()->mController1->isButton(PAD_BUTTON_X)) {
@@ -143,6 +143,11 @@ bool AlteredMapMenu::doStart(::Screen::StartSceneArg const* arg) {
 	return og::newScreen::ObjSMenuMap::doStart(arg);
 }
 
+bool AlteredMapMenu::doEnd(::Screen::EndSceneArg const* arg) {
+	PathfindCleanup();
+	return og::newScreen::ObjSMenuMap::doEnd(arg);
+}
+
 void AlteredMapMenu::doDraw(Graphics& gfx)
 {
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
@@ -181,7 +186,26 @@ bool AlteredMapMenu::doUpdate() {
 		mMapAngle -= 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogL;
 	}
 
-	return og::newScreen::ObjSMenuMap::doUpdate();
+	og::newScreen::SceneSMenuBase* scene = static_cast<og::newScreen::SceneSMenuBase*>(getOwner());
+
+	bool ret = false;
+
+	if (mPathfindState == PATHFIND_DONE && scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_A)) {
+
+		Vector2f center;
+		og::Screen::calcGlbCenter(mPane_map, &center);
+
+		Game::NaviPathMoveStateArg arg;
+		arg.mPosition = GetPositionFromTex(center.x, center.y);
+
+		Game::naviMgr->getActiveNavi()->transit(Game::NSID_PathMove, &arg);
+
+		mCancelToState = MENUCLOSE_Finish;
+		doUpdateCancelAction();
+		ret = true;
+	}
+
+	return og::newScreen::ObjSMenuMap::doUpdate() || ret;
 }
 
 enum EExecPathfindingSuccess {
@@ -218,7 +242,7 @@ void AlteredMapMenu::PathfindUpdate() {
 			mStartPathFindCounter = 0;
 			mPathFindCounter = 0;
 			mRootNode = nullptr;
-			initPathfinding(mLinks);
+			initPathfinding(false);
 			break;
 		case PATHFIND_AWAITING:
 			int status = execPathfinding();
@@ -243,7 +267,6 @@ void AlteredMapMenu::OnPathfindDone() {
 void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	OSReport("initPathfinding\n");
 	if (resetLinkCount) {
-		mLinks->mCount = 0;
 	}
 	Game::Navi* movingNavi = Game::naviMgr->getActiveNavi();
 	P2ASSERT(movingNavi);
@@ -264,27 +287,19 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	}
 
 	searchArg.mRoomID = roomIndex;
-	searchArg.mLinks  = mLinks;
+	searchArg.mLinks  = nullptr;
 
 	Game::WayPoint* startWP = nullptr;
 	if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg)) {
-		if (!searchArg.mWp1->isFlag(Game::WPF_Closed)) {
-			startWP = searchArg.mWp1;
-		} else {
+		if (searchArg.mWp1->isFlag(Game::WPF_Closed)) {
 			startWP = searchArg.mWp2;
+		} else {
+			startWP = searchArg.mWp1;
 		}
 	} else {
-		searchArg.mLinks = nullptr;
-		if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg)) {
-			if (searchArg.mWp1->isFlag(Game::WPF_Closed)) {
-				startWP = searchArg.mWp2;
-			} else {
-				startWP = searchArg.mWp1;
-			}
-		} else {
-			JUT_PANIC("zannen !\n");
-		}
+		JUT_PANIC("zannen !\n");
 	}
+	
 
 	JUT_ASSERT(startWP, "start==0");
 
@@ -486,6 +501,12 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	print.print(goHerePtr.x, goHerePtr.y, "v"); // awesome pointer trust
 
+}
+
+void AlteredMapMenu::PathfindCleanup() {
+	if (mContextHandle) {
+		Game::testPathfinder->release(mContextHandle);
+	}
 }
 
 } // namespace Screen

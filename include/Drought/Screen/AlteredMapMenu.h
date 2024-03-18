@@ -17,9 +17,11 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     virtual bool doUpdate();
     virtual bool doStart(const ::Screen::StartSceneArg*);
     virtual void doCreate(JKRArchive*);
+    virtual bool doEnd(const ::Screen::EndSceneArg*);
 
     void PathfindUpdate();
     void OnPathfindDone();
+    void PathfindCleanup();
     void drawPath(Graphics& gfx);
 
     bool CheckMapMove();
@@ -38,7 +40,6 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
         PATHFIND_DONE     = 1
     };
 
-    WayPointLinks* mLinks;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
