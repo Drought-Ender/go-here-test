@@ -25,7 +25,7 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     bool CheckMapMove();
 
     Vector3f GetPositionFromTex(f32 x, f32 y);
-    Vector2f GetPositionOnTex(Vector3f& pos);
+    Vector2f GetPositionOnTex(Vector3f& pos, Vector2f& other);
 
     bool CheckAllPikisBlue(Game::Navi* navi);
 

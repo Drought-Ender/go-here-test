@@ -16,12 +16,12 @@ AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(na
 	mLinks = new WayPointLinks;
 	mStartWPIndex = -1;
 
-	// if (Game::naviMgr->getActiveNavi()->mController1->isButton(PAD_BUTTON_X)) {
-	// 	Vector3f vec = 0.0f;
-	// 	vec.y = Game::mapMgr->getMinY(vec);
-	// 	Game::naviMgr->getActiveNavi()->mPosition = vec;
-	// 	Game::naviMgr->getActiveNavi()->mFaceDir = 0.0f;
-	// }
+	if (Game::naviMgr->getActiveNavi()->mController1->isButton(PAD_BUTTON_X)) {
+		Vector3f vec = 0.0f;
+		vec.y = Game::mapMgr->getMinY(vec);
+		Game::naviMgr->getActiveNavi()->mPosition = vec;
+		Game::naviMgr->getActiveNavi()->mFaceDir = 0.0f;
+	}
 	// else {
 	// 	// Game::naviMgr->getActiveNavi()->mPosition.z = 0.0f;
 	// 	// Game::naviMgr->getActiveNavi()->mPosition.x = 1.0f;
@@ -48,36 +48,125 @@ Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 
 	og::Screen::calcGlbCenter(mMapTexPane, &center);
 
-	Vector2f rotated(x, y);
+	f32 mapX = x - msVal.mMapTexOffset.x;
+	f32 mapY = y - msVal.mMapTexOffset.y;
 
-	rotated -= center;
-	rotated /= mCurrentZoom;
-
-	f32 angle = (mMapAngle * TAU) / 360.0f;
-
+	f32 angle    = -(mMapAngle * TAU) / 360.0f;
 	f32 anglecos = cosf(angle);
 	f32 anglesin = sinf(angle);
 
+	Vector2f vec = Vector2f(mapX, mapY);
+
 	Vector2f unrotated = Vector2f(
-		rotated.x * anglecos - rotated.y * anglesin,
-		rotated.y * anglecos + rotated.x * anglesin
+		vec.x * anglecos - vec.y * anglesin,
+		vec.y * anglecos + vec.x * anglesin
 	);
 
-	unrotated.x -= 22.1112399998f;
-	unrotated.x /= 0.052355f;
+	f32 scale = mCurrentZoom;
+	if (mDisp->mInCave)
+		scale *= 2.0f;
 
-	unrotated.y += 7.34816666659f;
-	unrotated.y /= 0.048157f;
+	Vector2f oldOrigin = (unrotated - center) * (1 / scale) + center;
 
-	Vector3f output(unrotated.x, 0.0f, unrotated.y);
-	output.y = Game::mapMgr->getMinY(output);
-	return output;
+
+	oldOrigin.x = -oldOrigin.x;
+	oldOrigin.y = -oldOrigin.y;
+
+	Vector2f cPos;
+
+	if (mDisp->mInCave) {
+		cPos.y = (oldOrigin.y + 0.6f) / 0.047f;
+		cPos.x = (oldOrigin.x + 0.2f) / 0.047f;
+	}
+	else {
+		cPos.y = (oldOrigin.y + 8.85f - mMapBounds.y * 0.5f) / 0.058f;
+		cPos.x = (oldOrigin.y - 24.5f - mMapBounds.y * 0.5f) / 0.058f;
+		if (mDisp->mCourseIndex == 3) {
+			cPos.x -= (mMapBounds.x * 1400.0f) / 4705.6f;
+		}
+	}
+
+	Vector3f vec2 (cPos.x, 0.0f, cPos.y);
+	vec2.y = Game::mapMgr->getMinY(vec2);
+	return vec2;
+	
 }
 
-static f32 factor = 0.050000f;
-static f32 factorFactor = 1.0f;
 
-Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
+
+Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos, Vector2f& other) {
+	f32 xpos, ypos;
+
+	OSReport("Map Position %f %f\n", mMapPosition.x, mMapPosition.y);
+	OSReport("Map Bounds %f %f\n", mMapBounds.x, mMapBounds.y);
+	
+	OSReport("Map Rotation Origin %f %f\n", mMapRotationOrigin.x, mMapRotationOrigin.y);
+	// OSReport("Map Angle %f\n", mMapAngle);
+	OSReport("Map Tex Offs %f %f\n", msVal.mMapTexOffset.x, msVal.mMapTexOffset.y);
+
+	Vector2f center;
+
+	og::Screen::calcGlbCenter(mPane_map, &center);
+
+	
+
+
+	Vector2f mapPosition;
+
+	xpos = 0.0f;
+	ypos = 0.0f;
+
+	if (mDisp->mInCave) {
+		ypos = pos.z * 0.047f + -0.6f;
+		xpos = pos.x * 0.047f + -0.2f;
+	} else {
+		if (mDisp->mCourseIndex == 3) {
+			xpos = (mMapBounds.x * 1400.0f) / 4705.6f;
+		}
+		xpos += mMapTextureDimensions.x * 0.5f + pos.x * 0.058f + 24.5f;
+		ypos = mMapTextureDimensions.y * 0.5f + pos.z * 0.058f + -8.85f;
+		
+	}
+	mapPosition.x = (-xpos);
+	mapPosition.y = (-ypos);
+
+	other = mapPosition;
+	other.x = -other.x;
+	other.y = -other.y;
+
+	// OSReport("Guess map pos %f %f\n", mapPosition.x, mapPosition.y);
+
+	OSReport("Zoom %f\n", mCurrentZoom);
+
+	f32 scale = mCurrentZoom;
+	if (mDisp->mInCave)
+		scale *= 2.0f;
+
+	Vector2f vec = (mMapPosition - mapPosition);
+
+	OSReport("Add Scale %f %f\n", mMapTexPane->mScale.x, mMapTexPane->mScale.y);
+	// magic numbers /shrug
+	
+
+	f32 angle    = -(mMapAngle * TAU) / 360.0f;
+	f32 anglecos = cosf(angle);
+	f32 anglesin = sinf(angle);
+
+	Vector2f rotated = Vector2f(
+		vec.x * anglecos - vec.y * anglesin,
+		vec.y * anglecos + vec.x * anglesin
+	);
+
+	rotated.x *= mMapTexPane->mScale.x * 0.9f;
+	rotated.y *= mMapTexPane->mScale.y * 0.85f;
+
+
+
+	return rotated + center;
+
+	
+
+	/*
 	Vector2f cPos = Vector2f(pos.x, pos.z);
 
 	f32 xpos, ypos;
@@ -85,9 +174,14 @@ Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 	xpos = cPos.x * 0.052355f + 22.1112399998f;
 	ypos = cPos.y * 0.048157f - 7.34816666659f;
 
+
+	// xpos = cPos.x * 0.052355f + mMapBounds.x * 0.5f - 97.88876f;
+	// ypos = cPos.y * 0.048157f + mMapBounds.y * 0.5f - 257.651833;
+
 	f32 angle    = -(mMapAngle * TAU) / 360.0f;
 	OSReport("angle %f\n", angle);
 	OSReport("Zoom %f\n", mCurrentZoom);
+	OSReport("Map Bounds %f %f\n", mMapBounds.x, mMapBounds.y);
 	// OSReport("factor %f\n", factor);
 	f32 anglecos = cosf(angle);
 	f32 anglesin = sinf(angle);
@@ -108,6 +202,7 @@ Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 	
 
 	return rotated + center;
+	*/
 
 }
 
@@ -151,9 +246,17 @@ bool AlteredMapMenu::doUpdate() {
 	Vector2f center;
 
 	// og::Screen::calcGlbCenter(mMapTexPane, &center);
-	Vector3f goalPos =  GetPositionFromTex(423.173004f, 225.297607f);
-	Game::naviMgr->getActiveNavi()->mPosition = goalPos;
+	// Vector3f goalPos =  GetPositionFromTex(423.173004f, 225.297607f);
+	// Game::naviMgr->getActiveNavi()->mPosition = goalPos;
 	// PathfindUpdate();
+
+	if (mController->mPadButton->mAnalogR > 0.0f) {
+		mMapAngle += 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogR;
+	}
+	if (mController->mPadButton->mAnalogL > 0.0f) {
+		mMapAngle -= 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogL;
+	}
+
 	return og::newScreen::ObjSMenuMap::doUpdate();
 }
 
@@ -376,21 +479,46 @@ int AlteredMapMenu::execPathfinding() {
 
 void AlteredMapMenu::drawPath(Graphics& gfx) {
 	JUtility::TColor color1 = 0xffffffff;
+	JUtility::TColor color2 = 0xff0000ff;
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
 	graf->setPort();
 	J2DPrint print(JFWSystem::systemFont, color1, color1);
 	Vector3f naviPos = Game::naviMgr->getActiveNavi()->getPosition();  //Game::ItemOnyon::mgr->mUfo->getPosition();
-	Vector2f naviOnBoard = GetPositionOnTex(naviPos);
+
+	Vector2f view;
+
+	Vector2f naviOnBoard = GetPositionOnTex(naviPos, view);
 	print.print(naviOnBoard.x, naviOnBoard.y, "v"); // awesome pointer trust
+
+
+	print.print(-mMapPosition.x, -mMapPosition.y, "o"); // awesome pointer trust
+	print.print(view.x, view.y, "x");
+
+	const u8 oldWidth = graf->mLineWidth;
+	graf->setPort();
+	graf->setLineWidth(10);
+	graf->setColor(color1);
+	
+	
 
 	Vector2f center;
 	og::Screen::calcGlbCenter(mOlimarArrow, &center);
 
 	Vector2f realNaviPos = center;
 
-	OSReport("Ship Guess Pos %f %f\n", naviOnBoard.x, naviOnBoard.y);
-	OSReport("Ship Real Pos %f %f\n", realNaviPos.x, realNaviPos.y);
-	OSReport("Delta %f %f\n", realNaviPos.x - naviOnBoard.x, realNaviPos.y - naviOnBoard.y);
+	og::Screen::calcGlbCenter(mMapTexPane, &center);
+
+	graf->line(center, naviOnBoard);
+
+	graf->setColor(color2);
+
+	graf->line(realNaviPos, naviOnBoard);
+
+	graf->setLineWidth(oldWidth);
+
+	// OSReport("Ship Guess Pos %f %f\n", naviOnBoard.x, naviOnBoard.y);
+	// OSReport("Ship Real Pos %f %f\n", realNaviPos.x, realNaviPos.y);
+	// OSReport("Delta %f %f\n", realNaviPos.x - naviOnBoard.x, realNaviPos.y - naviOnBoard.y);
 
 
 	if (mPathfindState != PATHFIND_DONE) {
@@ -402,26 +530,26 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	
 
-	const u8 oldWidth = graf->mLineWidth;
+	// const u8 oldWidth = graf->mLineWidth;
 
-	graf->setLineWidth(10);
-	graf->setColor(color1);
+	// graf->setLineWidth(10);
+	// graf->setColor(color1);
 
-	FOREACH_NODE_EX(Game::PathNode, mRootNode, node, node->mNext) {
-		Vector3f firstPos = (Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIndex)->getPosition());
-		// im sorry
-		Vector3f secondPos = (Game::mapMgr->mRouteMgr->getWayPoint(static_cast<Game::PathNode*>(node->mNext)->mWpIndex)->getPosition());
+	// FOREACH_NODE_EX(Game::PathNode, mRootNode, node, node->mNext) {
+	// 	Vector3f firstPos = (Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIndex)->getPosition());
+	// 	// im sorry
+	// 	Vector3f secondPos = (Game::mapMgr->mRouteMgr->getWayPoint(static_cast<Game::PathNode*>(node->mNext)->mWpIndex)->getPosition());
 
 
-		JGeometry::TVec2f first = GetPositionOnTex(firstPos);
-		JGeometry::TVec2f second = GetPositionOnTex(secondPos);
+	// 	JGeometry::TVec2f first = GetPositionOnTex(firstPos);
+	// 	JGeometry::TVec2f second = GetPositionOnTex(secondPos);
 
 		
-		graf->line(first, second);
+	// 	graf->line(first, second);
 		
-	}
+	// }
 
-	graf->setLineWidth(oldWidth);
+	// graf->setLineWidth(oldWidth);
 
 }
 
