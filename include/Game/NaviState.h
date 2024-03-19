@@ -38,6 +38,7 @@ enum ENaviStateID {
 	NSID_CarryBomb   = 24,
 	NSID_Climb       = 25,
 	NSID_PathMove    = 26,
+	NSID_GoHere      = 27,
 	NSID_StateCount, // 27
 };
 

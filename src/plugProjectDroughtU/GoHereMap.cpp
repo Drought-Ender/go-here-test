@@ -1,6 +1,7 @@
 #include "Drought/Screen/AlteredMapMenu.h"
 #include "Game/Navi.h"
 #include "Game/NaviState.h"
+#include "Drought/Game/NaviGoHere.h"
 #include "Game/Cave/RandMapMgr.h"
 #include "Game/Piki.h"
 #include "Game/CPlate.h"
@@ -30,6 +31,7 @@ AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(na
 
 void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAllPikisBlue = false;
+	mCanStartPathfind = false;
 	mGoalWPIndex = -1;
 	mContextHandle = 0;
 	mStartPathFindCounter = 0;
@@ -138,8 +140,27 @@ bool AlteredMapMenu::CheckAllPikisBlue(Game::Navi* navi) {
 	return true;
 }
 
+bool AlteredMapMenu::CheckCanStartPathfind(Game::Navi* navi) {
+	int stateID = navi->getStateID();
+
+	switch (stateID)
+	{
+	case Game::NSID_Walk:
+	case Game::NSID_GoHere:
+	case Game::NSID_PathMove:
+	case Game::NSID_Punch:
+	case Game::NSID_CarryBomb:
+	case Game::NSID_ThrowWait:
+	case Game::NSID_Throw:
+		return true;
+	default: 
+		return false;
+	}
+}
+
 bool AlteredMapMenu::doStart(::Screen::StartSceneArg const* arg) {
 	mAllPikisBlue = CheckAllPikisBlue(Game::naviMgr->getActiveNavi());
+	mCanStartPathfind = CheckCanStartPathfind(Game::naviMgr->getActiveNavi());
 	return og::newScreen::ObjSMenuMap::doStart(arg);
 }
 
@@ -190,18 +211,21 @@ bool AlteredMapMenu::doUpdate() {
 
 	bool ret = false;
 
-	if (mPathfindState == PATHFIND_DONE && scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_A)) {
+	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE && scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_A)) {
 
 		Vector2f center;
 		og::Screen::calcGlbCenter(mPane_map, &center);
 
-		Game::NaviPathMoveStateArg arg;
-		arg.mPosition = GetPositionFromTex(center.x, center.y);
+		
+		Vector3f pos = GetPositionFromTex(center.x, center.y);
 
-		Game::naviMgr->getActiveNavi()->transit(Game::NSID_PathMove, &arg);
+		Game::NaviGoHereStateArg arg(pos, mContextHandle, mRootNode);
+
+		Game::naviMgr->getActiveNavi()->transit(Game::NSID_GoHere, &arg);
 
 		mCancelToState = MENUCLOSE_Finish;
 		doUpdateCancelAction();
+		mPathfindState = PATHFIND_GOHERE;
 		ret = true;
 	}
 
@@ -426,9 +450,10 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 	OSReport("Draw Path\n");
 
 	JUtility::TColor color1 = 0xffffffff;
-	JUtility::TColor color2 = 0xff3333ff;
+	JUtility::TColor color2 = 0xffaaaaff;
 
 	bool isImpossible = false;
+
 
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
 	
@@ -453,6 +478,13 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	graf->setLineWidth(10);
 	graf->setColor(color1);
+
+	
+	if (!mCanStartPathfind) {
+		graf->setColor(color2);
+		isImpossible = true;
+	}
+	
 
 	JGeometry::TVec2f naviFirst = GetPositionOnTex(naviPos);
 
@@ -504,7 +536,7 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 }
 
 void AlteredMapMenu::PathfindCleanup() {
-	if (mContextHandle) {
+	if (mPathfindState != PATHFIND_GOHERE && mContextHandle) {
 		Game::testPathfinder->release(mContextHandle);
 	}
 }

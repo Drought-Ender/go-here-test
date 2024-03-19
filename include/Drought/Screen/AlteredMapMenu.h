@@ -1,5 +1,5 @@
-#ifndef _OG_NEWSCREEN_ALTEREDMAPMENU_H
-#define _OG_NEWSCREEN_ALTEREDMAPMENU_H
+#ifndef _DROUGHT_SCREEN_ALTEREDMAPMENU_H
+#define _DROUGHT_SCREEN_ALTEREDMAPMENU_H
 
 #include "og/newScreen/SMenu.h"
 #include "Game/routeMgr.h"
@@ -30,6 +30,7 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     Vector2f GetPositionOnTex(Vector3f& pos);
 
     bool CheckAllPikisBlue(Game::Navi* navi);
+    bool CheckCanStartPathfind(Game::Navi* navi);
 
     void initPathfinding(bool);
     int execPathfinding();
@@ -37,9 +38,11 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     enum PathfindState {
         PATHFIND_INACTIVE = -1,
         PATHFIND_AWAITING = 0,
-        PATHFIND_DONE     = 1
+        PATHFIND_DONE     = 1,
+        PATHFIND_GOHERE   = 2
     };
 
+    bool mCanStartPathfind;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
