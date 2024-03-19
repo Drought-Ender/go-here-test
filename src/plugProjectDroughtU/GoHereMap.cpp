@@ -3,6 +3,7 @@
 #include "Game/NaviState.h"
 #include "Drought/Game/NaviGoHere.h"
 #include "Game/Cave/RandMapMgr.h"
+#include "LoadResource.h"
 #include "Game/Piki.h"
 #include "Game/CPlate.h"
 #include "JSystem/J2D/J2DPrint.h"
@@ -40,8 +41,44 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mPathfindState = PATHFIND_INACTIVE;
 
 	og::newScreen::ObjSMenuMap::doCreate(rarc);
+
+	LoadResource::Arg first ("/user/Drought/GoHere/a_btn.bti");
+	LoadResource::Arg second ("/user/Drought/GoHere/arrow.bti");
+	LoadResource::Arg third ("/user/Drought/GoHere/arrow_red.bti");
+
+	LoadResource::Node* node1 = gLoadResourceMgr->load(first);
+	LoadResource::Node* node2 = gLoadResourceMgr->load(second);
+	LoadResource::Node* node3 = gLoadResourceMgr->load(third);
+	mAButtonTex  = static_cast<ResTIMG*>(node1->mFile);
+	mArrowTex    = static_cast<ResTIMG*>(node2->mFile);
+	mArrowRedTex = static_cast<ResTIMG*>(node3->mFile);
+
+	mArrowPicture = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here0');
+	mAButton      = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here1');
+
+	mAButton->changeTexture(mAButtonTex, 0);
+	mAButton->mScale *= 0.5f;
+	mArrowPicture->changeTexture(mArrowTex, 0);
+	mArrowPicture->hide();
+	mAButton->hide();
+
 	// mMapAngle = 0.0f;
 
+}
+
+void AlteredMapMenu::commonUpdate() {
+	og::newScreen::ObjSMenuMap::commonUpdate();
+
+// 	mArrowPicture->setAlpha(255);
+// 	mAButton->setAlpha(255);
+
+	Vector2f center;
+
+	og::Screen::calcGlbCenter(mPane_map, &center);
+
+
+	mArrowPicture->setOffset(12.0f, -5.0f);
+	mAButton->setOffset(20.0f, -20.0f);
 }
 
 // your guess is as good as mine
@@ -128,18 +165,6 @@ Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 	return rotated + center;
 }
 
-bool AlteredMapMenu::CheckAllPikisBlue(Game::Navi* navi) {
-	Iterator<Game::Creature> iterator(navi->mCPlateMgr);
-	CI_LOOP(iterator)
-	{
-		Game::Piki* piki = static_cast<Game::Piki*>(*iterator);
-		if (piki->getKind() != Game::Blue) {
-			return false;
-		}
-	}
-	return true;
-}
-
 bool AlteredMapMenu::CheckCanStartPathfind(Game::Navi* navi) {
 	int stateID = navi->getStateID();
 
@@ -159,7 +184,7 @@ bool AlteredMapMenu::CheckCanStartPathfind(Game::Navi* navi) {
 }
 
 bool AlteredMapMenu::doStart(::Screen::StartSceneArg const* arg) {
-	mAllPikisBlue = CheckAllPikisBlue(Game::naviMgr->getActiveNavi());
+	mAllPikisBlue = Game::CheckAllPikisBlue(Game::naviMgr->getActiveNavi());
 	mCanStartPathfind = CheckCanStartPathfind(Game::naviMgr->getActiveNavi());
 	return og::newScreen::ObjSMenuMap::doStart(arg);
 }
@@ -174,10 +199,22 @@ void AlteredMapMenu::doDraw(Graphics& gfx)
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
 	drawMap(gfx);
 
+	drawPath(gfx);
+
 	Graphics gfx2;
+	
 	mIconScreen->draw(gfx2, *graf);
 
-	drawPath(gfx);
+	mArrowPicture->show();
+	mAButton->show();
+
+	mArrowPicture->J2DPane::draw(0.0f, 0.0f, graf, true, true);
+	mAButton->J2DPane::draw(0.0f, 0.0f, graf, true, true);
+
+	mArrowPicture->hide();
+	mAButton->hide();
+
+	
 
 	if (mCompassPic && mPane_Ncompas) {
 		PSMTXCopy(mPane_Ncompas->mGlobalMtx, mCompassPic->mPositionMtx);
@@ -289,7 +326,6 @@ void AlteredMapMenu::OnPathfindDone() {
 
 
 void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
-	OSReport("initPathfinding\n");
 	if (resetLinkCount) {
 	}
 	Game::Navi* movingNavi = Game::naviMgr->getActiveNavi();
@@ -368,7 +404,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	mGoalWPIndex = endWP->mIndex;
 	
 
-	OSReport("%d->...->%d\n", mStartWPIndex, mGoalWPIndex);
 
 	if (mContextHandle) {
 		Game::testPathfinder->release(mContextHandle);
@@ -386,7 +421,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	mPathFindCounter      = 0;
 	mRootNode             = nullptr;
 
-	OSReport("Path Find Start\n");
 
 	mPathfindState = PATHFIND_AWAITING;
 }
@@ -419,7 +453,7 @@ int AlteredMapMenu::execPathfinding() {
 
 		u8 flag = Game::PATHFLAG_Unk3;
 
-		if (mAllPikisBlue) {
+		if (mAllPikisBlue || mStartPathFindCounter >= 1) {
 			flag |= Game::PATHFLAG_PathThroughWater;
 		}
 		mStartPathFindCounter++;
@@ -444,10 +478,11 @@ int AlteredMapMenu::execPathfinding() {
 }
 
 void AlteredMapMenu::drawPath(Graphics& gfx) {
+
+
 	if (mPathfindState != PATHFIND_DONE) {
 		return;
 	}
-	OSReport("Draw Path\n");
 
 	JUtility::TColor color1 = 0xffffffff;
 	JUtility::TColor color2 = 0xffaaaaff;
@@ -468,7 +503,6 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	
 
-	graf->setPort();
 
 	const u8 oldWidth = graf->mLineWidth;
 
@@ -476,7 +510,7 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
-	graf->setLineWidth(10);
+	graf->setLineWidth(8);
 	graf->setColor(color1);
 
 	
@@ -484,7 +518,6 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 		graf->setColor(color2);
 		isImpossible = true;
 	}
-	
 
 	JGeometry::TVec2f naviFirst = GetPositionOnTex(naviPos);
 
@@ -496,12 +529,11 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 		Game::WayPoint* wp = Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIndex);
 		Vector3f currPos = (wp->getPosition());
 
-		if (!wp->isFlag(Game::WPF_Closed)) {
-			Vector3f diffVec = currPos - previousPos;
-			f32 magnitude = diffVec.normalise2D();
+		Vector3f diffVec = currPos - previousPos;
+		f32 magnitude = diffVec.normalise2D();
 
-			currPos -= diffVec * wp->mRadius;
-		}
+		currPos -= diffVec * wp->mRadius;
+		
 
 		
 
@@ -511,7 +543,7 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 		
 		graf->lineTo(point);
 
-		if (wp->isFlag(Game::WPF_Closed)) {
+		if (wp->isFlag(Game::WPF_Closed) || (wp->isFlag(Game::WPF_Water) && !mAllPikisBlue)) {
 			isImpossible = true;
 			graf->setColor(color2);
 		}
@@ -525,13 +557,26 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	graf->setLineWidth(oldWidth);
 
+
+	// JUtility::TColor& color = (isImpossible) ? color2 : color1;
+
+	// J2DPrint print(JFWSystem::systemFont, color, color);
+
+	// print.print(goHerePtr.x, goHerePtr.y, "v"); // awesome pointer trust
+
+
+	// graf->setPort();
+	// Vector3f vec1 = mPane_map->getGlbVtx(0);
+	// Vector3f vec2 = mPane_map->getGlbVtx(1);
+	// Vector3f vec3 = mPane_map->getGlbVtx(2);
+	// Vector3f vec4 = mPane_map->getGlbVtx(3);
+	// Color4 color3(100, 0, 0, 155);
+	// drawVecZ(gfx, *(Vec*)&vec1, *(Vec*)&vec2, *(Vec*)&vec3, *(Vec*)&vec4, color3, -0.999);
+	// GXSetColorUpdate(GX_TRUE);
+	// PSMTXCopy(mPane_map->mGlobalMtx, mRootPane->mPositionMtx);
 	graf->setPort();
-
-	JUtility::TColor& color = (isImpossible) ? color2 : color1;
-
-	J2DPrint print(JFWSystem::systemFont, color, color);
-
-	print.print(goHerePtr.x, goHerePtr.y, "v"); // awesome pointer trust
+	GXSetZCompLoc(GX_TRUE);
+	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
 }
 

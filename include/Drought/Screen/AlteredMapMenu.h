@@ -17,6 +17,7 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     virtual bool doUpdate();
     virtual bool doStart(const ::Screen::StartSceneArg*);
     virtual void doCreate(JKRArchive*);
+    virtual void commonUpdate();
     virtual bool doEnd(const ::Screen::EndSceneArg*);
 
     void PathfindUpdate();
@@ -29,8 +30,8 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     Vector3f GetPositionFromTex(f32 x, f32 y);
     Vector2f GetPositionOnTex(Vector3f& pos);
 
-    bool CheckAllPikisBlue(Game::Navi* navi);
-    bool CheckCanStartPathfind(Game::Navi* navi);
+    static bool CheckCanStartPathfind(Game::Navi* navi);
+
 
     void initPathfinding(bool);
     int execPathfinding();
@@ -52,6 +53,13 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     Game::PathNode* mRootNode;
     PathfindState mPathfindState;
     int mWayPointCount;
+
+    ResTIMG* mAButtonTex;
+    ResTIMG* mArrowTex;
+    ResTIMG* mArrowRedTex;
+
+    J2DPictureEx* mArrowPicture;
+    J2DPictureEx* mAButton;
 
 
 

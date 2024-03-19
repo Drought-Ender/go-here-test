@@ -4,9 +4,22 @@
 #include "Drought/Game/NaviGoHere.h"
 #include "Game/MoviePlayer.h"
 #include "Game/MapMgr.h"
+#include "Game/CPlate.h"
 
 namespace Game
 {
+
+bool CheckAllPikisBlue(Navi* navi) {
+	Iterator<Creature> iterator(navi->mCPlateMgr);
+	CI_LOOP(iterator)
+	{
+		Piki* piki = static_cast<Piki*>(*iterator);
+		if (piki->getKind() != Game::Blue) {
+			return false;
+		}
+	}
+	return true;
+}
 
 void NaviFSM::init(Navi* navi)
 {
@@ -82,6 +95,11 @@ inline void NaviState::playChangeVoice(Navi* navi)
 void NaviGoHereState::exec(Navi* navi) {
     bool done = false;
 
+	if (gameSystem && gameSystem->mIsFrozen) {
+		navi->mVelocity = 0.0f;
+		return;
+	}
+
     if (mCurrNode) {
         execMove(navi);
     }
@@ -135,7 +153,7 @@ bool NaviGoHereState::execMove(Navi* navi)
 
         if (mCurrNode) {
             WayPoint* nextWp = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIndex);
-            if (nextWp->isFlag(WPF_Closed)) {
+            if (nextWp->isFlag(WPF_Closed) || (nextWp->isFlag(WPF_Water) && !CheckAllPikisBlue(navi))) {
                 mPosition = wp->getPosition();
                 mCurrNode = nullptr;
             }
