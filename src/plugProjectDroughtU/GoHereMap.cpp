@@ -16,7 +16,6 @@ namespace
 	const char* cRedArrowPath = "/user/Drought/GoHere/arrow_red.bti";
 } // namespace
 
-
 namespace Drought
 {
 
@@ -25,6 +24,8 @@ namespace Screen
 
 // sets whether you can rotate the map with shoulder L/R
 const bool cAllowMapRotation = false;
+
+
 
 AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(name)
 {

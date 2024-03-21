@@ -7,9 +7,12 @@
 namespace Game
 {
 
-bool CheckAllPikisBlue(Game::Navi* navi);
+/* setting this to true will have the navi still
+ * attempt to route through water if it 
+ * has non-blue pikmin */
+const bool cTryRouteWater = false;
 
-const bool cTryRouteWater;
+bool CheckAllPikisBlue(Game::Navi* navi);
 
 struct NaviGoHereStateArg : public StateArg
 {
