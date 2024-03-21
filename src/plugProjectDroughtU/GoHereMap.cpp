@@ -8,6 +8,15 @@
 #include "Game/CPlate.h"
 #include "JSystem/J2D/J2DPrint.h"
 
+// included in assets folder if you've downloaded this
+namespace
+{
+	const char* cAButtonPath = "/user/Drought/GoHere/a_btn.bti";
+	const char* cBlueArrowPath = "/user/Drought/GoHere/arrow.bti";
+	const char* cRedArrowPath = "/user/Drought/GoHere/arrow_red.bti";
+} // namespace
+
+
 namespace Drought
 {
 
@@ -35,9 +44,9 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 
 	og::newScreen::ObjSMenuMap::doCreate(rarc);
 
-	LoadResource::Arg first ("/user/Drought/GoHere/a_btn.bti");
-	LoadResource::Arg second ("/user/Drought/GoHere/arrow.bti");
-	LoadResource::Arg third ("/user/Drought/GoHere/arrow_red.bti");
+	LoadResource::Arg first (cAButtonPath);
+	LoadResource::Arg second (cBlueArrowPath);
+	LoadResource::Arg third (cRedArrowPath);
 
 	LoadResource::Node* node1 = gLoadResourceMgr->load(first);
 	LoadResource::Node* node2 = gLoadResourceMgr->load(second);
@@ -45,6 +54,11 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAButtonTex  = static_cast<ResTIMG*>(node1->mFile);
 	mArrowTex    = static_cast<ResTIMG*>(node2->mFile);
 	mArrowRedTex = static_cast<ResTIMG*>(node3->mFile);
+
+	if (!mAButton) JUT_PANIC("%s missing", cAButtonPath);
+	if (!mArrowTex) JUT_PANIC("%s missing", cBlueArrowPath);
+	if (!mArrowRedTex) JUT_PANIC("%s missing", cRedArrowPath);
+
 
 	mArrowPicture = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here0');
 	mAButton      = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here1');
