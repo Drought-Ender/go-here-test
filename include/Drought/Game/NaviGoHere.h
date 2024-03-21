@@ -9,6 +9,8 @@ namespace Game
 
 bool CheckAllPikisBlue(Game::Navi* navi);
 
+const bool cTryRouteWater;
+
 struct NaviGoHereStateArg : public StateArg
 {
     inline NaviGoHereStateArg(Vector3f pos, u32 contextID, PathNode* nodes) 

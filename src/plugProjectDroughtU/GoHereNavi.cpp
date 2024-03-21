@@ -9,6 +9,12 @@
 namespace Game
 {
 
+/* setting this to true will have the navi still
+ * attempt to route through water if it 
+ * has non-blue pikmin */
+const bool cTryRouteWater = false;
+
+
 bool CheckAllPikisBlue(Navi* navi) {
 	Iterator<Creature> iterator(navi->mCPlateMgr);
 	CI_LOOP(iterator)
@@ -53,6 +59,7 @@ void NaviFSM::init(Navi* navi)
 	registerState(new NaviCarryBombState);
 	registerState(new NaviClimbState);
 	registerState(new NaviPathMoveState);
+	// added state
     registerState(new NaviGoHereState);
 }
 
@@ -68,6 +75,7 @@ void NaviGoHereState::init(Navi* navi, StateArg* arg) {
     mCurrNode            = goHereArg->mNodes;
 }
 
+// usually inlined, plays the navi's voice line when swapped
 inline void NaviState::playChangeVoice(Navi* navi)
 {
 	if (navi->mNaviIndex == NAVIID_Olimar) { // OLIMAR
@@ -89,7 +97,6 @@ inline void NaviState::playChangeVoice(Navi* navi)
 	} else { // LOUIE
 		navi->mSoundObj->startSound(PSSE_PL_PIKON_LUI, 0);
 	}
-	// UNUSED FUNCTION
 }
 
 void NaviGoHereState::exec(Navi* navi) {
@@ -113,6 +120,7 @@ void NaviGoHereState::exec(Navi* navi) {
             done = true;
         }
 
+		// swaps captains
         if (!gameSystem->paused_soft() && moviePlayer->mDemoState == 0 && !gameSystem->isMultiplayerMode() &&
             navi->mController1->isButtonDown(JUTGamePad::PRESS_Y) && playData->isDemoFlag(DEMO_Unlock_Captain_Switch)) {
 
@@ -134,10 +142,12 @@ void NaviGoHereState::exec(Navi* navi) {
     }
 
     if (done) {
+		navi->GoHereSuccess();
         transit(navi, NSID_Walk, nullptr);
     }
 }
 
+// moves the navi to the nearest waypoint
 bool NaviGoHereState::execMove(Navi* navi)
 {
 	WayPoint* wp     = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIndex);
@@ -153,9 +163,19 @@ bool NaviGoHereState::execMove(Navi* navi)
 
         if (mCurrNode) {
             WayPoint* nextWp = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIndex);
-            if (nextWp->isFlag(WPF_Closed) || (nextWp->isFlag(WPF_Water) && !CheckAllPikisBlue(navi))) {
+			bool wpClosed = nextWp->isFlag(WPF_Closed);
+			bool wpWater = nextWp->isFlag(WPF_Water) && !CheckAllPikisBlue(navi);
+            if (wpClosed || wpWater) {
                 mPosition = wp->getPosition();
                 mCurrNode = nullptr;
+				
+				navi->GoHereInterupted();
+				if (wpWater) {
+					navi->GoHereInteruptWater();
+				}
+				else {
+					navi->GoHereInteruptBlocked();
+				}
             }
         }
 
@@ -173,6 +193,7 @@ bool NaviGoHereState::execMove(Navi* navi)
 	return false;
 }
 
+// moves the navi to its final target destination
 bool NaviGoHereState::execMoveGoal(Navi* navi) {
     Vector3f goalPos = mPosition;
 	goalPos.y        = 0.0f;
@@ -196,5 +217,22 @@ bool NaviGoHereState::execMoveGoal(Navi* navi) {
 }
 
 void NaviGoHereState::cleanup(Navi* navi) { releasePathfinder(); }
+
+
+void Navi::GoHereSuccess() {
+	// your code here
+}
+
+void Navi::GoHereInterupted() {
+
+}
+
+void Navi::GoHereInteruptBlocked() {
+
+}
+
+void Navi::GoHereInteruptWater() {
+	
+}
 
 } // namespace Game

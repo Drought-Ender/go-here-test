@@ -10,6 +10,8 @@ namespace Drought
 namespace Screen
 {
 
+const bool cAllowMapRotation;
+
 struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
 {
     AlteredMapMenu(const char*);

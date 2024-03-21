@@ -14,20 +14,12 @@ namespace Drought
 namespace Screen
 {
 
+// sets whether you can rotate the map with shoulder L/R
+const bool cAllowMapRotation = false;
+
 AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(name)
 {
 	mStartWPIndex = -1;
-
-	if (Game::naviMgr->getActiveNavi()->mController1->isButton(PAD_BUTTON_X)) {
-		Vector3f vec = 0.0f;
-		vec.y = Game::mapMgr->getMinY(vec);
-		Game::naviMgr->getActiveNavi()->mPosition = vec;
-		Game::naviMgr->getActiveNavi()->mFaceDir = 0.0f;
-	}
-	// else {
-	// 	// Game::naviMgr->getActiveNavi()->mPosition.z = 0.0f;
-	// 	// Game::naviMgr->getActiveNavi()->mPosition.x = 1.0f;
-	// }
 }
 
 void AlteredMapMenu::doCreate(JKRArchive* rarc) {
@@ -64,16 +56,13 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mArrowPicture->hide();
 	mAButton->hide();
 
-
+	// (this would set it to north)
 	// mMapAngle = 0.0f;
 
 }
 
 void AlteredMapMenu::commonUpdate() {
 	og::newScreen::ObjSMenuMap::commonUpdate();
-
-	// 	mArrowPicture->setAlpha(255);
-	// 	mAButton->setAlpha(255);
 
 	Vector2f center;
 
@@ -88,7 +77,6 @@ void AlteredMapMenu::commonUpdate() {
 
 	if (mPathfindBlue) {
 		mArrowPicture->changeTexture(mArrowTex, 0);
-		
 	}
 	else {
 		mArrowPicture->changeTexture(mArrowRedTex, 0);
@@ -99,7 +87,10 @@ void AlteredMapMenu::commonUpdate() {
 	mAButton->setOffset(20.0f, -20.0f);
 }
 
-// your guess is as good as mine
+/// @brief Converts a position on the map texture to its 3D coordinates
+/// @param x Map-Object's x position on the radar map
+/// @param y Map-Object's y position on the radar map
+/// @return The position on the game map
 Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 
 	Vector2f center;
@@ -108,6 +99,7 @@ Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 
 	Vector2f vec (x - center.x, y - center.y);
 
+	/* ~~~Magic Numbers, Inacuracy Here~~~ */
 	vec.x /= mMapTexPane->mScale.x * 0.9f;
 	vec.y /= mMapTexPane->mScale.y * 0.85f;
 
@@ -145,7 +137,9 @@ Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 }
 
 
-
+/// @brief Converts a position on the game map to a point on the radar map
+/// @param pos The point on the radar map
+/// @return Object's position on the radar map
 Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 	Vector2f mapPosition (0.0f, 0.0f);
 
@@ -172,7 +166,7 @@ Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 		vec.y * anglecos + vec.x * anglesin
 	);
 
-	// magic numbers /shrug
+	/* ~~~Magic Numbers, Inacuracy Here~~~ */
 	rotated.x *= mMapTexPane->mScale.x * 0.9f;
 	rotated.y *= mMapTexPane->mScale.y * 0.85f;
 
@@ -253,22 +247,18 @@ void AlteredMapMenu::doDraw(Graphics& gfx)
 bool AlteredMapMenu::doUpdate() {
 	PathfindUpdate();
 
-	// Vector2f center;
-
-	// og::Screen::calcGlbCenter(mPane_map, &center);
-
-	// Vector3f goalPos = GetPositionFromTex(center.x, center.y);
-
-	// Game::naviMgr->getActiveNavi()->mPosition = goalPos;
-
-	if (mController->mPadButton->mAnalogR > 0.0f) {
-		mMapAngle += 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogR;
-	}
-	if (mController->mPadButton->mAnalogL > 0.0f) {
-		mMapAngle -= 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogL;
+	if (cAllowMapRotation) { 
+		if (mController->mPadButton->mAnalogR > 0.0f) {
+			mMapAngle += 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogR;
+		}
+		if (mController->mPadButton->mAnalogL > 0.0f) {
+			mMapAngle -= 90.0f * sys->mDeltaTime * mController->mPadButton->mAnalogL;
+		}
 	}
 
 	og::newScreen::SceneSMenuBase* scene = static_cast<og::newScreen::SceneSMenuBase*>(getOwner());
+
+	// allows the pathfind process to start if everything is setup
 
 	bool ret = false;
 
@@ -277,7 +267,6 @@ bool AlteredMapMenu::doUpdate() {
 		Vector2f center;
 		og::Screen::calcGlbCenter(mPane_map, &center);
 
-		
 		Vector3f pos = GetPositionFromTex(center.x, center.y);
 
 		Game::NaviGoHereStateArg arg(pos, mContextHandle, mRootNode);
@@ -349,7 +338,7 @@ void AlteredMapMenu::OnPathfindDone() {
 	PSSystem::spSysIF->playSystemSe(PSSE_MP_SHIP_CALLING_01, 0);
 }
 
-
+// setup our pathfinder and set our start and end positions
 void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	if (resetLinkCount) {
 	}
@@ -395,32 +384,7 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	og::Screen::calcGlbCenter(mPane_map, &center);
 
 	Vector3f goalPos = GetPositionFromTex(center.x, center.y);
-	
-	// Game::WPEdgeSearchArg searchArg2(goalPos);
 
-	// if (Game::gameSystem->mIsInCave) {
-	// 	Sys::Sphere sphere;
-	// 	sphere.mPosition = goalPos;
-	// 	sphere.mRadius   = 1.0f;
-
-
-	// 	roomIndex = static_cast<Game::RoomMapMgr*>(Game::mapMgr)->findRoomIndex(sphere);
-	// }
-
-	// searchArg2.mRoomID = roomIndex;
-	// searchArg2.mLinks  = mLinks;
-
-	// Game::WayPoint* endWP = nullptr;
-	// if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg2)) {
-	// 	endWP = searchArg2.mWp1;
-	// } else {
-	// 	searchArg2.mLinks = nullptr;
-	// 	if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg2)) {
-	// 		endWP = searchArg2.mWp1;
-	// 	} else {
-	// 		JUT_PANIC("zannen !\n");
-	// 	}
-	// }
 
 	Game::WPSearchArg searchArg2(goalPos, nullptr, false, 100.0f);
 	Game::WayPoint* endWP = Game::mapMgr->mRouteMgr->getNearestWayPoint(searchArg2);
@@ -428,8 +392,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 
 	mGoalWPIndex = endWP->mIndex;
 	
-
-
 	if (mContextHandle) {
 		Game::testPathfinder->release(mContextHandle);
 	}
@@ -450,17 +412,11 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	mPathfindState = PATHFIND_AWAITING;
 }
 
-
+// Check on the pathfinder and update if done
 int AlteredMapMenu::execPathfinding() {
-	if (mContextHandle == 0) {
+	if (mContextHandle <= 0) {
 		return PATHFINDSTATUS_FAIL;
 	}
-
-	// NULL context handle! (!)
-	if (mContextHandle == -1) {
-		return PATHFINDSTATUS_FAIL;
-	}
-
 	mPathFindCounter++;
 
 	switch (Game::testPathfinder->check(mContextHandle)) {
@@ -470,7 +426,7 @@ int AlteredMapMenu::execPathfinding() {
 		OnPathfindDone();
 		break;
 
-	case Game::PATHFIND_Start: // make a new context and start a path
+	case Game::PATHFIND_Start:
 		OSReport("Pathfind restart\n");
 		if (mContextHandle) {
 			Game::testPathfinder->release(mContextHandle);
@@ -478,66 +434,57 @@ int AlteredMapMenu::execPathfinding() {
 
 		u8 flag = Game::PATHFLAG_Unk3;
 
-		if (mAllPikisBlue || mStartPathFindCounter >= 1) {
+		if (mAllPikisBlue || (mStartPathFindCounter >= 1 && Game::cTryRouteWater)) {
 			flag |= Game::PATHFLAG_PathThroughWater;
 		}
 		mStartPathFindCounter++;
 
 		Game::PathfindRequest request(mStartWPIndex, mGoalWPIndex, flag);
 
-		// get a new handle
 		mContextHandle = Game::testPathfinder->start(request);
 
-		// reset our counter bc we have a new context!
 		mPathFindCounter = 0;
 		return PATHFINDSTATUS_OK;
 
-		case Game::PATHFIND_Busy: // keep on keepin' on
+		case Game::PATHFIND_Busy:
 		break;
 
-	case Game::PATHFIND_NoHandle: // woops something happened to the handle
+	case Game::PATHFIND_NoHandle:
 		JUT_PANIC("no handle %d\n", mContextHandle);
 		break;
 	}
 	return PATHFINDSTATUS_OK;
 }
 
+// draw the path of the Go-Here route on the 2D map
 void AlteredMapMenu::drawPath(Graphics& gfx) {
-
 
 	if (mPathfindState != PATHFIND_DONE) {
 		return;
 	}
 
-	JUtility::TColor color1 = 0xffffffff;
-	JUtility::TColor color2 = 0xffaaaaff;
+	J2DPerspGraph* graf = &gfx.mPerspGraph;
+
+	const JUtility::TColor color1 = 0xffffffff; // white
+	const JUtility::TColor color2 = 0xffaaaaff; // pinkish-red
 
 	bool isImpossible = false;
-
-
-	J2DPerspGraph* graf = &gfx.mPerspGraph;
 	
-	Vector3f naviPos = Game::naviMgr->getActiveNavi()->getPosition();  //Game::ItemOnyon::mgr->mUfo->getPosition();
-
-	Vector2f view;
-
+	Vector3f naviPos = Game::naviMgr->getActiveNavi()->getPosition();
 	
 	Vector2f goHerePtr;
-
 	og::Screen::calcGlbCenter(mPane_map, &goHerePtr);
 
-	
-
-
+	// probably unnecessary, but just in case
 	const u8 oldWidth = graf->mLineWidth;
 
 	graf->setPort();
+	// GX Voodoo
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
 	graf->setLineWidth(8);
 	graf->setColor(color1);
-
 	
 	if (!mCanStartPathfind) {
 		graf->setColor(color2);
@@ -558,23 +505,19 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 		f32 magnitude = diffVec.normalise2D();
 
 		currPos -= diffVec * wp->mRadius;
-		
-
-		
-
 
 		JGeometry::TVec2f point = GetPositionOnTex(currPos);
 
 		
 		graf->lineTo(point);
-
+		
+		// if our route fails, set our color to red
 		if (wp->isFlag(Game::WPF_Closed) || (wp->isFlag(Game::WPF_Water) && !mAllPikisBlue)) {
 			isImpossible = true;
 			graf->setColor(color2);
 		}
 
 		previousPos = currPos;
-		
 	}
 
 
@@ -586,29 +529,14 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 		mPathfindBlue = false;
 	}
 
-
-	// JUtility::TColor& color = (isImpossible) ? color2 : color1;
-
-	// J2DPrint print(JFWSystem::systemFont, color, color);
-
-	// print.print(goHerePtr.x, goHerePtr.y, "v"); // awesome pointer trust
-
-
-	// graf->setPort();
-	// Vector3f vec1 = mPane_map->getGlbVtx(0);
-	// Vector3f vec2 = mPane_map->getGlbVtx(1);
-	// Vector3f vec3 = mPane_map->getGlbVtx(2);
-	// Vector3f vec4 = mPane_map->getGlbVtx(3);
-	// Color4 color3(100, 0, 0, 155);
-	// drawVecZ(gfx, *(Vec*)&vec1, *(Vec*)&vec2, *(Vec*)&vec3, *(Vec*)&vec4, color3, -0.999);
-	// GXSetColorUpdate(GX_TRUE);
-	// PSMTXCopy(mPane_map->mGlobalMtx, mRootPane->mPositionMtx);
 	graf->setPort();
+	// More GX Voodoo
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
 }
 
+// Ensures we're not leaving our pathfinder with a dead task
 void AlteredMapMenu::PathfindCleanup() {
 	if (mPathfindState != PATHFIND_GOHERE && mContextHandle) {
 		Game::testPathfinder->release(mContextHandle);

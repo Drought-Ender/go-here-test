@@ -238,6 +238,11 @@ struct Navi : public FakePiki, virtual public PelletView {
 	inline void setCurrState(StateType* state) { mCurrentState = state; }
 	inline StateType* getCurrState() { return mCurrentState; }
 
+	void GoHereSuccess();
+	void GoHereInterupted();
+	void GoHereInteruptBlocked();
+	void GoHereInteruptWater();
+
 	// _000      = VTBL
 	// _000-_250 = FakePiki
 	// _250      = ptr to PelletView
