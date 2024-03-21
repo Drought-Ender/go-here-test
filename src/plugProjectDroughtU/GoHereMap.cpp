@@ -2,6 +2,7 @@
 #include "Game/Navi.h"
 #include "Game/NaviState.h"
 #include "Drought/Game/NaviGoHere.h"
+#include "Drought/Misc.h"
 #include "Game/Cave/RandMapMgr.h"
 #include "LoadResource.h"
 #include "Game/Piki.h"
@@ -35,6 +36,7 @@ AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(na
 void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAllPikisBlue = false;
 	mCanStartPathfind = false;
+	mPathfindTexSetBlue = true;
 	mPathfindBlue = true;
 	mGoalWPIndex = -1;
 	mContextHandle = 0;
@@ -67,7 +69,7 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAButton->changeTexture(mAButtonTex, 0);
 	mAButton->setAlpha(0);
 	mAButton->mScale *= 0.5f;
-	mArrowPicture->changeTexture(mArrowRedTex, 0);
+	mArrowPicture->changeTexture(mArrowTex, 0);
 	mArrowPicture->hide();
 	mAButton->hide();
 
@@ -91,10 +93,16 @@ void AlteredMapMenu::commonUpdate() {
 	}
 
 	if (mPathfindBlue) {
-		mArrowPicture->changeTexture(mArrowTex, 0);
+		if (!mPathfindTexSetBlue) {
+			mArrowPicture->changeTexture(mArrowTex, 0);
+			mPathfindTexSetBlue = true;
+		}
 	}
 	else {
-		mArrowPicture->changeTexture(mArrowRedTex, 0);
+		if (mPathfindTexSetBlue) {
+			mArrowPicture->changeTexture(mArrowRedTex, 0);
+			mPathfindTexSetBlue = false;
+		}
 	}
 
 
@@ -400,6 +408,15 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 
 	Vector3f goalPos = GetPositionFromTex(center.x, center.y);
 
+	if (!Drought::hasValidFloor(goalPos)) {
+		mPathfindBlue = false;
+		mPathfindState = PATHFIND_INACTIVE;
+		if (mContextHandle) {
+			Game::testPathfinder->release(mContextHandle);
+		}
+		
+		return;
+	}
 
 	Game::WPSearchArg searchArg2(goalPos, nullptr, false, 100.0f);
 	Game::WayPoint* endWP = Game::mapMgr->mRouteMgr->getNearestWayPoint(searchArg2);
@@ -438,7 +455,9 @@ int AlteredMapMenu::execPathfinding() {
 	case Game::PATHFIND_MakePath:
 		mPathfindState = PATHFIND_DONE;
 		mWayPointCount = Game::testPathfinder->makepath(mContextHandle, &mRootNode);
-		OnPathfindDone();
+		if (mCanStartPathfind && mPathfindBlue) {
+			OnPathfindDone();
+		}
 		break;
 
 	case Game::PATHFIND_Start:

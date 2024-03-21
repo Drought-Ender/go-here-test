@@ -38,6 +38,7 @@ struct NaviGoHereState : public NaviState {
 	virtual void init(Navi*, StateArg*); // _08
 	virtual void exec(Navi*);            // _0C
 	virtual void cleanup(Navi*);         // _10
+	virtual bool callable() { return true; }
 
 	bool execMove(Navi*);
 	bool execMoveGoal(Navi*);

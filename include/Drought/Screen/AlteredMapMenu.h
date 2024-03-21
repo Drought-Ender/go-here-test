@@ -47,6 +47,7 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
 
     bool mCanStartPathfind;
     bool mPathfindBlue;
+    bool mPathfindTexSetBlue;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
