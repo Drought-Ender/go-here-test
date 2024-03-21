@@ -27,6 +27,8 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
 
     bool CheckMapMove();
 
+    void NodeCleanup();
+
     Vector3f GetPositionFromTex(f32 x, f32 y);
     Vector2f GetPositionOnTex(Vector3f& pos);
 
@@ -44,6 +46,7 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     };
 
     bool mCanStartPathfind;
+    bool mPathfindBlue;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
@@ -60,7 +63,6 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
 
     J2DPictureEx* mArrowPicture;
     J2DPictureEx* mAButton;
-
 
 
     

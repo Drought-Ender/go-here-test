@@ -33,6 +33,7 @@ AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(na
 void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAllPikisBlue = false;
 	mCanStartPathfind = false;
+	mPathfindBlue = true;
 	mGoalWPIndex = -1;
 	mContextHandle = 0;
 	mStartPathFindCounter = 0;
@@ -57,10 +58,12 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAButton      = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here1');
 
 	mAButton->changeTexture(mAButtonTex, 0);
+	mAButton->setAlpha(0);
 	mAButton->mScale *= 0.5f;
-	mArrowPicture->changeTexture(mArrowTex, 0);
+	mArrowPicture->changeTexture(mArrowRedTex, 0);
 	mArrowPicture->hide();
 	mAButton->hide();
+
 
 	// mMapAngle = 0.0f;
 
@@ -69,12 +72,27 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 void AlteredMapMenu::commonUpdate() {
 	og::newScreen::ObjSMenuMap::commonUpdate();
 
-// 	mArrowPicture->setAlpha(255);
-// 	mAButton->setAlpha(255);
+	// 	mArrowPicture->setAlpha(255);
+	// 	mAButton->setAlpha(255);
 
 	Vector2f center;
 
 	og::Screen::calcGlbCenter(mPane_map, &center);
+
+	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE) {
+		mAButton->setAlpha(255);
+	}
+	else {
+		mAButton->setAlpha(0);
+	}
+
+	if (mPathfindBlue) {
+		mArrowPicture->changeTexture(mArrowTex, 0);
+		
+	}
+	else {
+		mArrowPicture->changeTexture(mArrowRedTex, 0);
+	}
 
 
 	mArrowPicture->setOffset(12.0f, -5.0f);
@@ -191,7 +209,13 @@ bool AlteredMapMenu::doStart(::Screen::StartSceneArg const* arg) {
 
 bool AlteredMapMenu::doEnd(::Screen::EndSceneArg const* arg) {
 	PathfindCleanup();
+	NodeCleanup();
+
 	return og::newScreen::ObjSMenuMap::doEnd(arg);
+}
+
+void AlteredMapMenu::NodeCleanup() {
+
 }
 
 void AlteredMapMenu::doDraw(Graphics& gfx)
@@ -303,6 +327,7 @@ void AlteredMapMenu::PathfindUpdate() {
 			mStartPathFindCounter = 0;
 			mPathFindCounter = 0;
 			mRootNode = nullptr;
+			mPathfindBlue = true;
 			initPathfinding(false);
 			break;
 		case PATHFIND_AWAITING:
@@ -556,6 +581,10 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 	graf->lineTo(goHerePtr);
 
 	graf->setLineWidth(oldWidth);
+
+	if (isImpossible) {
+		mPathfindBlue = false;
+	}
 
 
 	// JUtility::TColor& color = (isImpossible) ? color2 : color1;
