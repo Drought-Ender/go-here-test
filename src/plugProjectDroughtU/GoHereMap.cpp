@@ -461,7 +461,6 @@ int AlteredMapMenu::execPathfinding() {
 		break;
 
 	case Game::PATHFIND_Start:
-		OSReport("Pathfind restart\n");
 		if (mContextHandle) {
 			Game::testPathfinder->release(mContextHandle);
 		}
