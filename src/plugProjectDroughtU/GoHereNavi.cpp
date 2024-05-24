@@ -183,7 +183,7 @@ bool NaviGoHereState::execMove(Navi* navi)
     navi->mFaceDir += 0.2f * angDist(JMAAtan2Radian(diff.x, diff.z), navi->mFaceDir);
     navi->mFaceDir = roundAng(navi->mFaceDir);
 
-	navi->mVelocity = diff * 150.0f;
+	navi->mSimVelocity = diff * 150.0f;
 	return false;
 }
 
@@ -206,7 +206,7 @@ bool NaviGoHereState::execMoveGoal(Navi* navi) {
     navi->mFaceDir += 0.2f * angDist(JMAAtan2Radian(diff.x, diff.z), navi->mFaceDir);
     navi->mFaceDir = roundAng(navi->mFaceDir);
 
-	navi->mVelocity = diff * 150.0f;
+	navi->mSimVelocity = diff * 150.0f;
 	return false;
 }
 
