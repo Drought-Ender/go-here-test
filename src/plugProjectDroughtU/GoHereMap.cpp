@@ -58,7 +58,7 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mArrowTex    = static_cast<ResTIMG*>(node2->mFile);
 	mArrowRedTex = static_cast<ResTIMG*>(node3->mFile);
 
-	if (!mAButton) JUT_PANIC("%s missing", cAButtonPath);
+	if (!mAButtonTex) JUT_PANIC("%s missing", cAButtonPath);
 	if (!mArrowTex) JUT_PANIC("%s missing", cBlueArrowPath);
 	if (!mArrowRedTex) JUT_PANIC("%s missing", cRedArrowPath);
 
