@@ -35,6 +35,11 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
 
     static bool CheckCanStartPathfind(Game::Navi* navi);
 
+    void setupTextureDraw(Graphics& gfx);
+
+    void drawArrow(Graphics& gfx);
+    void drawButton(Graphics& gfx);
+
 
     void initPathfinding(bool);
     int execPathfinding();
@@ -49,7 +54,6 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     bool mCanStartPathfind;
     bool mHasNoPath;
     bool mPathfindBlue;
-    bool mPathfindTexSetBlue;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
@@ -62,13 +66,9 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     ResTIMG* mArrowTex;
     ResTIMG* mArrowRedTex;
 
-    J2DPictureEx* mArrowPicture;
-    J2DPictureEx* mAButton;
-
-
-    
-
-    
+    JUTTexture* mArrowPicture;
+    JUTTexture* mArrowRedPicture;
+    JUTTexture* mAButton;
 };
 
 

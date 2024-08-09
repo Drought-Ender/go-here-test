@@ -36,7 +36,6 @@ AlteredMapMenu::AlteredMapMenu(const char* name) : og::newScreen::ObjSMenuMap(na
 void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAllPikisBlue = false;
 	mCanStartPathfind = false;
-	mPathfindTexSetBlue = true;
 	mHasNoPath = false;
 	mPathfindBlue = true;
 	mGoalWPIndex = -1;
@@ -61,16 +60,9 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	if (!mArrowRedTex) JUT_PANIC("%s missing", cRedArrowPath);
 
 
-	mArrowPicture = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here0');
-	mAButton      = og::Screen::CopyPictureToPane(mLouieArrow, mRootPane, 0.0f, 0.0f, 'go_here1');
-
-	mAButton->changeTexture(mAButtonTex, 0);
-	mAButton->setAlpha(0);
-	mAButton->mScale *= 0.5f;
-	mArrowPicture->changeTexture(mArrowTex, 0);
-	mArrowPicture->hide();
-	mAButton->hide();
-
+	mArrowPicture    = new JUTTexture(mArrowTex);
+	mArrowRedPicture = new JUTTexture(mArrowRedTex);
+	mAButton         = new JUTTexture(mAButtonTex);
 	// (this would set it to north)
 	// mMapAngle = 0.0f;
 
@@ -78,34 +70,6 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 
 void AlteredMapMenu::commonUpdate() {
 	og::newScreen::ObjSMenuMap::commonUpdate();
-
-	Vector2f center;
-
-	og::Screen::calcGlbCenter(mPane_map, &center);
-
-	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE && !mHasNoPath) {
-		mAButton->setAlpha(255);
-	}
-	else {
-		mAButton->setAlpha(0);
-	}
-
-	if (mPathfindBlue) {
-		if (!mPathfindTexSetBlue) {
-			mArrowPicture->changeTexture(mArrowTex, 0);
-			mPathfindTexSetBlue = true;
-		}
-	}
-	else {
-		if (mPathfindTexSetBlue) {
-			mArrowPicture->changeTexture(mArrowRedTex, 0);
-			mPathfindTexSetBlue = false;
-		}
-	}
-
-
-	mArrowPicture->setOffset(12.0f, -5.0f);
-	mAButton->setOffset(20.0f, -20.0f);
 }
 
 /// @brief Converts a position on the map texture to its 3D coordinates
@@ -212,6 +176,77 @@ void AlteredMapMenu::NodeCleanup() {
 
 }
 
+void AlteredMapMenu::drawArrow(Graphics& gfx) {
+
+	if (mPathfindBlue) {
+		mArrowPicture->load(GX_TEXMAP0);
+	}
+	else {
+		mArrowRedPicture->load(GX_TEXMAP0);
+	}
+
+	Vector2f center;
+	og::Screen::calcGlbCenter(mPane_map, &center);
+
+	const Rectf cArrowDrawBox = Rectf(-12.0f, -24.0f, 12.0f, 0.0f);
+	
+
+    GXBegin(GX_QUADS, GX_VTXFMT0, 4);
+    GXPosition3f32(cArrowDrawBox.p1.x + center.x, cArrowDrawBox.p1.y + center.y, 0.0f);
+    GXPosition2f32(0.0f, 0.0f);
+    GXPosition3f32(cArrowDrawBox.p2.x + center.x, cArrowDrawBox.p1.y + center.y, 0.0f);
+    GXPosition2f32(1.0f, 0.0f);
+    GXPosition3f32(cArrowDrawBox.p2.x + center.x, cArrowDrawBox.p2.y + center.y, 0.0f);
+    GXPosition2f32(1.0f, 1.0f);
+    GXPosition3f32(cArrowDrawBox.p1.x + center.x, cArrowDrawBox.p2.y + center.y, 0.0f);
+    GXPosition2f32(0.0f, 1.0f);
+    GXEnd();
+}
+
+void AlteredMapMenu::drawButton(Graphics& gfx) {
+
+	if (!mCanStartPathfind || mPathfindState != PATHFIND_DONE || mHasNoPath) {
+		return;
+	}
+
+	mAButton->load(GX_TEXMAP0);
+
+	Vector2f center;
+	og::Screen::calcGlbCenter(mPane_map, &center);
+
+	const Rectf cButtonDrawBox = Rectf(4.0f, -32.0f, 20.0f, -16.0f);
+	
+
+    GXBegin(GX_QUADS, GX_VTXFMT0, 4);
+    GXPosition3f32(cButtonDrawBox.p1.x + center.x, cButtonDrawBox.p1.y + center.y, 0.0f);
+    GXPosition2f32(0.0f, 0.0f);
+    GXPosition3f32(cButtonDrawBox.p2.x + center.x, cButtonDrawBox.p1.y + center.y, 0.0f);
+    GXPosition2f32(1.0f, 0.0f);
+    GXPosition3f32(cButtonDrawBox.p2.x + center.x, cButtonDrawBox.p2.y + center.y, 0.0f);
+    GXPosition2f32(1.0f, 1.0f);
+    GXPosition3f32(cButtonDrawBox.p1.x + center.x, cButtonDrawBox.p2.y + center.y, 0.0f);
+    GXPosition2f32(0.0f, 1.0f);
+    GXEnd();
+}
+
+void AlteredMapMenu::setupTextureDraw(Graphics& gfx) {
+	GXClearVtxDesc();
+    GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
+    GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_POS_XYZ, GX_F32, 0);
+
+    GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_SET);
+
+    GXSetNumTexGens(1);
+    GXSetTexCoordGen2(GX_TEXCOORD0, GX_TG_MTX3X4, GX_TG_TEXCOORD0, 0x3c, 0, 0x7d);
+
+    GXSetNumTevStages(1);
+    GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+	
+	GXLoadPosMtxImm(gfx.mPerspGraph.mPosMtx, 0);
+}
+
 void AlteredMapMenu::doDraw(Graphics& gfx)
 {
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
@@ -222,16 +257,11 @@ void AlteredMapMenu::doDraw(Graphics& gfx)
 	Graphics gfx2;
 	
 	mIconScreen->draw(gfx2, *graf);
-
-	mArrowPicture->show();
-	mAButton->show();
-
-	mArrowPicture->J2DPane::draw(0.0f, 0.0f, graf, true, true);
-	mAButton->J2DPane::draw(0.0f, 0.0f, graf, true, true);
-
-	mArrowPicture->hide();
-	mAButton->hide();
-
+	
+	
+	setupTextureDraw(gfx);
+	drawArrow(gfx);
+	drawButton(gfx);
 	
 
 	if (mCompassPic && mPane_Ncompas) {
@@ -337,7 +367,12 @@ void AlteredMapMenu::PathfindUpdate() {
 }
 
 void AlteredMapMenu::OnPathfindDone() {
-	PSSystem::spSysIF->playSystemSe(PSSE_MP_SHIP_CALLING_01, 0);
+	if (mCanStartPathfind && !mHasNoPath) {
+		PSSystem::spSysIF->playSystemSe(PSSE_MP_SHIP_CALLING_01, 0);
+	}
+	else {
+		PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_ERROR, 0);
+	}
 }
 
 // setup our pathfinder and set our start and end positions
@@ -345,9 +380,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 
 	mPath      = nullptr;
 	mHasNoPath = false;
-	if (resetLinkCount) {
-	
-	}
 
 	Game::Navi* movingNavi = Game::naviMgr->getActiveNavi();
 	P2ASSERT(movingNavi);
@@ -362,7 +394,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 		Sys::Sphere sphere;
 		sphere.mPosition = naviPos;
 		sphere.mRadius   = 1.0f;
-
 
 		roomIndex = static_cast<Game::RoomMapMgr*>(Game::mapMgr)->findRoomIndex(sphere);
 	}
@@ -387,14 +418,13 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	mStartWPIndex = startWP->mIndex;
 
 	Vector2f center;
-
 	og::Screen::calcGlbCenter(mPane_map, &center);
-
 	Vector3f goalPos = GetPositionFromTex(center.x, center.y);
 
 	if (!Drought::hasValidFloor(goalPos)) {
 		mPathfindBlue = false;
 		mPathfindState = PATHFIND_INACTIVE;
+		OnPathfindDone();
 		return;
 	}
 
@@ -403,13 +433,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	JUT_ASSERT(endWP, "endWP=0");
 
 	mGoalWPIndex = endWP->mIndex;
-
-
-	u8 flag = Game::PATHFLAG_Unk1 | Game::PATHFLAG_Unk3;
-
-	if (mAllPikisBlue) {
-		flag |= Game::PATHFLAG_PathThroughWater;
-	}
 
 	mStartPathFindCounter = 0;
 
@@ -421,38 +444,43 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 int AlteredMapMenu::execPathfinding() {
 
 
-	u8 flag = Game::PATHFLAG_Unk1 | Game::PATHFLAG_Unk3;
+	u8 flag = 0;
+	mPathfindBlue = true;
 
-	if (mStartPathFindCounter == 1 || mStartPathFindCounter >= 3) {
-		flag &= ~Game::PATHFLAG_Unk1;
+	if (mStartPathFindCounter != 1 && mStartPathFindCounter < 3) {
+		flag |= Game::PATHFLAG_Unk1 | Game::PATHFLAG_Unk3;
 	}
 
 	if (mAllPikisBlue || (mStartPathFindCounter >= 2 && Game::cTryRouteWater)) {
 		flag |= Game::PATHFLAG_PathThroughWater;
 	}
 
-	// gives up
-	if (mStartPathFindCounter >= 5) {
-		mHasNoPath        = true;
-		mPathfindBlue     = false;
-		mPathfindState    = PATHFIND_DONE;
+	if (mStartPathFindCounter >= 1) {
+		mPathfindBlue = false;
 	}
-
-	mStartPathFindCounter++;
 
 	mPath = new Drought::Path;
 	mWayPointCount = Drought::Pathfinder::search_fast(mStartWPIndex, mGoalWPIndex, *mPath, flag);
 
 	if (mWayPointCount > 0) {
 		mPathfindState = PATHFIND_DONE;
-		if (mCanStartPathfind && mPathfindBlue) {
-			OnPathfindDone();
-		}
-		return;
+		OnPathfindDone();
+		return PATHFINDSTATUS_OK;
 	}
+
+	mStartPathFindCounter++;
 
 	delete mPath;
 	mPath = nullptr;
+
+	// gives up
+	if (mStartPathFindCounter >= 5) {
+		mHasNoPath        = true;
+		mPathfindBlue     = false;
+		mPathfindState    = PATHFIND_DONE;
+		OnPathfindDone();
+		return PATHFINDSTATUS_OK;
+	}
 
 }
 

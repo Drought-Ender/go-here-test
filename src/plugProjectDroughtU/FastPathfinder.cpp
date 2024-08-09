@@ -142,11 +142,11 @@ u32 Pathfinder::search_fast(s16 startWpID, s16 endWpID, Path& path, u8 requestFl
             
             s16 neighbor = getWaypoint(current)->mToLinks[i];
 
-            Game::WayPoint* neighborWP = getWaypoint(current);
+            Game::WayPoint* neighborWP = getWaypoint(neighbor);
             
-            if (((!(requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
+            if ((((requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
 				|| (!(requestFlag & PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water))
-				|| (!(requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
+				|| ((requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
 				|| ((neighborWP->mFlags & Game::WPF_Water) && (requestFlag & PATHFLAG_DisallowUnfinishedBridges) && (neighborWP->mFlags & Game::WPF_Bridge))
 				|| ((requestFlag & PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed))
 				|| ((requestFlag & PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)))) {
@@ -172,16 +172,16 @@ u32 Pathfinder::search_fast(s16 startWpID, s16 endWpID, Path& path, u8 requestFl
             
             s16 neighbor = getWaypoint(current)->mFromLinks[i];
 
-            Game::WayPoint* neighborWP = getWaypoint(current);
+            Game::WayPoint* neighborWP = getWaypoint(neighbor);
             
-            if (((!(requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
-                || (!(requestFlag & PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water))
-                || (!(requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
-                || ((neighborWP->mFlags & Game::WPF_Water) && (requestFlag & PATHFLAG_DisallowUnfinishedBridges) && (neighborWP->mFlags & Game::WPF_Bridge))
-                || ((requestFlag & PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed))
-                || ((requestFlag & PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)))) {
-                continue;
-            }
+            if ((((requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
+				|| (!(requestFlag & PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water))
+				|| ((requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
+				|| ((neighborWP->mFlags & Game::WPF_Water) && (requestFlag & PATHFLAG_DisallowUnfinishedBridges) && (neighborWP->mFlags & Game::WPF_Bridge))
+				|| ((requestFlag & PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed))
+				|| ((requestFlag & PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)))) {
+				continue;
+			}
             f32 tentative_gScore = gScore[current] + neighborWP->mPosition.sqrDistance(getWaypoint(current)->mPosition);
             if (tentative_gScore < gScore[neighbor]) {
                 cameFrom[neighbor] = current;
