@@ -4,6 +4,7 @@
 #include "Drought/Game/NaviGoHere.h"
 #include "Game/MoviePlayer.h"
 #include "Game/MapMgr.h"
+#include "Drought/Pathfinder.h"
 #include "Game/CPlate.h"
 
 namespace Game
@@ -60,13 +61,13 @@ void NaviFSM::init(Navi* navi)
 void NaviGoHereState::init(Navi* navi, StateArg* arg) {
     P2ASSERT(arg);
     NaviGoHereStateArg* goHereArg = static_cast<NaviGoHereStateArg*>(arg);
-    JUT_ASSERT(goHereArg->mContextID != 0, "Null Context ID!");
 
 	navi->startMotion(IPikiAnims::WALK, IPikiAnims::WALK, nullptr, nullptr);
 
-    mPathfinderContextID = goHereArg->mContextID;
     mPosition            = goHereArg->mPosition;
-    mCurrNode            = goHereArg->mNodes;
+	mPath                = goHereArg->mPath;
+    mCurrNode            = goHereArg->mPath->mRoot;
+
 }
 
 // usually inlined, plays the navi's voice line when swapped
@@ -109,6 +110,7 @@ void NaviGoHereState::exec(Navi* navi) {
     }
 
     if (navi->mController1) {
+		navi->mWhistle->update(navi->mVelocity, false);
 
         if (!gameSystem->paused_soft() && moviePlayer->mDemoState == 0 && navi->mController1->isButtonDown(JUTGamePad::PRESS_B)) {
             done = true;
@@ -144,7 +146,7 @@ void NaviGoHereState::exec(Navi* navi) {
 // moves the navi to the nearest waypoint
 bool NaviGoHereState::execMove(Navi* navi)
 {
-	WayPoint* wp     = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIndex);
+	WayPoint* wp     = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIdx);
 	Vector3f wpPos   = wp->mPosition;
 	wpPos.y          = 0.0f;
 	Vector3f naviPos = navi->getPosition();
@@ -156,7 +158,7 @@ bool NaviGoHereState::execMove(Navi* navi)
 		mCurrNode = mCurrNode->mNext;
 
         if (mCurrNode) {
-            WayPoint* nextWp = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIndex);
+            WayPoint* nextWp = mapMgr->mRouteMgr->getWayPoint(mCurrNode->mWpIdx);
 			bool wpClosed = nextWp->isFlag(WPF_Closed);
 			bool wpWater = nextWp->isFlag(WPF_Water) && !CheckAllPikisBlue(navi);
             if (wpClosed || wpWater) {
@@ -183,7 +185,8 @@ bool NaviGoHereState::execMove(Navi* navi)
     navi->mFaceDir += 0.2f * angDist(JMAAtan2Radian(diff.x, diff.z), navi->mFaceDir);
     navi->mFaceDir = roundAng(navi->mFaceDir);
 
-	navi->mSimVelocity = diff * 150.0f;
+	navi->mVelocity.x = diff.x * 150.0f;
+	navi->mVelocity.z = diff.z * 150.0f;
 	return false;
 }
 
@@ -206,11 +209,16 @@ bool NaviGoHereState::execMoveGoal(Navi* navi) {
     navi->mFaceDir += 0.2f * angDist(JMAAtan2Radian(diff.x, diff.z), navi->mFaceDir);
     navi->mFaceDir = roundAng(navi->mFaceDir);
 
-	navi->mSimVelocity = diff * 150.0f;
+	navi->mVelocity.x = diff.x * 150.0f;
+	navi->mVelocity.z = diff.z * 150.0f;
 	return false;
 }
 
-void NaviGoHereState::cleanup(Navi* navi) { releasePathfinder(); }
+void NaviGoHereState::cleanup(Navi* navi) {
+	delete mPath;
+	mPath     = nullptr;
+	mCurrNode = nullptr;
+}
 
 
 void Navi::GoHereSuccess() {

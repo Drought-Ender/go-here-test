@@ -3,6 +3,7 @@
 
 #include "Game/Navi.h"
 #include "Game/NaviState.h"
+#include "Drought/Pathfinder.h"
 
 namespace Game
 {
@@ -10,22 +11,20 @@ namespace Game
 /* setting this to true will have the navi still
  * attempt to route through water if it 
  * has non-blue pikmin */
-const bool cTryRouteWater = false;
+const bool cTryRouteWater = true;
 
 bool CheckAllPikisBlue(Game::Navi* navi);
 
 struct NaviGoHereStateArg : public StateArg
 {
-    inline NaviGoHereStateArg(Vector3f pos, u32 contextID, PathNode* nodes) 
-        : mContextID(contextID),
-        mPosition(pos),
-        mNodes(nodes)
+    inline NaviGoHereStateArg(Vector3f pos, Drought::Path* path) 
+        : mPosition(pos)
+        , mPath(path)
     {
     }
 
-    u32 mContextID;
     Vector3f mPosition;
-    PathNode* mNodes;
+    Drought::Path* mPath;
 };
 
 
@@ -43,20 +42,11 @@ struct NaviGoHereState : public NaviState {
 	bool execMove(Navi*);
 	bool execMoveGoal(Navi*);
 
-	/** @fabricated */
-	inline void releasePathfinder()
-	{
-		if (mPathfinderContextID != 0) {
-			testPathfinder->release(mPathfinderContextID);
-			mPathfinderContextID = 0;
-		}
-	}
-
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	u32 mPathfinderContextID; // _10
 	Vector3f mPosition;       // _14
-	PathNode* mCurrNode;
+	Drought::PathNode* mCurrNode;
+	Drought::Path* mPath;
 };
     
 } // namespace Game

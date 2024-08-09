@@ -3,6 +3,7 @@
 
 #include "og/newScreen/SMenu.h"
 #include "Game/routeMgr.h"
+#include "Drought/Pathfinder.h"
 
 namespace Drought
 {
@@ -46,17 +47,16 @@ struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
     };
 
     bool mCanStartPathfind;
+    bool mHasNoPath;
     bool mPathfindBlue;
     bool mPathfindTexSetBlue;
     bool mAllPikisBlue;
     s16 mStartWPIndex;
     s16 mGoalWPIndex;
-    u32 mContextHandle;
     int mStartPathFindCounter;
-    int mPathFindCounter;
-    Game::PathNode* mRootNode;
     PathfindState mPathfindState;
-    int mWayPointCount;
+    u32 mWayPointCount;
+    Path* mPath;
 
     ResTIMG* mAButtonTex;
     ResTIMG* mArrowTex;

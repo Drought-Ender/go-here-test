@@ -37,12 +37,10 @@ void AlteredMapMenu::doCreate(JKRArchive* rarc) {
 	mAllPikisBlue = false;
 	mCanStartPathfind = false;
 	mPathfindTexSetBlue = true;
+	mHasNoPath = false;
 	mPathfindBlue = true;
 	mGoalWPIndex = -1;
-	mContextHandle = 0;
 	mStartPathFindCounter = 0;
-	mPathFindCounter = 0;
-	mRootNode = nullptr;
 	mPathfindState = PATHFIND_INACTIVE;
 
 	og::newScreen::ObjSMenuMap::doCreate(rarc);
@@ -85,7 +83,7 @@ void AlteredMapMenu::commonUpdate() {
 
 	og::Screen::calcGlbCenter(mPane_map, &center);
 
-	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE) {
+	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE && !mHasNoPath) {
 		mAButton->setAlpha(255);
 	}
 	else {
@@ -116,28 +114,18 @@ void AlteredMapMenu::commonUpdate() {
 /// @return The position on the game map
 Vector3f AlteredMapMenu::GetPositionFromTex(f32 x, f32 y) {
 
-	Vector2f center;
+	
+	Vector3f inPos = Vector3f(x, y, 0.0f);
 
-	og::Screen::calcGlbCenter(mPane_map, &center);
+	Mtx inverse;
 
-	Vector2f vec (x - center.x, y - center.y);
+	PSMTXInverse(mMapTexPane->mGlobalMtx, inverse);
 
-	/* ~~~Magic Numbers, Inacuracy Here~~~ */
-	vec.x /= mMapTexPane->mScale.x * 0.9f;
-	vec.y /= mMapTexPane->mScale.y * 0.85f;
+	Vector3f outPos;
 
+	PSMTXMultVec(inverse, (Vec*)&inPos, (Vec*)&outPos); 
 
-	f32 angle    = (mMapAngle * TAU) / 360.0f;
-	f32 anglecos = cosf(angle);
-	f32 anglesin = sinf(angle);
-
-	Vector2f unrotated = Vector2f(
-		vec.x * anglecos - vec.y * anglesin,
-		vec.y * anglecos + vec.x * anglesin
-	);
-
-
-	Vector2f oldOrigin = unrotated - mMapPosition;
+	Vector2f oldOrigin = Vector2f(outPos.x, outPos.y);
 
 	Vector2f cPos;
 
@@ -178,26 +166,15 @@ Vector2f AlteredMapMenu::GetPositionOnTex(Vector3f& pos) {
 		
 	}
 
-	Vector2f vec = mMapPosition + mapPosition;	
+	Vector2f vec = mapPosition;	
 
-	f32 angle    = -(mMapAngle * TAU) / 360.0f;
-	f32 anglecos = cosf(angle);
-	f32 anglesin = sinf(angle);
+	Vector3f testVec = Vector3f(mapPosition.x, mapPosition.y, 0.0f);
 
-	Vector2f rotated = Vector2f(
-		vec.x * anglecos - vec.y * anglesin,
-		vec.y * anglecos + vec.x * anglesin
-	);
+	Vector3f outVec;
 
-	/* ~~~Magic Numbers, Inacuracy Here~~~ */
-	rotated.x *= mMapTexPane->mScale.x * 0.9f;
-	rotated.y *= mMapTexPane->mScale.y * 0.85f;
+	PSMTXMultVec(mMapTexPane->mGlobalMtx, (Vec*)&testVec, (Vec*)&outVec);
 
-	Vector2f center;
-
-	og::Screen::calcGlbCenter(mPane_map, &center);
-
-	return rotated + center;
+	return Vector2f(outVec.x, outVec.y);
 }
 
 bool AlteredMapMenu::CheckCanStartPathfind(Game::Navi* navi) {
@@ -285,14 +262,18 @@ bool AlteredMapMenu::doUpdate() {
 
 	bool ret = false;
 
-	if (mCanStartPathfind && mPathfindState == PATHFIND_DONE && scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_A)) {
+	if (mCanStartPathfind && !mHasNoPath && mPathfindState == PATHFIND_DONE && scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_A)) {
 
 		Vector2f center;
 		og::Screen::calcGlbCenter(mPane_map, &center);
 
 		Vector3f pos = GetPositionFromTex(center.x, center.y);
 
-		Game::NaviGoHereStateArg arg(pos, mContextHandle, mRootNode);
+		P2ASSERT(mPath);
+
+		Game::NaviGoHereStateArg arg(pos, mPath);
+
+		mPath = nullptr; // we no longer own this, it's the navistate's
 
 		Game::naviMgr->getActiveNavi()->transit(Game::NSID_GoHere, &arg);
 
@@ -337,8 +318,6 @@ void AlteredMapMenu::PathfindUpdate() {
 			mStartWPIndex = -1;
 			mGoalWPIndex = -1;
 			mStartPathFindCounter = 0;
-			mPathFindCounter = 0;
-			mRootNode = nullptr;
 			mPathfindBlue = true;
 			initPathfinding(false);
 			break;
@@ -363,8 +342,13 @@ void AlteredMapMenu::OnPathfindDone() {
 
 // setup our pathfinder and set our start and end positions
 void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
+
+	mPath      = nullptr;
+	mHasNoPath = false;
 	if (resetLinkCount) {
+	
 	}
+
 	Game::Navi* movingNavi = Game::naviMgr->getActiveNavi();
 	P2ASSERT(movingNavi);
 	P2ASSERT(Game::mapMgr);
@@ -411,10 +395,6 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	if (!Drought::hasValidFloor(goalPos)) {
 		mPathfindBlue = false;
 		mPathfindState = PATHFIND_INACTIVE;
-		if (mContextHandle) {
-			Game::testPathfinder->release(mContextHandle);
-		}
-		
 		return;
 	}
 
@@ -423,10 +403,7 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 	JUT_ASSERT(endWP, "endWP=0");
 
 	mGoalWPIndex = endWP->mIndex;
-	
-	if (mContextHandle) {
-		Game::testPathfinder->release(mContextHandle);
-	}
+
 
 	u8 flag = Game::PATHFLAG_Unk1 | Game::PATHFLAG_Unk3;
 
@@ -434,11 +411,7 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 		flag |= Game::PATHFLAG_PathThroughWater;
 	}
 
-	Game::PathfindRequest request(mStartWPIndex, mGoalWPIndex, flag);
-	mContextHandle        = Game::testPathfinder->start(request);
 	mStartPathFindCounter = 0;
-	mPathFindCounter      = 0;
-	mRootNode             = nullptr;
 
 
 	mPathfindState = PATHFIND_AWAITING;
@@ -446,53 +419,47 @@ void AlteredMapMenu::initPathfinding(bool resetLinkCount) {
 
 // Check on the pathfinder and update if done
 int AlteredMapMenu::execPathfinding() {
-	if (mContextHandle <= 0) {
-		return PATHFINDSTATUS_FAIL;
-	}
-	mPathFindCounter++;
 
-	switch (Game::testPathfinder->check(mContextHandle)) {
-	case Game::PATHFIND_MakePath:
+
+	u8 flag = Game::PATHFLAG_Unk1 | Game::PATHFLAG_Unk3;
+
+	if (mStartPathFindCounter == 1 || mStartPathFindCounter >= 3) {
+		flag &= ~Game::PATHFLAG_Unk1;
+	}
+
+	if (mAllPikisBlue || (mStartPathFindCounter >= 2 && Game::cTryRouteWater)) {
+		flag |= Game::PATHFLAG_PathThroughWater;
+	}
+
+	// gives up
+	if (mStartPathFindCounter >= 5) {
+		mHasNoPath        = true;
+		mPathfindBlue     = false;
+		mPathfindState    = PATHFIND_DONE;
+	}
+
+	mStartPathFindCounter++;
+
+	mPath = new Drought::Path;
+	mWayPointCount = Drought::Pathfinder::search_fast(mStartWPIndex, mGoalWPIndex, *mPath, flag);
+
+	if (mWayPointCount > 0) {
 		mPathfindState = PATHFIND_DONE;
-		mWayPointCount = Game::testPathfinder->makepath(mContextHandle, &mRootNode);
 		if (mCanStartPathfind && mPathfindBlue) {
 			OnPathfindDone();
 		}
-		break;
-
-	case Game::PATHFIND_Start:
-		if (mContextHandle) {
-			Game::testPathfinder->release(mContextHandle);
-		}
-
-		u8 flag = Game::PATHFLAG_Unk3;
-
-		if (mAllPikisBlue || (mStartPathFindCounter >= 1 && Game::cTryRouteWater)) {
-			flag |= Game::PATHFLAG_PathThroughWater;
-		}
-		mStartPathFindCounter++;
-
-		Game::PathfindRequest request(mStartWPIndex, mGoalWPIndex, flag);
-
-		mContextHandle = Game::testPathfinder->start(request);
-
-		mPathFindCounter = 0;
-		return PATHFINDSTATUS_OK;
-
-		case Game::PATHFIND_Busy:
-		break;
-
-	case Game::PATHFIND_NoHandle:
-		JUT_PANIC("no handle %d\n", mContextHandle);
-		break;
+		return;
 	}
-	return PATHFINDSTATUS_OK;
+
+	delete mPath;
+	mPath = nullptr;
+
 }
 
 // draw the path of the Go-Here route on the 2D map
 void AlteredMapMenu::drawPath(Graphics& gfx) {
 
-	if (mPathfindState != PATHFIND_DONE) {
+	if (mPathfindState != PATHFIND_DONE || !mPath) {
 		return;
 	}
 
@@ -530,14 +497,16 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 	graf->moveTo(naviFirst);
 
-	FOREACH_NODE(Game::PathNode, mRootNode, node) {
-		Game::WayPoint* wp = Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIndex);
+	
+
+	FOREACH_NODE(Drought::PathNode, mPath->mRoot, node) {
+		Game::WayPoint* wp = Game::mapMgr->mRouteMgr->getWayPoint(node->mWpIdx);
 		Vector3f currPos = (wp->getPosition());
 
-		Vector3f diffVec = currPos - previousPos;
-		f32 magnitude = diffVec.normalise2D();
+		// Vector3f diffVec = currPos - previousPos;
+		// f32 magnitude = diffVec.normalise2D();
 
-		currPos -= diffVec * wp->mRadius;
+		// currPos -= diffVec * wp->mRadius;
 
 		JGeometry::TVec2f point = GetPositionOnTex(currPos);
 
@@ -571,8 +540,13 @@ void AlteredMapMenu::drawPath(Graphics& gfx) {
 
 // Ensures we're not leaving our pathfinder with a dead task
 void AlteredMapMenu::PathfindCleanup() {
-	if (mPathfindState != PATHFIND_GOHERE && mContextHandle) {
-		Game::testPathfinder->release(mContextHandle);
+	if (mPathfindState != PATHFIND_GOHERE) {
+		// Game::testPathfinder->release(mContextHandle);
+	}
+
+	if (mPath) {
+		delete mPath;
+		mPath = nullptr;
 	}
 }
 

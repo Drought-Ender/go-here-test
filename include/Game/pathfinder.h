@@ -26,6 +26,9 @@ enum PathFindFlags {
 	PATHFLAG_InVersusMode     = 0x40,
 };
 
+
+
+
 namespace PathfindContext {
 extern Game::RouteMgr* routeMgr;
 } // namespace PathfindContext
