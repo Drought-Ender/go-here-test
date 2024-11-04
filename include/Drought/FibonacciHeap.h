@@ -2,9 +2,9 @@
 #include "ObjectMgr.h"
 #include "math.h"
 
+// Adapted from https://github.com/woodfrog/FibonacciHeap/tree/master
 
 namespace Drought {
-
 template <typename T>
 struct FibonacciNode {
     FibonacciNode(T obj) {
