@@ -88,7 +88,7 @@ void ObjectGameActor::update()
 		SysShape::Joint* joint = mGameObject->mModel->mJoints;
 		if (joint) {
 			Matrixf* mtx   = joint->getWorldMatrix();
-			mObjectFaceDir = JMath::atanTable_.atan2_(mtx->mMatrix.structView.zx, mtx->mMatrix.structView.zz);
+			mObjectFaceDir = JMAAtan2Radian(mtx->mMatrix.structView.zx, mtx->mMatrix.structView.zz);
 			if (mGameObject->isNavi()) {
 				mGameObject->getCreatureID();
 			}
@@ -96,9 +96,9 @@ void ObjectGameActor::update()
 	}
 
 	for (int i = 0; i < mCurrCommandCount; i++) {
-		if (mCommandIDs[i] >= 100) {
+		if (mCommandIDs[i] >= CC_MovieCommand1) {
 			mGameObject->movieUserCommand(mCommandIDs[i], mMoviePlayer);
-		} else if (mCommandIDs[i] == 0) {
+		} else if (mCommandIDs[i] == CC_StartAnimation) {
 			mGameObject->movieStartAnimation(mMovieCommandData[i]);
 		} else if (mCommandIDs[i] == 1) {
 			void* file = mActorArchive->getIdxResource(mMovieCommandData[i]);
@@ -258,11 +258,11 @@ void ObjectGameActor::parseUserData_(u32 data1, void const* data2)
 	data.getData(&tdata);
 	if (tdata.mStatus) {
 		bool test = false;
-		if (tdata.mFileCount && tdata.mStatus == 0x32 && tdata._10) {
+		if (tdata.mData && tdata.mStatus == 0x32 && tdata.mDataBlockEnd) {
 			test = true;
 		}
 		if (test) {
-			for (u16* i = (u16*)tdata.mFileCount; i != (u16*)tdata.mFileCount + tdata.mDataSize; i++) {
+			for (u16* i = (u16*)tdata.mData; i != (u16*)tdata.mData + tdata.mDataSize; i++) {
 				mMovieCommandData[count] = i[0];
 			}
 		}

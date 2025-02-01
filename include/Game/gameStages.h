@@ -75,7 +75,7 @@ struct CourseInfo : public CNode {
 	int getOtakaraNum(int);
 	int getCaveIndex_FromID(ID32&);
 	char* getCaveinfoFilename_FromID(ID32&);
-	ID32* getCaveID_FromIndex(int);
+	u32 getCaveID_FromIndex(int);
 	int getCaveNum();
 
 	char* mFolder;                    // _18
@@ -95,6 +95,8 @@ struct CourseInfo : public CNode {
 	int mGroundOtakaraMax;            // _CC
 	Matrixf mDemoMatrix;              // _D0
 };
+
+#define MAX_LEVELS (4)
 
 struct Stages {
 	Stages();

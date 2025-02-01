@@ -53,7 +53,7 @@ void CaveResultState::init(SingleGameSection* section, StateArg* arg)
 	mSection = section;
 
 	P2ASSERTLINE(284, arg);
-	mGameState = static_cast<CaveResultArg*>(arg)->_00;
+	mGameState = static_cast<CaveResultArg*>(arg)->mGameState;
 
 	mResultTextures = nullptr;
 	section->refreshHIO();
@@ -88,10 +88,10 @@ void CaveResultState::loadResource()
 	mResultTextures = new ResultTexMgr::Mgr;
 	mResultTextures->create(arg);
 
-	JUTTexture* texture = new JUTTexture(sys->getRenderModeObj()->fbWidth, sys->getRenderModeObj()->efbHeight, GX_TF_RGB565);
-	texture->mMinFilter = 0;
-	texture->mMagFilter = 0;
-	mSection->_168      = texture;
+	JUTTexture* texture     = new JUTTexture(sys->getRenderModeWidth(), sys->getRenderModeHeight(), GX_TF_RGB565);
+	texture->mMinFilter     = GX_NEAR;
+	texture->mMagFilter     = GX_NEAR;
+	mSection->mXfbTexture2d = texture;
 
 	createResultNodes();
 
@@ -99,8 +99,8 @@ void CaveResultState::loadResource()
 	sceneInfo.mSceneType = PSGame::SceneInfo::CAVE_RESULTS;
 	sceneInfo.mCameras   = 0;
 	PSMSetSceneInfo(sceneInfo);
-	PSMGetSceneMgr()->mScenes->getChildScene()->scene1stLoadSync();
-	PSMGetSceneMgrCheck()->getChildScene()->startMainSeq();
+	PSSystem::getSceneMgr()->doFirstLoad();
+	PSMGetChildScene()->startMainSeq(); // the PSMGetChildScene's getChildScene inline affects register allocation
 
 	/*
 	stwu     r1, -0x60(r1)
@@ -287,7 +287,7 @@ void CaveResultState::open2D(Game::SingleGameSection* section)
 	P2ASSERTLINE(381, courseInfo);
 	int otakaraNum = playData->getOtakaraNum_Course_CaveID(courseInfo->mCourseIndex, section->mCaveID);
 	int otakaraMax = playData->getOtakaraMax_Course_CaveID(courseInfo->mCourseIndex, section->mCaveID);
-	kh::Screen::DispCaveResult disp(&mResultNodes, DeathMgr::get_cave(7), otakaraNum, otakaraMax, playData->mPokoCount,
+	kh::Screen::DispCaveResult disp(&mResultNodes, DeathMgr::get_cave(DeathCounter::COD_All), otakaraNum, otakaraMax, playData->mPokoCount,
 	                                playData->isStoryFlag(STORY_DebtPaid), mMainHeap, (mIsCaveComplete && otakaraNum >= otakaraMax));
 	DeathMgr::account_cave();
 	BirthMgr::account_cave();
@@ -310,7 +310,7 @@ void CaveResultState::exec(SingleGameSection* section)
 		sys->dvdLoadUseCallBack(&mDvdThread, mLoadCallback);
 		return;
 	case 1:
-		if (mDvdThread.mMode == 2) {
+		if (mDvdThread.mMode == DvdThreadCommand::CM_Completed) {
 			open2D(section);
 		}
 		return;
@@ -323,7 +323,7 @@ void CaveResultState::exec(SingleGameSection* section)
 
 	case 3:
 		switch (Screen::gGame2DMgr->check_CaveResult()) {
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_CaveResult_Finished:
 			LoadArg arg(mGameState, false, true, false);
 			section->loadMainMapSituation();
 			transit(section, SGS_Load, &arg);
@@ -371,8 +371,8 @@ void CaveResultState::cleanup(SingleGameSection* section)
 	PSMGetSceneMgrCheck()->deleteCurrentScene();
 
 	playData->mCaveCropMemory->clear();
-	_14            = 0;
-	mSection->_168 = nullptr;
+	_14                     = 0;
+	mSection->mXfbTexture2d = nullptr;
 	mMainHeap->freeAll();
 	mMainHeap->destroy();
 	mMainHeap = nullptr;
@@ -388,9 +388,13 @@ void CaveResultState::createResultNodes()
 	mIsCaveComplete = 0;
 	sys->startChangeCurrentHeap(mResultTexHeap);
 	PelletCropMemory* cropMem = playData->mCaveCropMemory->createClone();
+	PelletCarcass::Mgr* carcassMgr;
+	PelletItem::Mgr* itemMgr;
+	PelletOtakara::Mgr* otaMgr;
+
 	if (mSection->mDoTrackCarcass) {
-		PelletCarcass::Mgr* carcassMgr = PelletCarcass::mgr;
-		KindCounter& counter           = playData->mCaveCropMemory->mCarcass;
+		carcassMgr           = PelletCarcass::mgr;
+		KindCounter& counter = playData->mCaveCropMemory->mCarcass;
 		for (int i = 0; i < counter.getNumKinds(); i++) {
 			if (counter(i) && carcassMgr->getPelletConfig(i)) {
 				counter(i) = 0;
@@ -401,24 +405,23 @@ void CaveResultState::createResultNodes()
 	playData->mMainCropMemory->addTo(playData->mCaveCropMemory);
 	playData->mCaveCropMemory->clear();
 
-	PelletItem::Mgr* itemMgr = PelletItem::mgr;
-	KindCounter& counter     = cropMem->mItem;
+	itemMgr              = PelletItem::mgr;
+	KindCounter& counter = cropMem->mItem;
 	for (int i = 0; i < counter.getNumKinds(); i++) {
 		if (counter(i) || mSection->mItemCounter(i)) {
-			int money;
 			mIsCaveComplete      = true;
 			PelletConfig* config = itemMgr->getPelletConfig(i);
 			int id               = PelletList::Mgr::getOffsetFromDictionaryNo(config->mParams.mDictionary.mData - 1);
 			u64 tag              = Result::TNode::convertByMorimun(id);
 			Result::TNode* node  = new Result::TNode;
-			money                = config->mParams.mMoney.mData;
+			int money            = config->getPokoValue();
 			node->setTNode(tag, mResultTextures->getItemTexture(i), counter(i), money * counter(i), money, mSection->mItemCounter(i));
 			mResultNodes.add(node);
 		}
 	}
 
-	PelletOtakara::Mgr* otaMgr = PelletOtakara::mgr;
-	KindCounter& counter2      = cropMem->mOtakara;
+	otaMgr                = PelletOtakara::mgr;
+	KindCounter& counter2 = cropMem->mOtakara;
 	for (int i = 0; i < counter2.getNumKinds(); i++) {
 		if (counter2(i) || mSection->mOtakaraCounter(i)) {
 			mIsCaveComplete      = true;
@@ -426,25 +429,22 @@ void CaveResultState::createResultNodes()
 			int id               = PelletList::Mgr::getOffsetFromDictionaryNo(config->mParams.mDictionary.mData - 1);
 			u64 tag              = Result::TNode::convertByMorimun(id);
 			Result::TNode* node  = new Result::TNode;
-			int money            = config->mParams.mMoney.mData;
+			int money            = config->getPokoValue();
 			node->setTNode(tag, mResultTextures->getOtakaraTexture(i), counter2(i), money * counter2(i), money,
 			               mSection->mOtakaraCounter(i));
 			mResultNodes.add(node);
 		}
 	}
 
-	PelletCarcass::Mgr* carcassMgr = PelletCarcass::mgr;
-	int money;
+	carcassMgr            = PelletCarcass::mgr;
 	KindCounter& counter3 = cropMem->mCarcass;
 	int value             = 0;
 	int num               = 0;
-	for (int i = 0; i < counter3.mNumKinds; i++) {
+	for (int i = 0; i < counter3.getNumKinds(); i++) {
 		if (counter3(i)) {
 			PelletConfig* config = carcassMgr->getPelletConfig(i);
 			num += counter3(i);
-			money          = config->mParams.mMoney.mData;
-			int counterVal = counter3(i);
-			value += counterVal * money;
+			value += counter3(i) * config->getPokoValue();
 		}
 	}
 	if (num > 0) {

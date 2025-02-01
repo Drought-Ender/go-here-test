@@ -11,14 +11,18 @@ struct JPABaseParticle;
 // not sure where this belongs
 static inline u32 COLOR_MULTI(u32 a, u32 b) { return ((a * (b + 1)) * 0x10000) >> 24; }
 
+struct JPAClrAnmKeyData {
+	s16 index;     // _00
+	GXColor color; // _02
+};
+
 /**
  * @fabricated
  */
 struct JPABaseShapeData {
-	// Represenation of contents of .jpc file
-	u8 mMagic[4]; // _00
-	u32 mSize;    // _04
-
+	// Representation of contents of .jpc file
+	u8 mMagic[4];         // _00
+	u32 mSize;            // _04
 	u32 mFlags;           // _08
 	s16 mClrPrmAnmOffset; // _0C
 	s16 mClrEnvAnmOffset; // _0E
@@ -51,17 +55,6 @@ struct JPABaseShape {
 
 	void setGX(JPAEmitterWorkData*) const;
 
-	// Unused/inlined:
-	void init_jpa(const u8*, JKRHeap*);
-
-	static GXBlendMode st_bm[3];
-	static GXBlendFactor st_bf[10];
-	static GXLogicOp st_lo[16];
-	static GXCompare st_c[8];
-	static GXAlphaOp st_ao[4];
-	static GXTevColorArg st_ca[6][4];
-	static GXTevAlphaArg st_aa[2][4];
-
 	GXBlendMode getBlendMode() const { return st_bm[mData->mBlendModeCfg & 0x03]; }
 	GXBlendFactor getBlendSrc() const { return st_bf[(mData->mBlendModeCfg >> 2) & 0x0F]; }
 	GXBlendFactor getBlendDst() const { return st_bf[(mData->mBlendModeCfg >> 6) & 0x0F]; }
@@ -84,7 +77,8 @@ struct JPABaseShape {
 	u32 getType() const { return (mData->mFlags >> 0) & 0x0F; }
 	u32 getDirType() const { return (mData->mFlags >> 4) & 0x07; }
 	u32 getRotType() const { return (mData->mFlags >> 7) & 0x07; }
-	u32 getBasePlaneType() const { return (mData->mFlags >> 10) & 0x07; }
+	u32 getBasePlaneType() const { return (mData->mFlags >> 10) & 0x01; }
+	u32 getProjType() const { return ((mData->mFlags >> 24) & 0x01); }
 	u32 getTilingS() const { return (mData->mFlags >> 25) & 0x01; }
 	u32 getTilingT() const { return (mData->mFlags >> 26) & 0x01; }
 	bool isGlblClrAnm() const { return !!(mData->mFlags & 0x00001000); }
@@ -117,6 +111,7 @@ struct JPABaseShape {
 	u32 getClrLoopOfst(u32 param_1) const { return getClrLoopOfstMask() & param_1; }
 	u8 getTexLoopOfstMask() const { return mData->mTexAnmRndmMask; }
 	u32 getTexLoopOfst(u8 param_1) const { return getTexLoopOfstMask() & param_1; }
+	u8 getLoopOfstValue() const { return mData->mAnmRndm; }
 
 	f32 getIncTransX() const { return ((f32*)mTexCrdMtxAnmTbl)[5]; }
 	f32 getInitTransX() const { return ((f32*)mTexCrdMtxAnmTbl)[0]; }
@@ -129,6 +124,17 @@ struct JPABaseShape {
 	f32 getIncRot() const { return ((f32*)mTexCrdMtxAnmTbl)[9]; }
 	f32 getInitRot() const { return ((f32*)mTexCrdMtxAnmTbl)[4]; }
 	u8 getTexAnmKeyNum() const { return mData->mTexAnmNum; }
+
+	// Unused/inlined:
+	void init_jpa(const u8*, JKRHeap*);
+
+	static GXBlendMode st_bm[3];
+	static GXBlendFactor st_bf[10];
+	static GXLogicOp st_lo[16];
+	static GXCompare st_c[8];
+	static GXAlphaOp st_ao[4];
+	static GXTevColorArg st_ca[6][4];
+	static GXTevAlphaArg st_aa[2][4];
 
 	const JPABaseShapeData* mData; // _00
 	const void* mTexCrdMtxAnmTbl;  // _04
@@ -172,6 +178,25 @@ struct JPAChildShape {
 
 	void getPrmClr(GXColor* dst) { *dst = mData->mPrmClr; }
 	void getEnvClr(GXColor* dst) { *dst = mData->mEnvClr; }
+	s16 getLife() const { return mData->mLife; }
+	s16 getRotInitSpeed() const { return mData->mRotSpeed; }
+	s16 getRate() const { return mData->mRate; }
+	u8 getPrmAlpha() const { return mData->mPrmClr.a; }
+
+	f32 getPosRndm() const { return mData->mPosRndm; }
+	f32 getBaseVel() const { return mData->mBaseVel; }
+	f32 getBaseVelRndm() const { return mData->mBaseVelRndm; }
+	f32 getVelInhRate() const { return mData->mVelInfRate; }
+	f32 getScaleInhRate() const { return mData->mInheritScale; }
+	f32 getColorInhRate() const { return mData->mInheritRGB; }
+	f32 getAlphaInhRate() const { return mData->mInheritAlpha; }
+	f32 getGravity() const { return mData->mGravity; }
+
+	bool isFieldAffected() const { return mData->mFlags & 0x200000; }
+	bool isScaleInherited() const { return mData->mFlags & 0x10000; }
+	bool isColorInherited() const { return mData->mFlags & 0x40000; }
+	bool isAlphaInherited() const { return mData->mFlags & 0x20000; }
+	bool isRotateOn() const { return mData->mFlags & 0x1000000; }
 
 	const JPAChildShapeData* mData; // _00
 };
@@ -254,19 +279,30 @@ struct JPAExtraShape {
 	f32 getScaleOutValueY() const { return mData->mScaleOutValueY; }
 	s16 getScaleAnmCycleX() const { return mData->mScaleAnmCycleX; }
 	s16 getScaleAnmCycleY() const { return mData->mScaleAnmCycleY; }
+	f32 getScaleRndm() const { return mData->mScaleOutRandom; }
 	f32 getAlphaInTiming() const { return mData->mAlphaInTiming; }
 	f32 getAlphaOutTiming() const { return mData->mAlphaOutTiming; }
 	f32 getAlphaInValue() const { return mData->mAlphaInValue; }
 	f32 getAlphaOutValue() const { return mData->mAlphaOutValue; }
 	f32 getAlphaBaseValue() const { return mData->mAlphaBaseValue; }
 	f32 getAlphaFreq() const { return mData->mAlphaWaveFrequency; }
+	f32 getAlphaFreqRndm() const { return mData->mAlphaWaveRandom; }
 	f32 getAlphaAmp() const { return mData->mAlphaWaveAmplitude; }
+	f32 getRotateInitAngle() const { return mData->mRotateAngle; }
+	f32 getRotateRndmAngle() const { return mData->mRotateAngleRandom; }
+	f32 getRotateInitSpeed() const { return mData->mRotateSpeed; }
+	f32 getRotateRndmSpeed() const { return mData->mRotateSpeedRandom; }
+	f32 getRotateDirection() const { return mData->mRotateDirection; }
 	f32 getScaleIncRateX() const { return mScaleIncRateX; }
 	f32 getScaleDecRateX() const { return mScaleDecRateX; }
 	f32 getScaleIncRateY() const { return mScaleIncRateY; }
 	f32 getScaleDecRateY() const { return mScaleDecRateY; }
 	f32 getAlphaIncRate() const { return mAlphaIncRate; }
 	f32 getAlphaDecRate() const { return mAlphaDecRate; }
+
+	bool isEnableScaleAnm() const { return mData->mFlags & 0x1; }
+	bool isEnableAlphaFlick() const { return mData->mFlags & 0x20000; }
+	bool isEnableRotateAnm() const { return mData->mFlags & 0x1000000; }
 
 	const JPAExtraShapeData* mData; // _00
 	f32 mAlphaIncRate;              // _04

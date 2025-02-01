@@ -95,12 +95,12 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mCarrySpeed(this, 'fp01', "â^î¿ë¨ìx", 100.0f, 0.0f, 300.0f)      // 'transport speed'
-		    , mReturnSpeed(this, 'fp02', "ñﬂÇËë¨ìx", 100.0f, 0.0f, 300.0f)     // 'return speed'
-		    , mMinScale(this, 'fp03', "ÉXÉPÅ[Éãç≈è¨", 1.0f, 0.0f, 3.0f)        // 'scale minimum'
-		    , mMaxScale(this, 'fp04', "ÉXÉPÅ[Éãç≈ëÂ", 1.2f, 0.0f, 3.0f)        // 'scale maximum'
-		    , mPoisonDamage(this, 'fp05', "îíÉsÉNÉ~Éì", 300.0f, 0.0f, 1000.0f) // 'white pikmin'
-		    , mHidingTime(this, 'ip01', "âBÇÍÇƒÇ¢ÇÈéûä‘", 30, 0, 120)          // 'hiding time'
+		    , mCarrySpeed(this, 'fp01', "ÈÅãÊê¨ÈÄüÂ∫¶", 100.0f, 0.0f, 300.0f)      // 'transport speed'
+		    , mReturnSpeed(this, 'fp02', "Êàª„ÇäÈÄüÂ∫¶", 100.0f, 0.0f, 300.0f)     // 'return speed'
+		    , mMinScale(this, 'fp03', "„Çπ„Ç±„Éº„É´ÊúÄÂ∞è", 1.0f, 0.0f, 3.0f)        // 'scale minimum'
+		    , mMaxScale(this, 'fp04', "„Çπ„Ç±„Éº„É´ÊúÄÂ§ß", 1.2f, 0.0f, 3.0f)        // 'scale maximum'
+		    , mPoisonDamage(this, 'fp05', "ÁôΩ„Éî„ÇØ„Éü„É≥", 300.0f, 0.0f, 1000.0f) // 'white pikmin'
+		    , mHidingTime(this, 'ip01', "Èö†„Çå„Å¶„ÅÑ„ÇãÊôÇÈñì", 30, 0, 120)          // 'hiding time'
 		{
 		}
 
@@ -125,13 +125,13 @@ struct Parms : public EnemyParmsBase {
 		mTurnWeight            = 20.0f;
 		mTurnModifier          = 0.05f;
 		mTiltDrag              = 30.0f;
-		_910                   = 8;
+		mClimbingTime          = 8;
 		mMaxPauseTime          = 35.0f;
 		mPauseSpeedModifier    = 0.15f;
 		_91C                   = 1.0f;
 		_920                   = 0.15f;
-		_924                   = 13.0f;
-		mMouthSlotSizeModifier = 18.0f;
+		mSAttackActiveFrame    = 13.0f;
+		mMouthSlotBaseSize     = 18.0f;
 		mMouthMtxScale         = 1.4f;
 		mLifeGaugeOffset       = 20.0f;
 	}
@@ -156,13 +156,13 @@ struct Parms : public EnemyParmsBase {
 	f32 mTurnWeight;             // _904
 	f32 mTurnModifier;           // _908
 	f32 mTiltDrag;               // _90C, modify XZ speed if not perfectly horizontal (going up or down ledges)
-	u8 _910;                     // _910
+	u8 mClimbingTime;            // _910
 	f32 mMaxPauseTime;           // _914, max time to pause (in frames) when carrying back piki
 	f32 mPauseSpeedModifier;     // _918, alters walk speed when 'pausing' while carrying piki
 	f32 _91C;                    // _91C
 	f32 _920;                    // _920
-	f32 _924;                    // _924
-	f32 mMouthSlotSizeModifier;  // _928
+	f32 mSAttackActiveFrame;     // _924, frame where short attack hitbox becomes active
+	f32 mMouthSlotBaseSize;      // _928
 	f32 mMouthMtxScale;          // _92C
 	f32 mLifeGaugeOffset;        // _930
 };
@@ -267,7 +267,7 @@ struct Obj : public EnemyBase {
 	f32 mPauseTimer;                   // _338, timer for pausing when carrying back piki
 	f32 mPauseTriggerTime;             // _33C, time to pause when carrying back piki (random between 0 and 35 frames)
 	bool mDoPauseAnim;                 // _340, alternates pausing and moving when carrying back piki
-	f32 mCarryAngleModifier;           // _344
+	f32 mCarryAngleSpeed;              // _344
 	u8 _348[0x4];                      // _348, unknown
 	int mWalkBounceTimer;              // _34C
 	Vector3f mPrevReturnCheckPosition; // _350, stores every 60 frames to help check if we're stuck
@@ -381,8 +381,8 @@ struct StateAttack : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	u8 _10; // _10
-	u8 _11; // _11
+	u8 mIsAttackActive; // _10
+	u8 mDoTurnToTarget; // _11
 };
 
 struct StateCarry : public State {
@@ -444,7 +444,7 @@ struct StateMiss : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	u8 _10; // _10
+	u8 mUnused; // _10
 };
 
 struct StateReturn : public State {
@@ -467,8 +467,8 @@ struct StateSAttack : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	u8 _10; // _10
-	u8 _11; // _11
+	u8 mDidCatchTarget; // _10
+	u8 mIsAttackActive; // _11
 };
 
 struct StateSearch : public State {

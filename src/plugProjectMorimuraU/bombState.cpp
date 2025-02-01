@@ -40,7 +40,7 @@ void Bomb::StateWait::init(EnemyBase* enemy, StateArg* stateArg)
 	bomb->startMotion(BOMBANIM_HitStart, nullptr);
 	bomb->stopMotion();
 	bomb->setEmotionCaution();
-	_10 = 0;
+	mExplodeDelayTimer = 0;
 }
 
 /**
@@ -50,9 +50,9 @@ void Bomb::StateWait::init(EnemyBase* enemy, StateArg* stateArg)
 void Bomb::StateWait::exec(EnemyBase* enemy)
 {
 	Obj* bomb = OBJ(enemy);
-	if ((bomb->_2BC != 0) && (bomb->mCaptureMatrix == nullptr)) {
-		_10++;
-		if (_10 > 200) {
+	if ((bomb->mHasEscapedCapture != 0) && (bomb->mCaptureMatrix == nullptr)) {
+		mExplodeDelayTimer++;
+		if (mExplodeDelayTimer > 200) {
 			bomb->kill(nullptr);
 		}
 	}
@@ -99,7 +99,7 @@ void Bomb::StateBomb::init(EnemyBase* enemy, StateArg* stateArg)
 	enemy->disableEvent(0, EB_Cullable);
 	enemy->startMotion(BOMBANIM_HitLoop, nullptr);
 	enemy->setEmotionExcitement();
-	_10 = 0;
+	mExplodeDelayTimer = 0;
 }
 
 /**
@@ -112,9 +112,9 @@ void StateBomb::exec(EnemyBase* enemy)
 	enemy->addDamage(sys->mDeltaTime, 1.0f);
 
 	if (enemy->mHealth <= 0.0f) {
-		_10++;
-		if (!(_10 < 10)) {
-			_10 = 0;
+		mExplodeDelayTimer++;
+		if (!(mExplodeDelayTimer < 10)) {
+			mExplodeDelayTimer = 0;
 			enemy->setEmotionCaution();
 			Vector3f effectPos;
 			enemy->getCommonEffectPos(effectPos);
@@ -134,8 +134,8 @@ void StateBomb::exec(EnemyBase* enemy)
 				OBJ(enemy)->bombEffInWater();
 			}
 
-			cameraMgr->startVibration(12, effectPos, 2);
-			rumbleMgr->startRumble(15, effectPos, RUMBLEID_Both);
+			cameraMgr->startVibration(VIBTYPE_MidMidShort, effectPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed15, effectPos, RUMBLEID_Both);
 
 			Vector3f position = enemy->getPosition();
 			Parms* parms      = CG_PARMS(enemy);

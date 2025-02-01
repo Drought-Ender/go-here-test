@@ -207,7 +207,7 @@ void Obj::doUpdateCarcass()
 				f32 z = mBaseTrMatrix.mMatrix.structView.zz;
 				EnemyBirthArg arg;
 				arg.mPosition        = mPosition;
-				arg.mFaceDir         = JMath::atanTable_.atan2_(x, z);
+				arg.mFaceDir         = JMAAtan2Radian(x, z);
 				arg.mExistenceLength = mExistDuration;
 				arg.mIsInPiklopedia  = (u8)mInPiklopedia;
 				EnemyBase* obj       = generalEnemyMgr->birth(getEnemyTypeID(), arg);
@@ -236,9 +236,9 @@ void Obj::doGetLifeGaugeParam(LifeGaugeParam& param)
 	} else {
 		param.mPosition.y = mPosition.y + C_GENERALPARMS.mLifeMeterHeight.mValue;
 	}
-	param.mPosition.z          = mPosition.z;
-	param.mCurHealthPercentage = mHealth / mMaxHealth;
-	param.mRadius              = 10.0f;
+	param.mPosition.z      = mPosition.z;
+	param.mCurrHealthRatio = mHealth / mMaxHealth;
+	param.mRadius          = 10.0f;
 }
 
 /**
@@ -461,7 +461,7 @@ void Obj::startEnemyRumble()
 	Vector3f vec(mtx->mMatrix.structView.tx, mtx->mMatrix.structView.ty, mtx->mMatrix.structView.tz);
 	vec.y = mPosition.y;
 
-	rumbleMgr->startRumble(11, vec, 2);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed11, vec, RUMBLEID_Both);
 	createBounceEffect(vec, 0.75f);
 }
 

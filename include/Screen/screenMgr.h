@@ -2,15 +2,23 @@
 #define _SCREEN_SCREENMGR_H
 
 #include "Screen/screenObj.h"
+#include "Screen/SceneInfoList.h"
 
-// no idea if theres a better place to put this, its kind of a random single function
-namespace kh {
+struct Controller;
+
+namespace og {
 namespace Screen {
-::Screen::SceneBase* createScene_Koono(s32);
-} // namespace Screen
-} // namespace kh
+struct DispMemberBase;
+}
+} // namespace og
 
 namespace Screen {
+
+struct SceneBase;
+struct SetSceneArg;
+struct StartSceneArg;
+struct EndSceneArg;
+struct MgrCommand;
 
 ScreenOwnerID getSceneOwnerName(SceneBase* scene);
 ScreenMemberID getSceneMemberName(SceneBase* scene);
@@ -71,11 +79,15 @@ struct Mgr : public MgrBase {
 	SceneBase* getSceneBase(s32);
 	void createNewBackupSceneInfo(SceneBase* scene);
 
-	inline void checkController()
+	inline Controller* getGamePad()
 	{
-		Controller* controller = mController;
-		P2ASSERTLINE(280, controller);
+		P2ASSERTLINE(280, mController);
+		return mController;
 	}
+
+	static Mgr* sScreenMgr;
+
+	inline SceneInfoList* getFirstList() { return static_cast<SceneInfoList*>(mSceneInfoList.mChild); }
 
 	// _00     = VTBL
 	// _00-_18 = MgrBase
@@ -88,9 +100,7 @@ struct Mgr : public MgrBase {
 	CNode mCommandList;       // _44
 	JKRSolidHeap* mCurrHeap;  // _5C
 	CNode mBackupInfoList;    // _60
-	CNode mSceneInfoList;     // _78, treat as SceneInfoList // NOTE: Why can't this just be SceneInfoList?
-
-	static Mgr* sScreenMgr;
+	CNode mSceneInfoList;     // _78, treat as SceneInfoList
 };
 
 inline void checkSceneList(SceneInfoList* list) { P2ASSERTLINE(329, list); }
@@ -112,7 +122,7 @@ struct Mgr : public Screen::Mgr {
 		mInCave      = false;
 		mInDemo      = false;
 		mCourseIndex = 0;
-		_98          = 0;
+		mUnused      = 0;
 	}
 
 	virtual ~Mgr() { }                                                 // _08 (weak)
@@ -130,11 +140,18 @@ struct Mgr : public Screen::Mgr {
 	bool mInCave;              // _91
 	bool mInDemo;              // _92
 	u32 mCourseIndex;          // _94
-	u32 _98;                   // _98
+	u32 mUnused;               // _98
 	JUtility::TColor mBgColor; // _9C
 	JUtility::TColor mColor2;  // _A0
 	int mBgMode;               // _A4
 };
 } // namespace newScreen
+
+// no idea if theres a better place to put this, its kind of a random single function
+namespace kh {
+namespace Screen {
+::Screen::SceneBase* createScene_Koono(s32);
+} // namespace Screen
+} // namespace kh
 
 #endif

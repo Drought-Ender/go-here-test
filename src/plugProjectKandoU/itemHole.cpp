@@ -43,9 +43,9 @@ Mgr* mgr;
 void FSM::init(Game::CFSMItem*)
 {
 	create(HOLE_StateCount);
-	registerState(new NormalState());
-	registerState(new AppearState());
-	registerState(new CloseState());
+	registerState(new NormalState);
+	registerState(new AppearState);
+	registerState(new CloseState);
 }
 
 /**
@@ -120,7 +120,7 @@ void CloseState::init(Game::CFSMItem* item, Game::StateArg* arg)
  * @note Size: 0x14
  * exec__Q34Game8ItemHole10CloseStateFPQ24Game8CFSMItem
  */
-void CloseState::exec(Game::CFSMItem* item) { item->mLod.resetFlag(AILOD_IsVisible | AILOD_IsVisVP0 | AILOD_IsVisVP1); }
+void CloseState::exec(Game::CFSMItem* item) { item->mLod.resetFlag(AILOD_IsVisibleBoth); }
 
 /**
  * @note Address: 0x801D1AA8
@@ -135,11 +135,11 @@ void CloseState::cleanup(Game::CFSMItem*) { }
 void Item::movieUserCommand(u32 command, MoviePlayer* player)
 {
 	switch (command) {
-	case 100:
+	case CC_MovieCommand1:
 		PelletIterator iterator;
-		iterator.first();
-		while (!iterator.isDone()) {
-			Pellet* pellet = (Pellet*)(*iterator);
+		CI_LOOP(iterator)
+		{
+			Pellet* pellet = *iterator;
 			if (pellet->isPickable() && pellet->isAlive()) {
 				Vector3f pelletPos = pellet->getPosition();
 				Vector3f holePos   = getPosition();
@@ -150,7 +150,6 @@ void Item::movieUserCommand(u32 command, MoviePlayer* player)
 					pellet->setPosition(pelletPos, false);
 				}
 			}
-			iterator.next();
 		}
 		if (!player->isFlag(MVP_IsFinished)) {
 			mFsm->transit(this, Hole_Appear, nullptr);
@@ -159,7 +158,7 @@ void Item::movieUserCommand(u32 command, MoviePlayer* player)
 			if (mBuryDepth != 0.0f) {
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_WORK_FINISH, 0);
 			}
-			efx::Arg arg(Vector3f::zero);
+			efx::Arg arg;
 			arg.mPosition = mPosition;
 			mEfxWarpZone->create(&arg);
 			mFsm->transit(this, Hole_Normal, nullptr);
@@ -282,7 +281,7 @@ void Item::initDependency()
 	}
 
 	if (getStateID() == Hole_Normal) {
-		efx::Arg arg(Vector3f::zero);
+		efx::Arg arg;
 		arg.mPosition = mPosition;
 		mEfxWarpZone->create(&arg);
 	}
@@ -334,7 +333,7 @@ void Item::doAI()
 	if (mBarrel) {
 		if (!mBarrel->isAlive()) {
 			mBarrel = nullptr;
-			efx::Arg arg(Vector3f::zero);
+			efx::Arg arg;
 			arg.mPosition = mPosition;
 			mEfxWarpZone->create(&arg);
 		}
@@ -392,16 +391,16 @@ Mgr::Mgr()
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("dungeon_hole.bmd", 0, 0x20000);
-	mModelData[0]->newSharedDisplayList(0x40000);
+	loadBmd("dungeon_hole.bmd", 0, J3DMODEL_CreateNewDL);
+	mModelData[0]->newSharedDisplayList(J3DMODEL_UseSingleSharedDL);
 	mModelData[0]->makeSharedDL();
 	JKRArchive* archive = openTextArc("texts.szs");
 	mCapPlatform        = loadPlatform(archive, "cap_platform.bin");
 	mSidePlatform       = loadPlatform(archive, "side_platform.bin");
 	MapCode::Code code;
-	code.setCode(1, 2, true);
+	code.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode_Steep, true);
 	mCapPlatform->setMapCodeAll(code);
-	code.setCode(1, 1, true);
+	code.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode_Gradual, true);
 	mSidePlatform->setMapCodeAll(code);
 	closeTextArc(archive);
 }
@@ -412,7 +411,7 @@ void Mgr::onLoadResources()
  */
 void Mgr::setup(Game::BaseItem* item)
 {
-	item->mModel = new SysShape::Model(getModelData(0), 0x20000, 2);
+	item->mModel = new SysShape::Model(getModelData(0), J3DMODEL_CreateNewDL, 2);
 	item->mModel->mJ3dModel->calc();
 	item->mModel->mJ3dModel->calcMaterial();
 	item->mModel->mJ3dModel->makeDL();

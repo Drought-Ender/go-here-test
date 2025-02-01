@@ -56,7 +56,7 @@ void StateDead::exec(EnemyBase* enemy)
 
 	if (crab->getMotionFrame() > 50.0f) {
 		Vector3f crabPos = crab->getPosition();
-		cameraMgr->startVibration(6, crabPos, 2);
+		cameraMgr->startVibration(VIBTYPE_LightFastShort, crabPos, CAMNAVI_Both);
 	}
 
 	if (crab->mCurAnim->mIsPlaying) {
@@ -69,8 +69,8 @@ void StateDead::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_3) {
 			crab->createDeadBombEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(26, crabPos, 2);
-			rumbleMgr->startRumble(14, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_HardFastLong, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			crab->kill(nullptr);
 		}
@@ -174,16 +174,16 @@ void StateAppear::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_2) {
 			crab->createAppearSmokeEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(27, crabPos, 2);
-			rumbleMgr->startRumble(15, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_Crash, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed15, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_3) {
 			crab->setBossAppearBGM();
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_4) {
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(15, crabPos, 2);
-			rumbleMgr->startRumble(11, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			Creature* target = crab->getSearchedTarget();
@@ -835,13 +835,7 @@ void StateMove::exec(EnemyBase* enemy)
 		} else {
 			crab->turnToTarget(target, CG_GENERALPARMS(crab).mTurnSpeed(), CG_GENERALPARMS(crab).mMaxTurnAngle());
 			if (FABS(viewAngle) <= PI * (DEG2RAD * CG_GENERALPARMS(crab).mMaxAttackAngle())) {
-				f32 moveSpeed = CG_GENERALPARMS(crab).mMoveSpeed();
-				f32 x         = sin(crab->getFaceDir());
-				f32 y         = crab->getTargetVelocity().y;
-				f32 z         = cos(crab->getFaceDir());
-
-				crab->mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
-
+				crab->setTargetVelocity();
 			} else {
 				crab->mTargetVelocity = Vector3f(0.0f);
 			}
@@ -856,22 +850,17 @@ void StateMove::exec(EnemyBase* enemy)
 	} else {
 		Vector3f targetPos = crab->mTargetPosition;
 		f32 viewAngle      = crab->getCreatureViewAngle(targetPos);
-		crab->turnToTarget(targetPos, CG_GENERALPARMS(crab).mTurnSpeed(), CG_GENERALPARMS(crab).mMaxTurnAngle());
+		crab->turnToTarget2(targetPos, CG_GENERALPARMS(crab).mTurnSpeed(), CG_GENERALPARMS(crab).mMaxTurnAngle());
 
 		if (FABS(viewAngle) <= HALF_PI) {
-			f32 moveSpeed = CG_GENERALPARMS(crab).mMoveSpeed();
-			f32 x         = sin(crab->getFaceDir());
-			f32 y         = crab->getTargetVelocity().y;
-			f32 z         = cos(crab->getFaceDir());
-
-			crab->mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
+			crab->setTargetVelocity();
 		} else {
-			crab->mTargetVelocity = Vector3f(0.0f);
+			crab->setTargetVelocity(Vector3f(0.0f));
 		}
 	}
 
 	if (crab->isFinishMotion()) {
-		crab->mTargetVelocity = Vector3f(0.0f);
+		crab->setTargetVelocity(Vector3f(0.0f));
 	}
 
 	crab->mStateTimer += sys->mDeltaTime;
@@ -882,8 +871,8 @@ void StateMove::exec(EnemyBase* enemy)
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_2) {
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(3, crabPos, 2);
-			rumbleMgr->startRumble(11, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_LightMidShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			transit(crab, crab->mNextState, nullptr);
@@ -1456,7 +1445,7 @@ void StateAttack::exec(EnemyBase* enemy)
 	if (crab->mIsRolling) {
 		crab->rollingMove();
 		Vector3f crabPos = crab->getPosition();
-		cameraMgr->startVibration(25, crabPos, 2);
+		cameraMgr->startVibration(VIBTYPE_HardFastMid, crabPos, CAMNAVI_Both);
 		crab->getJAIObject()->startSound(PSSE_EN_DANGO_ROLL_GROUND, 0);
 	} else {
 		crab->mTargetVelocity = Vector3f(0.0f);
@@ -1473,8 +1462,8 @@ void StateAttack::exec(EnemyBase* enemy)
 			crab->startBossAttackLoopBGM();
 			crab->createEnemyBounceEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(15, crabPos, 2);
-			rumbleMgr->startRumble(14, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_4) {
 			if (!crab->mIsRolling) {
@@ -1482,7 +1471,7 @@ void StateAttack::exec(EnemyBase* enemy)
 				crab->startRollingMoveEffect();
 			}
 
-		} else if (crab->mCurAnim->mType == KEYEVENT_1) {
+		} else if (crab->mCurAnim->mType == KEYEVENT_LOOP_END) {
 			if (crab->isFinishMotion()) {
 				crab->mIsRolling = false;
 				crab->mIsBall    = false;
@@ -1492,8 +1481,8 @@ void StateAttack::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_5) {
 			crab->createEnemyBounceEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(25, crabPos, 2);
-			rumbleMgr->startRumble(14, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_HardFastMid, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			transit(crab, crab->mNextState, nullptr);
@@ -1533,8 +1522,8 @@ void StateTurn::init(EnemyBase* enemy, StateArg* stateArg)
 	crab->createCrashEnemy();
 
 	Vector3f crabPos = crab->getPosition();
-	cameraMgr->startVibration(27, crabPos, 2);
-	rumbleMgr->startRumble(15, crabPos, 2);
+	cameraMgr->startVibration(VIBTYPE_Crash, crabPos, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed15, crabPos, RUMBLEID_Both);
 }
 
 /**
@@ -1561,10 +1550,10 @@ void StateTurn::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_2) {
 			crab->createEnemyBounceEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(21, crabPos, 2);
-			rumbleMgr->startRumble(14, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_HardMidShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 
-		} else if (crab->mCurAnim->mType == KEYEVENT_NULL) {
+		} else if (crab->mCurAnim->mType == KEYEVENT_LOOP_START) {
 			if (crab->isEvent(0, EB_Invulnerable)) {
 				crab->disableEvent(0, EB_NoInterrupt);
 				crab->disableEvent(0, EB_Invulnerable);
@@ -1575,14 +1564,14 @@ void StateTurn::exec(EnemyBase* enemy)
 			crab->enableEvent(0, EB_Invulnerable);
 			crab->setBodyCollision(true);
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(15, crabPos, 2);
-			rumbleMgr->startRumble(11, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_4) {
 			crab->createBodyTurnEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(25, crabPos, 2);
-			rumbleMgr->startRumble(14, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_HardFastMid, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			transit(crab, crab->mNextState, nullptr);
@@ -1631,8 +1620,8 @@ void StateRecover::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_2) {
 			crab->createEnemyBounceEffect();
 			Vector3f crabPos = crab->getPosition();
-			cameraMgr->startVibration(15, crabPos, 2);
-			rumbleMgr->startRumble(11, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, crabPos, RUMBLEID_Both);
 			crab->startBossFlickBGM();
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
@@ -1676,8 +1665,8 @@ void StateFlick::exec(EnemyBase* enemy)
 		crab->createWallBreakEffect();
 		crab->getJAIObject()->startSound(PSSE_EN_DANGO_ARM_GROUND, 0);
 		Vector3f crabPos = crab->getPosition();
-		cameraMgr->startVibration(25, crabPos, 2);
-		rumbleMgr->startRumble(14, crabPos, 2);
+		cameraMgr->startVibration(VIBTYPE_HardFastMid, crabPos, CAMNAVI_Both);
+		rumbleMgr->startRumble(RUMBLETYPE_Fixed14, crabPos, RUMBLEID_Both);
 		transit(crab, DANGOMUSHI_Wait, (DangoStateArg*)("blend"));
 		return;
 	}
@@ -1695,8 +1684,8 @@ void StateFlick::exec(EnemyBase* enemy)
 		} else if (crab->mCurAnim->mType == KEYEVENT_3) {
 			crab->mIsArmSwinging = false;
 			Vector3f crabPos     = crab->getPosition();
-			cameraMgr->startVibration(15, crabPos, 2);
-			rumbleMgr->startRumble(11, crabPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, crabPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, crabPos, RUMBLEID_Both);
 
 		} else if (crab->mCurAnim->mType == KEYEVENT_END) {
 			transit(crab, DANGOMUSHI_Wait, nullptr);

@@ -18,7 +18,7 @@ static const char* cMatAnimBrkTexName = "/enemy/data/FireChappy/yakichappy.brk";
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "ヤキチャッピーマネージャ"; // yaki chappy manager
+	mName = "繝､繧ｭ繝√Ε繝�繝斐�ｼ繝槭ロ繝ｼ繧ｸ繝｣"; // yaki chappy manager
 }
 
 /**
@@ -89,7 +89,7 @@ void Mgr::loadTexData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x40000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_UseSingleSharedDL, mMtxBufferSize);
 	P2ASSERTLINE(144, model);
 	return model;
 }

@@ -71,14 +71,15 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 	game->setFixNearFar(false, 0.0f, 0.0f);
 	static_cast<newScreen::Mgr*>(Screen::gGame2DMgr->mScreenMgr)->mInCave      = false;
 	static_cast<newScreen::Mgr*>(Screen::gGame2DMgr->mScreenMgr)->mCourseIndex = courseID;
-	gameSystem->mIsInCave                                                      = false;
-	game->mCurrentFloor                                                        = 0;
-	game->_194                                                                 = false;
+
+	gameSystem->mIsInCave = false;
+	game->mCurrentFloor   = 0;
+	game->mIsExitingMap   = false;
 
 	if ((playData->mDeadNaviID & 1) == 0) {
-		game->setPlayerMode(0);
+		game->setPlayerMode(NAVIID_Olimar);
 	} else {
-		game->setPlayerMode(1);
+		game->setPlayerMode(NAVIID_Louie);
 	}
 	game->setCamController();
 	if (game->mWeatherEfx) {
@@ -89,12 +90,12 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 	moviePlayer->getActiveGameCamera();
 
 	switch (startType) {
-	case Start_EndDay: {
+	case MapEnter_CaveNavisDown: {
 		DayEndArg dayEndArg(DayEndState::DETYPE_CaptainsDown);
 		transit(game, SGS_DayEnd, &dayEndArg);
 		return;
 	} break;
-	case Start_NewGame: {
+	case MapEnter_NewGame: {
 		char* courseName = const_cast<char*>(game->mCurrentCourseInfo->mName);
 		MoviePlayArg moviePlayArg("x01_gamestart", courseName, game->mMovieFinishCallback, 0);
 		playData->setDemoFlag(DEMO_Day_One_Start);
@@ -111,7 +112,7 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 		game->mWeatherEfx->fade();
 	} break;
 
-	case Start_NormalLand: {
+	case MapEnter_NewDay: {
 		int flagID = game->mCurrentCourseInfo->mCourseIndex + DEMO_Day_One_Start;
 		if (!playData->isDemoFlag(flagID)) {
 			playData->setDemoFlag(flagID);
@@ -133,9 +134,9 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 		}
 		gameSystem->mTimeMgr->setStartTime();
 	} break;
-	case Start_Unk3:
-	case Start_Unk4:
-	case Start_ReturnCave: {
+	case MapEnter_CaveExtinction:
+	case MapEnter_CaveGiveUp:
+	case MapEnter_CaveGeyser: {
 		char* courseName = const_cast<char*>(game->mCurrentCourseInfo->mName);
 		MoviePlayArg moviePlayArg("s0E_return_cave", courseName, game->mMovieFinishCallback, 0);
 		moviePlayArg.mDelegateStart = game->mMovieStartCallback;
@@ -150,7 +151,7 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 				}
 			}
 		}
-		if (startType == 1) {
+		if (startType == MapEnter_CaveGeyser) {
 			gameSystem->mTimeMgr->setTime(playData->mCaveSaveData.mTime);
 		}
 	} break;
@@ -159,8 +160,8 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 	}
 
 	sys->heapStatusDump(true);
-	gameSystem->mTimeMgr->mFlags.unset(TIMEFLAG_Stopped);
-	if (startType != Start_Unk3) {
+	gameSystem->mTimeMgr->resetFlag(TIMEFLAG_Stopped);
+	if (startType != MapEnter_CaveExtinction) {
 		// Check if any pikmin types are extinct, if they are, the post-extinction cutscene is needed
 		bool noPikisLeft = false;
 		for (int i = 0; i <= 2; i++) {
@@ -187,7 +188,7 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
 	// Do a dumb calcNearestTreasure because any non-0 return means a treasure at least exists
 	Vector3f dummyPos;
 	f32 dummyDist;
-	if (Radar::mgr->calcNearestTreasure(Vector3f::zero, 128000.0f, dummyPos, dummyDist) == 0) {
+	if (Radar::mgr->calcNearestTreasure(Vector3f::zero, FLOAT_DIST_MAX, dummyPos, dummyDist) == 0) {
 		game->mNeedTreasureCalc = true;
 	} else {
 		game->mNeedTreasureCalc = false;
@@ -207,13 +208,18 @@ void GameState::init(SingleGameSection* game, StateArg* arg)
  */
 unknown GameState::gameStart(SingleGameSection*)
 {
-	// Feels like there should be more to this, but the DispObjGround stuff is sometimes before this stuff, sometimes after, idk
 	gameSystem->setFlag(GAMESYS_IsPlaying);
 	if (gameSystem->mTimeMgr->mDayCount != 0) {
-		PSMGetSceneMgr()->mScenes->mChild->startMainSeq();
+		PSSystem::getSceneMgr()->doStartMainSeq();
 	} else {
-		static_cast<PSM::Scene_Objects*>(PSMGetSceneMgr()->mScenes->mChild)->onStartMainSeq();
-		static_cast<PSM::Scene_Objects*>(PSMGetSceneMgr()->mScenes->mChild)->getEnvSe()->on();
+		// PikSceneMgr cast is solely to fix a regswap, very cool
+		PSGame::PikSceneMgr* mgr = static_cast<PSGame::PikSceneMgr*>(PSSystem::getSceneMgr());
+		mgr->checkScene();
+		static_cast<PSM::Scene_Objects*>(mgr->mScenes->mChild)->onStartMainSeq();
+
+		mgr = static_cast<PSGame::PikSceneMgr*>(PSSystem::getSceneMgr());
+		mgr->checkScene();
+		static_cast<PSM::Scene_Game*>(mgr->mScenes->mChild)->getEnvSe()->on();
 	}
 }
 
@@ -412,6 +418,7 @@ void GameState::exec(SingleGameSection* game)
 		particle2dMgr->update();
 		Screen::gGame2DMgr->update();
 		if ((u8)Screen::gGame2DMgr->check_Save()) {
+			// MapEnter type isnt used when loading into caves, someone put 100 here for the funny
 			LoadArg arg(100, true, false, false);
 			transit(game, SGS_Load, &arg);
 		}
@@ -428,22 +435,22 @@ void GameState::exec(SingleGameSection* game)
 	game->updateMainMapScreen();
 
 	// Check starting the "you appear lost" cutscene timer
-	if (GameStat::getMapPikmins(-1) >= 15 && moviePlayer->mDemoState == 0 && !playData->isDemoFlag(DEMO_You_Appear_Lost)
-	    && playData->hasBootContainer(Red)) {
+	if (GameStat::getMapPikmins(AllPikminCalcs) >= 15 && moviePlayer->mDemoState == DEMOSTATE_Inactive
+	    && !playData->isDemoFlag(DEMO_You_Appear_Lost) && playData->hasBootContainer(Red)) {
 		playData->setDemoFlag(DEMO_You_Appear_Lost);
 		game->enableTimer(180.0f, DEMOTIMER_YouAppearLost);
 	}
 
-	if (moviePlayer->mDemoState == 0 && needRepayDemo()) {
+	if (moviePlayer->mDemoState == DEMOSTATE_Inactive && needRepayDemo()) {
 		startRepayDemo();
 	}
 
 	// Check if anything needs to be done following a % of debt cutscene
 	int repaystate = updateRepayDemo();
 	switch (repaystate) {
-	case 1:
+	case RDS_Started:
 		return;
-	case 3: { // end the day, go to ending
+	case RDS_GoToPayDebt: { // end the day, go to ending (debt repayed)
 		pikiMgr->forceEnterPikmins(false);
 		game->saveToGeneratorCache(game->mCurrentCourseInfo);
 		game->advanceDayCount();
@@ -452,23 +459,24 @@ void GameState::exec(SingleGameSection* game)
 		transit(game, SGS_Ending, &arg);
 		return;
 	}
-	case 4: { // end the day, go to ending
+	case RDS_GameComplete: { // end the day, go to ending (all treasures)
 		pikiMgr->forceEnterPikmins(false);
 		game->saveToGeneratorCache(game->mCurrentCourseInfo);
 		game->advanceDayCount();
 		gameSystem->setPause(false, "repay-done", 3);
-		EndingArg arg(2);
+		EndingArg arg(EndingState::Ending_IsComplete);
 		transit(game, SGS_Ending, &arg);
 		return;
 	}
 
-	case 2: {
+	case RDS_DemoPlaying: {
 		PSPause_StartMenuOff();
 		gameSystem->setPause(false, "repay-done", 3);
 		return;
 	}
 	}
 
+	// Don't continue if in cave/geyser menus
 	if (game->mOpenMenuFlags && !game->updateCaveMenus()) {
 		return;
 	}
@@ -478,20 +486,20 @@ void GameState::exec(SingleGameSection* game)
 	// Check status of opened pause menu
 	int menustate = Screen::gGame2DMgr->check_SMenu();
 	switch (menustate) {
-	case 0:
+	case Screen::Game2DMgr::CHECK2D_SMenu_Opened:
 		break;
-	case 1: // cancel menu
+	case Screen::Game2DMgr::CHECK2D_SMenu_Cancel: // cancel menu
 		gameSystem->setMoviePause(false, "sm-canc");
 		gameSystem->setPause(false, "sm-canc", 3);
 		break;
-	case 2:
+	case Screen::Game2DMgr::CHECK2D_SMenu_GoToSunset:
 		gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 		gameSystem->setMoviePause(false, "sm-ugot");
 		gameSystem->setPause(false, "sm-ugot", 3);
 		DayEndArg arg(DayEndState::DETYPE_Normal);
 		transit(game, SGS_DayEnd, &arg);
 		return;
-	case 3:
+	case Screen::Game2DMgr::CHECK2D_SMenu_ReturnToFileSelect:
 		P2ASSERTLINE(1304, Screen::gGame2DMgr->mScreenMgr->reset() == 1);
 		playData->mDeadNaviID = 0;
 		naviMgr->clearDeadCount();
@@ -501,12 +509,12 @@ void GameState::exec(SingleGameSection* game)
 		game->clearHeap();
 		transit(game, SGS_File, nullptr);
 		return;
-	case 4:
+	case Screen::Game2DMgr::CHECK2D_SMenu_EscapeCave:
 		JUT_PANICLINE(1318, "smenu_escape\n");
 		break;
 	default:
 		// Check open pause menu
-		if (!gameSystem->isFlag(GAMESYS_DisablePause) && moviePlayer->mDemoState == 0 && !gameSystem->paused()
+		if (!gameSystem->isFlag(GAMESYS_DisablePause) && moviePlayer->mDemoState == DEMOSTATE_Inactive && !gameSystem->paused()
 		    && game->mControllerP1->getButtonDown() & Controller::PRESS_START) {
 			og::Screen::DispMemberSMenuAll disp;
 			game->setDispMemberSMenu(disp);
@@ -527,8 +535,8 @@ void GameState::exec(SingleGameSection* game)
 	}
 
 	// Check need pikmin extinction to occur
-	if (!mIsPostExtinct && moviePlayer->mDemoState == 0) {
-		if (GameStat::getAllPikmins(-1) - GameStat::getZikatuPikmins(-1) == 0 && playData->hasBootContainer(Red)) {
+	if (!mIsPostExtinct && moviePlayer->mDemoState == DEMOSTATE_Inactive) {
+		if (GameStat::getAllPikmins(AllPikminCalcs) - GameStat::getZikatuPikmins(AllPikminCalcs) == 0 && playData->hasBootContainer(Red)) {
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 			MoviePlayArg moviePlayArg("s05_pikminzero", nullptr, game->mMovieFinishCallback, 0);
 			Navi* navi = naviMgr->getActiveNavi();
@@ -547,7 +555,7 @@ void GameState::exec(SingleGameSection* game)
 	}
 
 	PSM::PikminNumberDirector* director = PSMGetPikminNumD();
-	int pikis                           = GameStat::getMapPikmins_exclude_Me(-1);
+	int pikis                           = GameStat::getMapPikmins_exclude_Me(AllPikminCalcs);
 	if (pikis < 10 && DeathMgr::mSoundDeathCount > 0) {
 		if (director) {
 			director->directOn();
@@ -619,11 +627,11 @@ void GameState::onMovieStart(SingleGameSection* game, MovieConfig* config, u32, 
 		Screen::Game2DMgr::GameOverTitle naviType;
 		if (naviID == 0) {
 			naviType = Screen::Game2DMgr::GOTITLE_OlimarDown;
-			game->setPlayerMode(0);
+			game->setPlayerMode(NAVIID_Olimar);
 		} else {
-			naviType = (playData->mStoryFlags & STORY_DebtPaid) ? Screen::Game2DMgr::GOTITLE_PresidentDown
-			                                                    : Screen::Game2DMgr::GOTITLE_LouieDown;
-			game->setPlayerMode(1);
+			naviType
+			    = playData->isStoryFlag(STORY_DebtPaid) ? Screen::Game2DMgr::GOTITLE_PresidentDown : Screen::Game2DMgr::GOTITLE_LouieDown;
+			game->setPlayerMode(NAVIID_Louie);
 		}
 		Screen::gGame2DMgr->open_GameOver(naviType);
 	}
@@ -750,7 +758,7 @@ void GameState::onMovieDone(SingleGameSection* game, MovieConfig* config, u32, u
 	// Regular/first time course landing, check usual stuff after it
 	if (config->is("s00_coursein") || config->is("x01_coursein_forest") || config->is("x01_coursein_yakushima")
 	    || config->is("x01_coursein_last")) {
-		if ((playData->mStoryFlags & STORY_DebtPaid) && !playData->isDemoFlag(DEMO_President_Start)) {
+		if (playData->isStoryFlag(STORY_DebtPaid) && !playData->isDemoFlag(DEMO_President_Start)) {
 			playData->setDemoFlag(DEMO_President_Start);
 			char* name = const_cast<char*>(game->mCurrentCourseInfo->mName);
 			MoviePlayArg moviePlayArg("g35_president_gamestart", name, game->mMovieFinishCallback, 0);
@@ -807,7 +815,7 @@ void GameState::onMovieDone(SingleGameSection* game, MovieConfig* config, u32, u
 			return;
 		}
 
-		// @intns: only remaining regswaps are in this loop - Piki* piki should load into r25 not r28.
+		// ground all pikmin when cutscene ends
 		Iterator<Piki> iterator(pikiMgr);
 		CI_LOOP(iterator)
 		{
@@ -857,9 +865,9 @@ void GameState::onMovieDone(SingleGameSection* game, MovieConfig* config, u32, u
 		naviMgr->getAt(id)->setDeadLaydown();
 		if (naviMgr->mDeadNavis != 2) {
 			if ((int)id == NAVIID_Olimar) {
-				gameSystem->mSection->setPlayerMode(1);
+				gameSystem->mSection->setPlayerMode(NAVIID_Louie);
 			} else {
-				gameSystem->mSection->setPlayerMode(0);
+				gameSystem->mSection->setPlayerMode(NAVIID_Olimar);
 			}
 		} else {
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
@@ -942,17 +950,17 @@ GameState::RepayDemoState GameState::updateRepayDemo()
 			gameSystem->setMoviePause(false, "check-repay");
 			mCheckRepay = false;
 			if (playData->isCompletePelletTrigger()) {
-				return RDS_4;
+				return RDS_GameComplete;
 			}
 			playData->experienceRepayLevelFirstClear();
 			if (playData->getRepayLevel() >= 9) {
-				return RDS_3;
+				return RDS_GoToPayDebt;
 			}
-			return RDS_2;
+			return RDS_DemoPlaying;
 		}
-		return RDS_1;
+		return RDS_Started;
 	}
-	return RDS_0;
+	return RDS_Inactive;
 }
 
 /**

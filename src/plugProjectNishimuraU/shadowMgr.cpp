@@ -125,7 +125,7 @@ ShadowMgr::ShadowMgr(int count)
 	mEnabled             = true;
 	mDoCheckCylinderType = 1;
 	mCylinderID          = 0;
-	_44                  = 0;
+	mUnused0             = 0;
 	mName                = "ShadowMgr";
 }
 
@@ -666,7 +666,7 @@ u32 ShadowMgr::getShadowType(int p1, int p2)
  */
 bool ShadowMgr::isDrawNormalShadow(ShadowNode* node, int vpNum)
 {
-	if (node->getGameObject()->needShadow() && (node->mFlags & 0xF0000000 || node->getGameObject()->mLod.isFlag(AILOD_IsVisVP0 << vpNum))) {
+	if (node->getGameObject()->needShadow() && (node->mFlags & 0xF0000000 || node->getGameObject()->mLod.isVPVisible(vpNum))) {
 		return true;
 	}
 
@@ -679,7 +679,7 @@ bool ShadowMgr::isDrawNormalShadow(ShadowNode* node, int vpNum)
  */
 bool ShadowMgr::isDrawJointShadow(JointShadowRootNode* node, int vpNum)
 {
-	if (node->mCreature->needShadow() && (node->mIsVisible || node->mCreature->mLod.isFlag(AILOD_IsVisVP0 << vpNum))) {
+	if (node->mCreature->needShadow() && (node->mIsVisible || node->mCreature->mLod.isVPVisible(vpNum))) {
 		return true;
 	}
 
@@ -690,17 +690,7 @@ bool ShadowMgr::isDrawJointShadow(JointShadowRootNode* node, int vpNum)
  * @note Address: 0x80242454
  * @note Size: 0xAC
  */
-void ShadowMgr::readShadowParms(char* fileName)
-{
-	void* data = JKRDvdRipper::loadToMainRAM(fileName, nullptr, Switch_0, 0, nullptr, JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
-
-	if (data) {
-		RamStream input(data, -1);
-		input.resetPosition(true, 1);
-		read(input);
-		delete[] data;
-	}
-}
+void ShadowMgr::readShadowParms(char* fileName) { loadFromFile(this, fileName); }
 
 /**
  * @note Address: 0x80242500
@@ -711,7 +701,7 @@ void ShadowMgr::write(Stream& output)
 	output.writeShort((u16)mEnabled);
 	output.writeShort((u16)mDoCheckCylinderType);
 	output.writeInt(mCylinderID);
-	output.writeInt(_44);
+	output.writeInt(mUnused0);
 	mColor.write(output);
 	mParms->write(output);
 }
@@ -725,7 +715,7 @@ void ShadowMgr::read(Stream& input)
 	mEnabled             = input.readShort();
 	mDoCheckCylinderType = input.readShort();
 	mCylinderID          = input.readInt();
-	_44                  = input.readInt();
+	mUnused0             = input.readInt();
 	mColor.read(input);
 	mParms->read(input);
 }

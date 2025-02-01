@@ -36,14 +36,17 @@ bool InteractFueFuki::actPiki(Game::Piki* piki)
 	if (piki->mCurrentState->invincible(piki)) {
 		return false;
 	}
+
 	if (piki->mBrain->mActionId == PikiAI::ACT_Teki || !piki->isPikmin()) {
 		return false;
 	}
+
 	if (piki->mCurrentState->callable()) {
 		PikiAI::CreatureActionArg fueFukiArg = mCreature;
 		piki->mBrain->start(PikiAI::ACT_Teki, &fueFukiArg);
 		return true;
 	}
+
 	return false;
 }
 
@@ -100,12 +103,12 @@ bool InteractFue::actPiki(Game::Piki* piki)
 				piki->mFsm->transit(piki, PIKISTATE_Holein, &holeInArg);
 				return false;
 			}
-		} else if (!(moviePlayer->mDemoState || (u32)pikiKind - 1 > Red && pikiKind != Blue)) {
+		} else if (!(moviePlayer->mDemoState != DEMOSTATE_Inactive || (u32)pikiKind - 1 > Red && pikiKind != Blue)) {
 			piki->setZikatu(false);
 			GameStat::zikatuPikis.dec(piki->getKind());
-			if (!playData->isDemoFlag(DEMO_Meet_Red_Pikmin) && (piki->getKind() == Red)) {
-				if (gameSystem->mSection->getTimerType() != 4) {
-					gameSystem->mSection->enableTimer(1.2f, 4);
+			if (!playData->isDemoFlag(DEMO_Meet_Red_Pikmin) && piki->getKind() == Red) {
+				if (gameSystem->mSection->getTimerType() != DEMOTIMER_Meet_Red_Pikmin) {
+					gameSystem->mSection->enableTimer(1.2f, DEMOTIMER_Meet_Red_Pikmin);
 				}
 			}
 			if (!playData->hasBootContainer(piki->getKind())) {
@@ -153,7 +156,7 @@ bool InteractFue::actPiki(Game::Piki* piki)
 	if (!mCreature->isNavi()) {
 		return false;
 	}
-	if (!piki->mFlags.isSet(0x2)) {
+	if (!piki->isCreatureFlag(CF_IsAlive)) {
 		return false;
 	}
 
@@ -167,13 +170,13 @@ bool InteractFue::actPiki(Game::Piki* piki)
 
 	bool callable;
 	if (actionID == PikiAI::ACT_Teki) {
-		bool pikiChappyCalled;
 		if (currState->mId != PIKISTATE_Panic) {
 			return false;
 		}
+
 		callable = true;
-		if (BaseHIOParms::sTekiChappyFlag && piki->mFakePikiFlags.isSet(0x100)) {
-			piki->mFakePikiFlags.unset(0x100);
+		if (BaseHIOParms::sTekiChappyFlag && piki->isFPFlag(FPFLAGS_IsWildBulbmin)) {
+			piki->resetFPFlag(FPFLAGS_IsWildBulbmin);
 			GameStat::alivePikis.inc(piki);
 		}
 
@@ -186,12 +189,12 @@ bool InteractFue::actPiki(Game::Piki* piki)
 	}
 	if (!currState->dead() && callable) {
 		if (actionID != PikiAI::ACT_Formation || (actionID == PikiAI::ACT_Formation && currState->mId == PIKISTATE_Emotion)
-		    || (_08 && piki->mNavi != mCreature && actionID == 0)) {
-			Navi* vsNavi = (Navi*)mCreature;
+		    || (mDoCombineParties && piki->mNavi != mCreature && actionID == PikiAI::ACT_Formation)) {
+			Navi* whistlingNavi = (Navi*)mCreature;
 			if (gameSystem->isVersusMode()) {
 				int pikiColor = piki->getKind();
-				if ((pikiColor == Red && vsNavi->mNaviIndex == NAVIID_Louie)
-				    || (pikiColor == Blue && vsNavi->mNaviIndex == NAVIID_Olimar)) {
+				if ((pikiColor == Red && whistlingNavi->mNaviIndex == NAVIID_Louie)
+				    || (pikiColor == Blue && whistlingNavi->mNaviIndex == NAVIID_Olimar)) {
 					return false;
 				}
 			}
@@ -223,7 +226,7 @@ bool InteractDope::actPiki(Game::Piki* piki)
 	PikiState* currState = piki->mCurrentState;
 	if (mSprayType != SPRAY_TYPE_BITTER && currState->dopable() && !piki->doped()) {
 		DopeStateArg spicyArg;
-		spicyArg._00 = mSprayType;
+		spicyArg.mDopeType = mSprayType;
 		piki->mFsm->transit(piki, PIKISTATE_Dope, &spicyArg);
 		return true;
 	}
@@ -232,7 +235,7 @@ bool InteractDope::actPiki(Game::Piki* piki)
 			Navi* navi = static_cast<Navi*>(mCreature);
 			if (piki->getKind() == navi->getNaviID() && !currState->dead()) {
 				FallMeckStateArg bitterArg;
-				bitterArg._00 = true;
+				bitterArg.mDoAutoPluck = true;
 				piki->mFsm->transit(piki, PIKISTATE_FallMeck, &bitterArg);
 				return true;
 			}
@@ -280,7 +283,7 @@ bool InteractHanaChirashi::actPiki(Game::Piki* piki)
 	if (pikiKind == Purple) {
 		int pikiHappa = piki->mHappaKind;
 		if (pikiHappa >= Bud) {
-			efx::createSimpleChiru(*piki->mEffectsObj->_0C, piki->mEffectsObj->mPikiColor);
+			efx::createSimpleChiru(*piki->mEffectsObj->mStemPosition, piki->mEffectsObj->mPikiColor);
 			piki->startSound(PSSE_PK_FLOWER_FALL_VOICE, true);
 			piki->mHappaKind = Leaf;
 		}
@@ -397,10 +400,10 @@ bool InteractBury::actPiki(Game::Piki* piki)
 		pikiPos.y                    = minY;
 		if (pikiHead) {
 			efx::createSimplePkAp(pikiPos);
-			ItemPikihead::InitArg pikiHeadInit((EPikiKind)piki->getKind(), Vector3f::zero, 1, 2, -1.0f);
+			ItemPikihead::InitArg pikiHeadInit((EPikiKind)piki->getKind(), Vector3f::zero, true, Flower, -1.0f);
 			pikiHead->init(&pikiHeadInit);
 			pikiHead->setPosition(pikiPos, false);
-			CreatureKillArg pikiCleanup(CKILL_Unk1);
+			CreatureKillArg pikiCleanup(CKILL_DontCountAsDeath);
 			piki->kill(&pikiCleanup);
 			return true;
 		}
@@ -418,14 +421,15 @@ bool InteractSuikomi_Test::actPiki(Game::Piki* piki)
 	if (piki->mCurrentState->invincible(piki)) {
 		return false;
 	}
+
 	if (mCreature->isTeki()) {
 		EnemyBase* teki = static_cast<EnemyBase*>(mCreature);
 		piki->setTekiKillID(teki->getEnemyTypeID());
 	} else {
 		piki->mTekiKillID = -1;
 	}
-	SuikomiStateArg suikomiArg(mCreature, _14, mCollPart);
-	//               gottem
+
+	SuikomiStateArg suikomiArg(mCreature, mCollpart, mStomachCollpart);
 	piki->mFsm->transit(piki, PIKISTATE_Suikomi, &suikomiArg);
 	return true;
 }
@@ -635,7 +639,7 @@ bool InteractSwallow::actPiki(Game::Piki* piki)
 		posDiff.z = pikiPos.z - enemyPos.z;
 		posDiff.y = pikiPos.y - enemyPos.y;
 		_normaliseXZ(posDiff); // nearly every normalize function works
-		f32 angle = JMath::atanTable_.atan2_(posDiff.x, posDiff.z);
+		f32 angle = JMAAtan2Radian(posDiff.x, posDiff.z);
 		InteractFlick swallowFlick(mCreature, 50.0f, 0.0f, -angle);
 		piki->stimulate(swallowFlick);
 		return;
@@ -651,9 +655,9 @@ bool InteractSwallow::actPiki(Game::Piki* piki)
 	if (!piki->mCurrentState->dead()) {
 		piki->startStickMouth(mCreature, mCollPart);
 
-		int anim = 0x8;
-		if (_10 == 1) {
-			anim = 0x3f;
+		int anim = IPikiAnims::ESA;
+		if (mIsStabbed == TRUE) {
+			anim = IPikiAnims::SUWARERU;
 			piki->startSound(PSSE_PK_SE_STABBED, false);
 		}
 
@@ -680,7 +684,7 @@ bool InteractSwallow::actPiki(Game::Piki* piki)
 bool InteractKill::actPiki(Game::Piki* piki)
 {
 	CreatureKillArg* killArg = mKillArg;
-	if (!killArg || (killArg && !(killArg->isFlag(CKILL_Unk1)))) {
+	if (!killArg || (killArg && !(killArg->isFlag(CKILL_DontCountAsDeath)))) {
 		if (mCreature->isTeki()) {
 			EnemyBase* teki = static_cast<EnemyBase*>(mCreature);
 			piki->setTekiKillID(teki->getEnemyTypeID());
@@ -688,7 +692,7 @@ bool InteractKill::actPiki(Game::Piki* piki)
 			piki->mTekiKillID = -1;
 		}
 		if (piki->isPikmin()) {
-			DeathMgr::inc(0);
+			DeathMgr::inc(DeathCounter::COD_Battle);
 		}
 	}
 	piki->kill(mKillArg);

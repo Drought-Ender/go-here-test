@@ -200,7 +200,7 @@ void Obj::doGetLifeGaugeParam(LifeGaugeParam& param)
 
 		param.mPosition.y += C_GENERALPARMS.mLifeMeterHeight.mValue;
 
-		param.mCurHealthPercentage = mHealth / mMaxHealth;
+		param.mCurrHealthRatio = mHealth / mMaxHealth;
 
 		param.mRadius = 10.0f;
 	} else {
@@ -245,9 +245,9 @@ void Obj::setElecHibaPosition(InitialParam* param, f32 p1)
 {
 	Vector3f initPos = mBirthPosition;
 	f32 theta        = HALF_PI + getFaceDir();
-	f32 halfFactor   = param->_00 / 2;
+	f32 distance     = param->mSeperation / 2;
 
-	Vector3f finalPos = Vector3f((p1 * halfFactor) * sinf(theta) + initPos.x, initPos.y, (p1 * halfFactor) * cosf(theta) + initPos.z);
+	Vector3f finalPos = Vector3f((p1 * distance) * sinf(theta) + initPos.x, initPos.y, (p1 * distance) * cosf(theta) + initPos.z);
 	finalPos.y        = mapMgr->getMinY(finalPos);
 	setPosition(finalPos, false);
 }
@@ -293,7 +293,7 @@ void Obj::interactDenkiAttack(Vector3f& position)
 			Vector3f creaturePos = creature->getPosition();
 			// Vector3f creatureSep = creaturePos - some other vector of consts;
 
-			// f32 dotProd = dot(crossProd, creatureSep);
+			// f32 dotProd = crossProd.dot(creatureSep);
 			f32 dotProd = 1.0f;
 			if (!(dotProd > 0.0f)) { // make sure it's positive
 				dotProd = -dotProd;

@@ -152,7 +152,7 @@ void Mgr::loadEnemy()
 	heap2->becomeCurrentHeap();
 
 	RamStream stream(JKRLoadToMainRAM("/enemy/enemyResList.txt"), -1);
-	stream.resetPosition(true, 1);
+	stream.setMode(STREAM_MODE_TEXT, 1);
 
 	JKRAram::getAramHeap()->getFreeSize();
 
@@ -180,7 +180,7 @@ void Mgr::load2D()
 	JKRAram::sAramObject->mAramHeap->getFreeSize();
 
 	for (u32 i = 0; i < 13; i++) {
-		char langResName[0x100];
+		char langResName[PATH_MAX];
 		og::newScreen::makeLanguageResName(langResName, sAramResName2D[i]);
 		gAramMgr->dvdToAram(langResName, !mLoadPermission);
 	}

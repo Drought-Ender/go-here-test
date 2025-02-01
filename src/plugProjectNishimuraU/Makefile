@@ -1,6 +1,6 @@
 NISHIMURA_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/nslibmath.o\
-	$(BUILD_DIR)/asm/plugProjectNishimuraU/ShadowCylinder.o\
+	$(BUILD_DIR)/src/plugProjectNishimuraU/ShadowCylinder.o\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/playCamera.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/shadowMgr.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/MapUnit.o\
@@ -21,7 +21,7 @@ NISHIMURA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/RandGateUnit.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/ObjectLayout.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/CameraMgr.o\
-	$(BUILD_DIR)/asm/plugProjectNishimuraU/ContRumble.o\
+	$(BUILD_DIR)/src/plugProjectNishimuraU/ContRumble.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/RumbleMgr.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/PomAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/PomMgr.o\
@@ -84,7 +84,7 @@ NISHIMURA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/TadpoleAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/TadpoleMgr.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/Tadpole.o\
-	$(BUILD_DIR)/asm/plugProjectNishimuraU/ElecBugState.o\
+	$(BUILD_DIR)/src/plugProjectNishimuraU/ElecBugState.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/ElecBugAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/ElecBugMgr.o\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/ElecBug.o\
@@ -105,7 +105,7 @@ NISHIMURA_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/QueenState.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/QueenAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/QueenMgr.o\
-	$(BUILD_DIR)/asm/plugProjectNishimuraU/Queen.o\
+	$(BUILD_DIR)/src/plugProjectNishimuraU/Queen.o\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/BabyState.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/BabyAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/BabyMgr.o\
@@ -196,7 +196,7 @@ NISHIMURA_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/KabutoState.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/KabutoAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/KabutoMgr.o\
-	$(BUILD_DIR)/asm/plugProjectNishimuraU/Kabuto.o\
+	$(BUILD_DIR)/src/plugProjectNishimuraU/Kabuto.o\
 	$(BUILD_DIR)/asm/plugProjectNishimuraU/KumaKochappyState.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/KumaKochappyAnimator.o\
 	$(BUILD_DIR)/src/plugProjectNishimuraU/KumaKochappyMgr.o\

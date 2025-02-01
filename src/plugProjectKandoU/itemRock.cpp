@@ -29,9 +29,9 @@ void FSM::init(Item*)
  */
 void NormalState::init(Item* item, StateArg* stateArg)
 {
-	static_cast<ItemRock::Item*>(item)->startWaitMotion();
-	_10 = 0;
-	_11 = 0;
+	item->startWaitMotion();
+	mIsDamaged  = false;
+	mIsFullSize = false;
 }
 
 /**
@@ -40,14 +40,13 @@ void NormalState::init(Item* item, StateArg* stateArg)
  */
 void NormalState::exec(Item* item)
 {
-	ItemRock::Item* rock = static_cast<ItemRock::Item*>(item);
-	f32 changeTime       = rock->mGrowTimes[rock->mSize];
-	if (rock->mSize > Item::SIZE_Max) {
-		rock->mSizeTimer += sys->mDeltaTime;
-		if (rock->mSizeTimer >= changeTime) {
-			_11           = 1;
-			rock->mHealth = rock->mHealthLimits[rock->mSize - 1];
-			transit(rock, ITEMROCK_Up, nullptr);
+	f32 changeTime = item->mGrowTimes[item->mSize];
+	if (item->mSize > Item::SIZE_Max) {
+		item->mSizeTimer += sys->mDeltaTime;
+		if (item->mSizeTimer >= changeTime) {
+			mIsFullSize   = true;
+			item->mHealth = item->mHealthLimits[item->mSize - 1];
+			transit(item, ITEMROCK_Up, nullptr);
 		}
 	}
 }
@@ -64,14 +63,13 @@ void NormalState::cleanup(Item*) { }
  */
 void NormalState::onDamage(Item* item, f32 damage)
 {
-	ItemRock::Item* rock = static_cast<ItemRock::Item*>(item);
-	rock->startDamageMotion();
-	rock->mDamageBuffer += damage;
-	rock->mHealth -= rock->mDamageBuffer;
-	rock->mDamageBuffer = 0.0f;
-	if (rock->mHealth < rock->mHealthLimits[rock->mSize + 1]) {
-		_10 = 1;
-		transit(rock, ITEMROCK_Down, nullptr);
+	item->startDamageMotion();
+	item->mDamageBuffer += damage;
+	item->mHealth -= item->mDamageBuffer;
+	item->mDamageBuffer = 0.0f;
+	if (item->mHealth < item->mHealthLimits[item->mSize + 1]) {
+		mIsDamaged = true;
+		transit(item, ITEMROCK_Down, nullptr);
 	}
 }
 
@@ -81,22 +79,21 @@ void NormalState::onDamage(Item* item, f32 damage)
  */
 void NormalState::onKeyEvent(Item* item, const SysShape::KeyEvent& event)
 {
-	ItemRock::Item* rock = static_cast<ItemRock::Item*>(item);
 	if (event.mType == KEYEVENT_100) {
-		Vector3f rockPos = rock->getPosition();
-		rock->startFukuEffect(rockPos);
+		Vector3f rockPos = item->getPosition();
+		item->startFukuEffect(rockPos);
 	}
 
-	if (_11) {
-		rock->mHealth = rock->mHealthLimits[rock->mSize - 1];
-		transit(rock, ITEMROCK_Up, nullptr);
+	if (mIsFullSize) {
+		item->mHealth = item->mHealthLimits[item->mSize - 1];
+		transit(item, ITEMROCK_Up, nullptr);
 		return;
-	} else if (_10) {
-		transit(rock, ITEMROCK_Down, nullptr);
+	} else if (mIsDamaged) {
+		transit(item, ITEMROCK_Down, nullptr);
 		return;
 	}
 
-	rock->startWaitMotion();
+	item->startWaitMotion();
 }
 
 /**
@@ -105,7 +102,7 @@ void NormalState::onKeyEvent(Item* item, const SysShape::KeyEvent& event)
  */
 void DownState::init(Item* item, StateArg* stateArg)
 {
-	static_cast<ItemRock::Item*>(item)->startDownMotion();
+	item->startDownMotion();
 	item->startSound(PSSE_EV_RUIN_WITHER);
 }
 
@@ -125,7 +122,7 @@ void DownState::cleanup(Item*) { }
  * @note Address: 0x801E12BC
  * @note Size: 0x10
  */
-void DownState::onDamage(Item* item, f32 damage) { static_cast<ItemRock::Item*>(item)->mDamageBuffer += damage; }
+void DownState::onDamage(Item* item, f32 damage) { item->mDamageBuffer += damage; }
 
 /**
  * @note Address: 0x801E12CC
@@ -133,18 +130,17 @@ void DownState::onDamage(Item* item, f32 damage) { static_cast<ItemRock::Item*>(
  */
 void DownState::onKeyEvent(Item* item, const SysShape::KeyEvent& event)
 {
-	ItemRock::Item* rock = static_cast<ItemRock::Item*>(item);
-	rock->mSizeTimer     = 0.0f;
-	rock->mSize++;
-	if (rock->mSize >= rock->mSizeCount) {
-		rock->mSize = rock->mSizeCount;
-		rock->setAlive(false);
-		rock->finishLoopEffect();
+	item->mSizeTimer = 0.0f;
+	item->mSize++;
+	if (item->mSize >= item->mSizeCount) {
+		item->mSize = item->mSizeCount;
+		item->setAlive(false);
+		item->finishLoopEffect();
 	}
 
-	rock->mObstacle->setPower(1.0f - (f32)rock->mSize / (f32)rock->mSizeCount);
-	rock->startLoopEffect();
-	transit(rock, ITEMROCK_Normal, nullptr);
+	item->mObstacle->setPower(1.0f - (f32)item->mSize / (f32)item->mSizeCount);
+	item->startLoopEffect();
+	transit(item, ITEMROCK_Normal, nullptr);
 }
 
 /**
@@ -153,11 +149,10 @@ void DownState::onKeyEvent(Item* item, const SysShape::KeyEvent& event)
  */
 void UpState::init(Item* item, StateArg* stateArg)
 {
-	ItemRock::Item* rock = static_cast<ItemRock::Item*>(item);
-	rock->startUpMotion();
-	rock->mAnimSpeed = 30.0f;
-	rock->mSizeTimer = 0.0f;
-	rock->startSound(PSSE_EV_RUIN_GROW);
+	item->startUpMotion();
+	item->mAnimSpeed = 30.0f;
+	item->mSizeTimer = 0.0f;
+	item->startSound(PSSE_EV_RUIN_GROW);
 }
 
 /**
@@ -176,7 +171,7 @@ void UpState::cleanup(Item*) { }
  * @note Address: 0x801E141C
  * @note Size: 0x10
  */
-void UpState::onDamage(Item* item, f32 damage) { static_cast<ItemRock::Item*>(item)->mDamageBuffer += damage; }
+void UpState::onDamage(Item* item, f32 damage) { item->mDamageBuffer += damage; }
 
 /**
  * @note Address: 0x801E142C
@@ -184,12 +179,10 @@ void UpState::onDamage(Item* item, f32 damage) { static_cast<ItemRock::Item*>(it
  */
 void UpState::onKeyEvent(Item* item, const SysShape::KeyEvent& event)
 {
-	// sigh - cannot do a cast at the start, doesn't match.
-	static_cast<ItemRock::Item*>(item)->mSize--;
+	item->mSize--;
 	item->setAlive(true);
-	static_cast<ItemRock::Item*>(item)->mObstacle->setPower(
-	    1.0f - (f32) static_cast<ItemRock::Item*>(item)->mSize / (f32) static_cast<ItemRock::Item*>(item)->mSizeCount);
-	static_cast<ItemRock::Item*>(item)->startLoopEffect();
+	item->mObstacle->setPower(1.0f - (f32)item->mSize / (f32)item->mSizeCount);
+	item->startLoopEffect();
 	transit(item, ITEMROCK_Normal, nullptr);
 }
 
@@ -217,7 +210,7 @@ void Item::constructor() { mSoundObj = new PSM::WorkItem(this); }
 void Item::onInit(CreatureInitArg* initArg)
 {
 	mSizeTimer = 0.0f;
-	mModel     = new SysShape::Model(mgr->getModelData(0), 0x20000, 2);
+	mModel     = new SysShape::Model(mgr->getModelData(0), J3DMODEL_CreateNewDL, 2);
 	mModel->mJ3dModel->calc();
 	mModel->mJ3dModel->calcMaterial();
 	mModel->mJ3dModel->makeDL();
@@ -240,7 +233,7 @@ void Item::onInit(CreatureInitArg* initArg)
 	mWorkRadii[SIZE_Small]  = mgr->mParms->mRockParms.mWorkRadiusSmall.mValue;
 
 	mCollTree->createSingleSphere(mModel, 0, mBoundingSphere, nullptr);
-	_1FC = 0;
+	mMakeEffectDelay = 0;
 }
 
 /**
@@ -266,7 +259,7 @@ void Item::onSetPosition()
  */
 void Item::emitDamageEffect()
 {
-	if (!_1FC) {
+	if (!mMakeEffectDelay) {
 		int type;
 		switch (mSize) {
 		case SIZE_Max:
@@ -284,7 +277,7 @@ void Item::emitDamageEffect()
 		efx::ArgKouhai fxArg(mPosition, type);
 		damageFX.create(&fxArg);
 
-		_1FC = (int)(randFloat() * 5.0f) + 6;
+		mMakeEffectDelay = randInt(5) + 6;
 	}
 }
 
@@ -410,8 +403,8 @@ void Item::doAI()
 		finishLoopEffect();
 	}
 
-	if (_1FC) {
-		_1FC--;
+	if (mMakeEffectDelay) {
+		mMakeEffectDelay--;
 	}
 }
 
@@ -578,135 +571,18 @@ void Item::createRock(int visibleSizeCount)
 	mGrowTimes    = new f32[visibleSizeCount + 1];
 	mWorkRadii    = new f32[visibleSizeCount]; // don't need one for hidden
 
-	for (int i = 0; i < visibleSizeCount + 1; i++) {
-		for (int j = 0; j < 4; j++) {
-			mHealthLimits[j] = ((Parm<f32>*)(&mgr->mParms->mRockParms.mHealthMax) + j)->mValue;
-		}
-
-		for (int j = 0; j < 4; j++) {
-			mGrowTimes[j] = 60.0f * ((Parm<f32>*)(&mgr->mParms->mRockParms.mGrowTimeMax) + j)->mValue;
-		}
-		// mHealthLimits[1] = mgr->mParms->mRockParms.mP001.mValue;
-		// mHealthLimits[2] = mgr->mParms->mRockParms.mP002.mValue;
-		// mHealthLimits[3] = mgr->mParms->mRockParms.mP003.mValue;
-		// mGrowTimes[0] = 60.0f * mgr->mParms->mRockParms.mP004.mValue;
-		// mGrowTimes[1] = 60.0f * mgr->mParms->mRockParms.mP005.mValue;
-		// mGrowTimes[2] = 60.0f * mgr->mParms->mRockParms.mP006.mValue;
-		// mGrowTimes[3] = 60.0f * mgr->mParms->mRockParms.mP007.mValue;
-		mMaxHealth = mHealthLimits[SIZE_Max];
-		mHealth    = mMaxHealth;
+	for (int j = 0; j < 4; j++) {
+		mHealthLimits[j] = ((Parm<f32>*)(&mgr->mParms->mRockParms.mHealthMax) + j)->mValue;
 	}
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	lfs      f0, lbl_805198C8@sda21(r2)
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	mr       r31, r4
-	addi     r0, r31, 1
-	stw      r30, 0x18(r1)
-	mr       r30, r3
-	stw      r29, 0x14(r1)
-	slwi     r29, r0, 2
-	stw      r31, 0x220(r3)
-	li       r3, 0
-	stw      r3, 0x21c(r30)
-	mr       r3, r29
-	stfs     f0, 0x218(r30)
-	bl       __nwa__FUl
-	stw      r3, 0x208(r30)
-	mr       r3, r29
-	bl       __nwa__FUl
-	stw      r3, 0x20c(r30)
-	slwi     r3, r31, 2
-	bl       __nwa__FUl
-	stw      r3, 0x210(r30)
-	addic.   r0, r31, 1
-	lfs      f1, lbl_805198F4@sda21(r2)
-	li       r3, 0
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x208(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x100(r5)
-	stfs     f0, 0(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x208(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x128(r5)
-	stfs     f0, 4(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x208(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x150(r5)
-	stfs     f0, 8(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x208(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x178(r5)
-	stfs     f0, 0xc(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x20c(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x1a0(r5)
-	fmuls    f0, f1, f0
-	stfs     f0, 0(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x20c(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x1c8(r5)
-	fmuls    f0, f1, f0
-	stfs     f0, 4(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x20c(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x1f0(r5)
-	fmuls    f0, f1, f0
-	stfs     f0, 8(r4)
-	lwz      r5, mgr__Q24Game8ItemRock@sda21(r13)
-	lwz      r4, 0x20c(r30)
-	lwz      r5, 0x88(r5)
-	lfs      f0, 0x218(r5)
-	fmuls    f0, f1, f0
-	stfs     f0, 0xc(r4)
-	lwz      r4, 0x208(r30)
-	lfs      f0, 0(r4)
-	stfs     f0, 0x204(r30)
-	lfs      f0, 0x204(r30)
-	stfs     f0, 0x200(r30)
-	ble      lbl_801E2764
-	addi     r0, r31, 1
-	addi     r4, r31, -7
-	cmpwi    r0, 8
-	ble      lbl_801E274C
-	addi     r0, r4, 7
-	srwi     r0, r0, 3
-	mtctr    r0
-	cmpwi    r4, 0
-	ble      lbl_801E274C
 
-lbl_801E2744:
-	addi     r3, r3, 8
-	bdnz     lbl_801E2744
+	for (int j = 0; j < 4; j++) {
+		mGrowTimes[j] = 60.0f * ((Parm<f32>*)(&mgr->mParms->mRockParms.mGrowTimeMax) + j)->mValue;
+	}
 
-lbl_801E274C:
-	addi     r4, r31, 1
-	subf     r0, r3, r4
-	mtctr    r0
-	cmpw     r3, r4
-	bge      lbl_801E2764
+	mMaxHealth = mHealthLimits[SIZE_Max];
+	mHealth    = mMaxHealth;
 
-lbl_801E2760:
-	bdnz     lbl_801E2760
-
-lbl_801E2764:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
+	for (int i = 0; i < visibleSizeCount + 1; i++) { }
 }
 
 /**
@@ -740,17 +616,16 @@ f32 Item::getWorkRadius()
  * @note Size: 0x120
  */
 Mgr::Mgr()
-    : TNodeItemMgr()
 {
-	mItemName = "r”pƒIƒuƒWƒFƒNƒg"; // 'ruined object'
+	mItemName = "è’å»ƒã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ"; // 'ruined object'
 	setModelSize(1);
 	mObjectPathComponent = "user/Kando/objects/ojamarock";
-	mParms               = new RockParms();
+	mParms               = new RockParms;
 	void* resource       = JKRDvdRipper::loadToMainRAM("user/Abe/item/rockParms.txt", nullptr, Switch_0, 0, nullptr,
                                                  JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
 	if (resource) {
 		RamStream stream(resource, -1);
-		stream.resetPosition(true, true);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 		mParms->read(stream);
 		delete[] resource;
 	}
@@ -786,8 +661,8 @@ BaseItem* Mgr::generatorBirth(Vector3f& pos, Vector3f& rot, GenItemParm* parm)
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("rock.bmd", 0, 0x20020000);
-	mModelData[0]->newSharedDisplayList(0x40000);
+	loadBmd("rock.bmd", 0, J3DMODEL_Unk30 | J3DMODEL_CreateNewDL);
+	mModelData[0]->newSharedDisplayList(J3DMODEL_UseSingleSharedDL);
 	mModelData[0]->makeSharedDL();
 
 	JKRArchive* textArc = openTextArc("texts.szs");

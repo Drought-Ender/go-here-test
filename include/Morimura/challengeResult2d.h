@@ -117,13 +117,6 @@ struct TChallengeResult : public TTestBase {
 		Vector2f _08;
 	};
 
-	inline void loadSaveMgrResources()
-	{
-		ebi::Save::TMgr* saveMgr = mSaveMgr;
-		saveMgr->mSaveMenu.loadResource();
-		saveMgr->doLoadResource(JKRGetCurrentHeap());
-	}
-
 	virtual ~TChallengeResult();                                                                             // _08
 	virtual void doCreate(JKRArchive*);                                                                      // _4C
 	virtual bool doUpdate();                                                                                 // _58
@@ -190,8 +183,8 @@ struct TChallengeResult : public TTestBase {
 	J2DPane* mOnyonPane[3];                        // _E4
 	Vector2f mPosList1[3];                         // _F0
 	Vector2f mPosList2[3];                         // _108
-	f32 _120;                                      // _120
-	f32 _124;                                      // _124
+	f32 mPokoCountOffsetX;                         // _120
+	f32 mPokoCountOffsetY;                         // _124
 	VectorUnit mVecUnit[4];                        // _128
 	VectorUnit _168;                               // _168
 	f32 mMoveTimer;                                // _178

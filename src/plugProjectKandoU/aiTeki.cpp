@@ -46,13 +46,13 @@ void ActTeki::init(PikiAI::ActionArg* arg)
 
 	mMoveSpeed = 0.0f;
 
-	mToPanicFinish = false;
+	mIsLeafChappy = false;
 	if (mFollowingTeki->isTeki() && mFollowingTeki->getEnemyTypeID() == Game::EnemyTypeID::EnemyID_LeafChappy) {
-		mToPanicFinish = true;
+		mIsLeafChappy = true;
 	}
 
 	mToEmote = false;
-	mParent->startMotion(30, 30, nullptr, nullptr);
+	mParent->startMotion(Game::IPikiAnims::WALK, Game::IPikiAnims::WALK, nullptr, nullptr);
 }
 
 /**
@@ -63,8 +63,8 @@ int ActTeki::exec()
 {
 	// Panic after parent death
 	if (!mFollowingTeki->isAlive()) {
-		if (mToPanicFinish) {
-			mToPanicFinish = false;
+		if (mIsLeafChappy) {
+			mIsLeafChappy = false;
 
 			if (!Game::BaseHIOParms::sTekiChappyFlag) {
 				Game::GameStat::alivePikis.inc(mParent);
@@ -187,7 +187,7 @@ void ActTeki::test_0()
 		mParentFollowTimer -= sys->mDeltaTime;
 
 		// We've reached the parent, so stop moving and wait for them to move again.
-		mParent->mVelocity = Vector3f(0.0f);
+		mParent->mTargetVelocity = Vector3f(0.0f);
 
 		// If we've gone out of reach of follow distance, or the follow timer has fallen below 0, we need to find a new target.
 		if (mParentFollowTimer <= 0.0f || distance > FOLLOW_DISTANCE) {
@@ -210,8 +210,8 @@ void ActTeki::test_0()
 		}
 		// If we've reached the footprint destination, we'll follow the parent next.
 		else if (distToFootprint < (FOLLOW_DISTANCE / 2)) {
-			mParent->mVelocity = Vector3f(0, 0, 0);
-			mFollowState       = TFS_Parent;
+			mParent->mTargetVelocity = Vector3f(0, 0, 0);
+			mFollowState             = TFS_Parent;
 			setTimer();
 			return;
 		}
@@ -232,9 +232,6 @@ void ActTeki::test_0()
 		mParent->setSpeed(mMoveSpeed, dirToFootprint);
 		break;
 	}
-
-	default:
-		break;
 	}
 }
 
@@ -290,7 +287,7 @@ void ActTeki::collisionCallback(Game::Piki* piki, Game::CollEvent& event)
 	// And doesn't logically make sense, mUnusedZeroVector is always Vector3f(0, 0, 0)
 	// Meaning the dot product is always 0, thus mUnusedDotProduct is always -0.1f
 	Vector3f sep      = currentPos - collidedPos;
-	f32 dotProd       = dot(mUnusedZeroVector, sep);
+	f32 dotProd       = mUnusedZeroVector.dot(sep);
 	mUnusedDotProduct = dotProd;
 	if (dotProd > 0.0f) {
 		mUnusedDotProduct = 0.1f;

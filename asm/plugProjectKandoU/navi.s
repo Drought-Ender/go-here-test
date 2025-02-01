@@ -5422,10 +5422,6 @@ lbl_constructor:
 /* 80143AF0 00140A30  4E 80 00 20 */	blr 
 .endfn getMapCollisionRadius__Q24Game4NaviFv
 
-.fn doDirectDraw__Q24Game4NaviFR8Graphics, global
-/* 80143AF4 00140A34  4E 80 00 20 */	blr 
-.endfn doDirectDraw__Q24Game4NaviFR8Graphics
-
 .fn disableController__Q24Game4NaviFv, global
 /* 80143AF8 00140A38  38 00 00 00 */	li r0, 0
 /* 80143AFC 00140A3C  90 03 02 78 */	stw r0, 0x278(r3)

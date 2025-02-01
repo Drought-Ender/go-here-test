@@ -69,7 +69,7 @@ void Item::onInit(CreatureInitArg* settings)
 		mBridgeType = ((BridgeInitArg*)settings)->mBridgeType;
 	}
 
-	mModel = new SysShape::Model(mgr->getModelData(mBridgeType), 0x20000, 2);
+	mModel = new SysShape::Model(mgr->getModelData(mBridgeType), J3DMODEL_CreateNewDL, 2);
 	mModel->mJ3dModel->calc();
 	mModel->mJ3dModel->calcMaterial();
 	mModel->mJ3dModel->makeDL();
@@ -87,9 +87,9 @@ void Item::onInit(CreatureInitArg* settings)
 		mStageHealths[i] = stageLength;
 	}
 
-	mEndWP    = nullptr;
-	mBridgeWP = nullptr;
-	_1F8      = 0;
+	mEndWP      = nullptr;
+	mBridgeWP   = nullptr;
+	mBreakDelay = 0;
 }
 
 /**
@@ -268,15 +268,15 @@ void Item::doAI()
 {
 	mFsm->exec(this);
 	switch (mSoundEvent.update()) {
-	case 2:
+	case TSE_ApplyTransition:
 		P2ASSERTLINE(446, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(mSoundObj)->eventStop();
 		break;
 	}
 
-	if (_1F8 != 0) {
-		_1F8--;
-		if (_1F8 == 0) {
+	if (mBreakDelay != 0) {
+		mBreakDelay--;
+		if (mBreakDelay == 0) {
 			setCurrStage(mCurrStageIdx + 1);
 			if (mCurrStageIdx == mStageCount) {
 				setAlive(false);
@@ -1028,14 +1028,14 @@ f32 Item::getWorkDistance(Sys::Sphere& sphere)
 	getBridgePos(sphere.mPosition, x, z);
 
 	if (mCurrStageIdx == mStageCount) {
-		return 128000.0f;
+		return FLOAT_DIST_MAX;
 	}
 
 	f32 rad = getStageZ(mCurrStageIdx);
 	z -= 10.0f;
 
 	if (z > rad + 10.0f) {
-		return 128000.0f;
+		return FLOAT_DIST_MAX;
 	}
 
 	if (z >= 0.0f && z <= rad) {
@@ -1046,11 +1046,11 @@ f32 Item::getWorkDistance(Sys::Sphere& sphere)
 	}
 
 	if (z < -100.0f) {
-		return 128000.0f;
+		return FLOAT_DIST_MAX;
 	}
 
 	if (absF(x) >= 105.0f) {
-		return 128000.0f;
+		return FLOAT_DIST_MAX;
 	}
 
 	return absF(z - rad);
@@ -1063,17 +1063,17 @@ f32 Item::getWorkDistance(Sys::Sphere& sphere)
 bool Item::interactAttack(InteractAttack& attack)
 {
 	switch (mSoundEvent.event()) {
-	case 1:
+	case TSE_Active:
 		P2ASSERTLINE(825, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(mSoundObj)->eventStart();
 		break;
-	case 3:
+	case TSE_Apply:
 		P2ASSERTLINE(832, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(mSoundObj)->eventRestart();
 		break;
 	}
 
-	if (_1F8) {
+	if (mBreakDelay) {
 		return true;
 	}
 
@@ -1104,7 +1104,7 @@ bool Item::interactAttack(InteractAttack& attack)
 		nextSetFX.create(nullptr);
 		mMabiki.mBuffer += 60;
 
-		_1F8 = 40;
+		mBreakDelay = 40;
 
 		startSound(PSSE_EV_WORK_BRIDGE_EXTEND);
 	}
@@ -1118,7 +1118,7 @@ bool Item::interactAttack(InteractAttack& attack)
  */
 bool Item::interactBreakBridge(InteractBreakBridge& breakBridge)
 {
-	if (_1F8 || mCurrStageIdx == 0) {
+	if (mBreakDelay || mCurrStageIdx == 0) {
 		return false;
 	}
 
@@ -1167,7 +1167,7 @@ void Mgr::generatorWrite(Stream& output, GenItemParm* genParm)
 	P2ASSERTLINE(940, genBridgeParm);
 	output.textWriteTab(output.mTabCount);
 	output.writeShort(genBridgeParm->mBridgeType);
-	output.textWriteText("\t#‹´ƒ^ƒCƒv\r\n"); // '#Bridge type'
+	output.textWriteText("\t#æ©‹ã‚¿ã‚¤ãƒ—\r\n"); // '#Bridge type'
 }
 
 /**
@@ -1193,7 +1193,7 @@ Mgr::Mgr()
     : TNodeItemMgr()
 {
 	mItemName = "Bridge";
-	setModelSize(3);
+	setModelSize(BRIDGETYPE_COUNT);
 	mObjectPathComponent = "user/Kando/objects/bridge";
 	mParms               = new BridgeParms();
 	DVDConvertPathToEntrynum("/user/Abe/item/bridgeParms.txt");
@@ -1202,7 +1202,7 @@ Mgr::Mgr()
 	                                         JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
 	if (data != nullptr) {
 		RamStream input(data, -1);
-		input.resetPosition(true, 1);
+		input.setMode(STREAM_MODE_TEXT, 1);
 		mParms->read(input);
 		delete[] data;
 	}
@@ -1251,15 +1251,15 @@ void Mgr::onLoadResources()
 
 	mObjectPathComponent = "user/Kando/bridge/s_bridge";
 	loadArchive("arc.szs");
-	loadBmd("s_bridge.bmd", BRIDGETYPE_Short, 0x20000);
+	loadBmd("s_bridge.bmd", BRIDGETYPE_Short, J3DMODEL_CreateNewDL);
 
 	mObjectPathComponent = "user/Kando/bridge/slope_u";
 	loadArchive("arc.szs");
-	loadBmd("slope_u.bmd", BRIDGETYPE_Sloped, 0x20000);
+	loadBmd("slope_u.bmd", BRIDGETYPE_Sloped, J3DMODEL_CreateNewDL);
 
 	mObjectPathComponent = "user/Kando/bridge/l_bridge";
 	loadArchive("arc.szs");
-	loadBmd("l_bridge.bmd", BRIDGETYPE_Long, 0x20000);
+	loadBmd("l_bridge.bmd", BRIDGETYPE_Long, J3DMODEL_CreateNewDL);
 
 	for (int i = 0; i < BRIDGETYPE_COUNT; i++) {
 		mModelData[i]->newSharedDisplayList(0x40000);
@@ -1267,7 +1267,7 @@ void Mgr::onLoadResources()
 	}
 
 	MapCode::Code mapCode;
-	mapCode.setCode(MapCode::Code::Attribute1 + MapCode::Code::Attribute2, MapCode::Code::SlipCode0, true);
+	mapCode.setCode(MapCode::Code::Attribute1 + MapCode::Code::Attribute2, MapCode::Code::SlipCode_NoSlip, true);
 
 	mObjectPathComponent             = "user/Kando/bridge/s_bridge";
 	JKRArchive* textArcShort         = openTextArc("texts.szs");
@@ -1362,7 +1362,7 @@ void Mgr::createBridgeInfo(int type)
  */
 void Mgr::setupPlatInstanceAttacher(Item* bridge, PlatInstanceAttacher& attacher)
 {
-	P2ASSERTLINE(1186, bridge->mBridgeType < 3);
+	P2ASSERTLINE(1186, bridge->mBridgeType < BRIDGETYPE_COUNT);
 	BridgeInfo* info = getBridgeInfo(bridge->mBridgeType);
 	ID32 id('none');
 	attacher.addToMgr(bridge, id, mPlatAttachers[bridge->mBridgeType], false);

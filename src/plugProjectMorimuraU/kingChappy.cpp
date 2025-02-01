@@ -137,7 +137,7 @@ void Obj::onInit(CreatureInitArg* initArg)
 	mEfxDeadHana->setMtxptr(mModel->getJoint("hana")->getWorldMatrix()->mMatrix.mtxView);
 
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(false);
 
 	mIsBig = false;
@@ -261,9 +261,7 @@ void Obj::doAnimationUpdateAnimator()
 		frameRate     = EnemyAnimatorBase::defaultAnimSpeed * frameRate;
 		SysShape::BlendLinearFun linearBlend;
 		animator->animate(&linearBlend, 60.0f * sys->mDeltaTime, frameRate, frameRate);
-
-		SysShape::Model* model = mModel;
-		model->mJ3dModel->mModelData->mJointTree.getJointNodePointer(0)->setMtxCalc(animator->mAnimator.getCalc());
+		static_cast<EnemyBlendAnimatorBase*>(animator)->mAnimator.setModelCalc(mModel, 0);
 	} else {
 		EnemyBase::doAnimationUpdateAnimator();
 	}
@@ -337,7 +335,7 @@ void Obj::doAnimationCullingOff()
 
 			if (stuckCreature->isTeki()) {
 				if (mCanEatBombs && static_cast<EnemyBase*>(stuckCreature)->getEnemyTypeID() == EnemyTypeID::EnemyID_Bomb) {
-					static_cast<Bomb::Obj*>(stuckCreature)->_2BD = 1;
+					static_cast<Bomb::Obj*>(stuckCreature)->mDoSkipRender = 1;
 				}
 			} else {
 				PSVECCrossProduct((Vec*)&yBasis, (Vec*)&zBasis, (Vec*)&xBasis);
@@ -365,7 +363,7 @@ void Obj::doAnimationCullingOff()
 	mCollTree->update();
 
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj); // get sound object
-	PSM::checkBoss(soundObj);                                           // make sure we have sound object
+	PSM::assertIsBoss(soundObj);                                        // make sure we have sound object
 	if (soundObj) {                                                     // REALLY MAKE SURE WE HAVE SOUND OBJECT
 		// POINTLESS IF STATEMENT
 		if (mSticked) {
@@ -830,7 +828,7 @@ bool Obj::damageCallBack(Creature* creature, f32 damage, CollPart* collpart)
 	} else if (creature->isAlive()) {
 		Vector3f creaturePos = creature->getPosition();
 		if (creaturePos.y < 5.0f + mPosition.y) {
-			if (sqrDistanceXZ(creaturePos, mPosition) < 1600.0f) {
+			if (sqrDistanceXZ(creaturePos, mPosition) < SQUARE(40.0f)) {
 				addDamage(damage * 0.2f, 1.0f);
 				return true;
 			}
@@ -1118,7 +1116,7 @@ void Obj::searchTarget()
 		return;
 	}
 
-	if (C_PARMS->_BC9) {
+	if (C_PARMS->mDontSearchTarget) {
 		return;
 	}
 
@@ -1779,8 +1777,8 @@ void Obj::checkAttack(bool check)
 
 	if (mTargetCreature && mTargetCreature->isAlive()) {
 		Creature* target = mTargetCreature;
-		if (isTargetOutOfRange(target, getCreatureViewAngle(target), C_GENERALPARMS.mPrivateRadius(), C_GENERALPARMS.mSightRadius(),
-		                       C_GENERALPARMS.mFov(), C_GENERALPARMS.mViewAngle())) {
+		if (isTargetWithinRange(target, getCreatureViewAngle(target), C_GENERALPARMS.mPrivateRadius(), C_GENERALPARMS.mSightRadius(),
+		                        C_GENERALPARMS.mFov(), C_GENERALPARMS.mViewAngle())) {
 			mTargetCreature = nullptr;
 
 		} else {
@@ -1801,7 +1799,7 @@ void Obj::checkAttack(bool check)
 		}
 	}
 
-	if (!C_PARMS->_BCB || !mLod.isFlag(AILOD_IsVisible)) {
+	if (!C_PARMS->mCanAttackBombs || !mLod.isFlag(AILOD_IsVisible)) {
 		return;
 	}
 
@@ -2516,19 +2514,14 @@ void Obj::startMotionSelf(int animIdx, SysShape::MotionListener* listener)
 		SysShape::Animator& sysAnim = animator->getAnimator(0);
 		f32 frame;
 		if (sysAnim.mAnimInfo) {
-			frame = sysAnim.mAnimInfo->mAnm->mFrameLength;
+			frame = sysAnim.mAnimInfo->mAnm->mTotalFrameCount;
 		} else {
 			frame = 0.0f;
 		}
 
 		f32 timer = sysAnim.mTimer;
 		if (frame - 1.0f > timer) {
-			int currAnim;
-			if (sysAnim.mAnimInfo) {
-				currAnim = sysAnim.mAnimInfo->mId;
-			} else {
-				currAnim = -1;
-			}
+			int currAnim = sysAnim.getAnimIndex();
 
 			if (animIdx != currAnim) {
 				startBlend(currAnim, animIdx, &EnemyBlendAnimatorBase::sBlendLinearFun, 30.0f, nullptr);
@@ -2551,12 +2544,8 @@ void Obj::startMotionSelf(int animIdx, SysShape::MotionListener* listener)
 void Obj::endBlendAnimation()
 {
 	SysShape::Animator& animator = mAnimator->getAnimator(1);
-	int animIdx;
-	if (animator.mAnimInfo) {
-		animIdx = animator.mAnimInfo->mId;
-	} else {
-		animIdx = -1;
-	}
+
+	int animIdx = animator.getAnimIndex();
 
 	f32 timer = animator.mTimer;
 
@@ -2589,7 +2578,7 @@ void Obj::rightFootMtxCalc()
  */
 void Obj::footMtxCalc(Mtx mtx, Vector3f* pos, f32* p1)
 {
-	if (mtx[1][3] > mPosition.y + C_PARMS->_BD0) {
+	if (mtx[1][3] > mPosition.y + C_PARMS->mFootCalcHeightThreshold) {
 		*p1 += 0.25f;
 
 		f32 invP1 = 1.0f - *p1;
@@ -2609,8 +2598,8 @@ void Obj::footMtxCalc(Mtx mtx, Vector3f* pos, f32* p1)
 	*p1 *= 0.7f;
 	if (*p1 < 0.1f) {
 		if (*p1 != 0.0f) {
-			cameraMgr->startVibration(6, *pos, 2);
-			rumbleMgr->startRumble(11, *pos, RUMBLEID_Both);
+			cameraMgr->startVibration(VIBTYPE_LightFastShort, *pos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, *pos, RUMBLEID_Both);
 		}
 
 		*p1 = 0.0f;

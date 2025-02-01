@@ -20,7 +20,7 @@
 #include "System.h"
 #include "SoundID.h"
 #include "Radar.h"
-// #include "nans.h"
+#include "nans.h"
 
 namespace Game {
 
@@ -33,8 +33,6 @@ Color4 Piki::pikiColorsCursor[PikiColorCount + 1]
 
 static const int unusedPikiArray[] = { 0, 0, 0 };
 } // namespace Game
-
-#include "nans.h"
 
 namespace Game {
 
@@ -69,12 +67,16 @@ Piki::Piki()
  */
 bool Piki::isWalking()
 {
+	// If we're in formation
 	if (getCurrActionID() == PikiAI::ACT_Formation) {
 		PikiAI::ActFormation* action = static_cast<PikiAI::ActFormation*>(getCurrAction());
-		if (action && action->mSortState == FORMATION_SORT_FORMED && mVelocity.length() > 20.0f) {
+
+		// We're in formation and we're walking
+		if (action && action->mSortState == FORMATION_SORT_FORMED && mTargetVelocity.length() > 20.0f) {
 			return true;
 		}
 	}
+
 	return false;
 }
 
@@ -86,10 +88,12 @@ int Piki::getFormationSlotID()
 {
 	if (getCurrActionID() == PikiAI::ACT_Formation) {
 		PikiAI::ActFormation* action = static_cast<PikiAI::ActFormation*>(getCurrAction());
+
 		if (action) {
 			return action->mSlotID;
 		}
 	}
+
 	return -1;
 }
 
@@ -130,17 +134,17 @@ void Piki::onInit(CreatureInitArg* initArg)
 	pikiMgr->setupPiki(this);
 	initAnimator();
 	mEffectsObj->init();
-	mEffectsObj->_0C        = &mLeafStemOffset;
-	mEffectsObj->_14        = &mLeafStemPosition;
-	mEffectsObj->mPikiColor = -1;
+	mEffectsObj->mStemPosition    = &mLeafStemOffset;
+	mEffectsObj->mAltStemPosition = &mLeafStemPosition;
+	mEffectsObj->mPikiColor       = -1;
 	mCollTree->attachModel(mModel);
 
 	PikiInitArg* pikiArg = static_cast<PikiInitArg*>(initArg);
 	if (pikiArg && pikiArg->mLeader) {
 		PikiAI::CreatureActionArg actionArg(pikiArg->mLeader);
 		mBrain->start(PikiAI::ACT_Teki, &actionArg);
-		changeShape(5);
-		setFPFlag(FPFLAGS_Unk8);
+		changeShape(Bulbmin);
+		setFPFlag(FPFLAGS_IsWildBulbmin);
 	} else {
 		mBrain->start(PikiAI::ACT_Free, nullptr);
 		GameStat::alivePikis.inc(this);
@@ -173,46 +177,60 @@ void Piki::onInit(CreatureInitArg* initArg)
  */
 void Piki::onKill(CreatureKillArg* killArg)
 {
-	if (gameSystem->isVersusMode() && killArg && killArg->isFlag(CKILL_Unk32)) {
+	// If we're in versus mode and Piki was killed another piki
+	if (gameSystem->isVersusMode() && killArg && killArg->isFlag(CKILL_VsChargePiki)) {
 		Onyon* onyon = ItemOnyon::mgr->getOnyon(getKind());
 		if (onyon) {
 			onyon->vsChargePikmin();
 		}
 	}
 
+	// Clear Piki effects and the spicy state
 	clearDope();
 	mEffectsObj->clear();
 
-	if (!killArg || !(killArg->isFlag(CKILL_Unk1))) {
+	// If the kill argument isn't set, or the kill should count as a death
+	if (!killArg || !(killArg->isFlag(CKILL_DontCountAsDeath))) {
+		// If we're in challenge mode and we're a Pikmin
 		if (gameSystem && gameSystem->isChallengeMode() && isPikmin()) {
 			GameMessageVsPikminDead deadMsg;
 			gameSystem->mSection->sendMessage(deadMsg);
 		}
 
-		Vector3f pikiPos = getPosition();
-		mEffectsObj->doDead();
+		// Create dead piki noise and effect
+		Vector3f pikiPos          = getPosition();
+		efx::TPkEffect* effectObj = mEffectsObj;
+		effectObj->clear();
+		efx::createSimpleDead(*effectObj->mHamonPosPtr, effectObj->mPikiColor);
 		mSoundObj->startFreePikiSound(PSSE_PK_VC_GHOST, 90, 0);
 
+		// If death counter is enabled
 		if (gameSystem && !gameSystem->isFlag(GAMESYS_DisableDeathCounter)) {
+			// If we're not a Bulbmin, wild Pikmin, or Pikmin (carrot)
 			int pikiType = getKind();
 			if (pikiType < Bulbmin && !isZikatu() && !isPikmin()) {
 				DeathMgr::inc(DeathCounter::COD_All);
 			}
 
+			// Increment stats of whoever killed us
 			if (mTekiKillID != -1 && gameSystem->isStoryMode()) {
 				playData->mTekiStatMgr.getTekiInfo(mTekiKillID)->incKillPikmin();
 			}
 		}
 	}
 
-	bool isBulbmin = false;
-	if (!isPikmin() && getKind() == Bulbmin) {
-		isBulbmin = true;
-	}
+	bool isBulbmin = !isPikmin() && getKind() == Bulbmin;
 
+	// Delete shadow of the Pikmin
 	killFakePiki();
+
+	// Set the light effect as if the Pikmin is free (wild)
 	setFreeLightEffect(false);
+
+	// Disable the spicy spray state
 	setDopeEffect(false);
+
+	// Finish our current action
 	if (getCurrAction()) {
 		getCurrAction()->cleanup();
 	}
@@ -220,10 +238,12 @@ void Piki::onKill(CreatureKillArg* killArg)
 	clearCurrAction();
 	mPikiUpdateContext.exit();
 
+	// If we're not a Bulbmin, decrement the number of alive Pikmin
 	if (!isBulbmin) {
 		GameStat::alivePikis.dec(this);
 	}
 
+	// Remove associated variables and remove from radar
 	pikiMgr->kill(this);
 	mNavi = nullptr;
 	Radar::Mgr::exit(this);
@@ -272,7 +292,7 @@ void Piki::update()
 			int stateID  = getStateID();
 			int pikiType = getKind();
 			if (stateID != PIKISTATE_WaterHanged && stateID != PIKISTATE_Drown && !mCurrentState->dead() && pikiType != Blue
-			    && pikiType != Bulbmin && moviePlayer->mDemoState == 0 && mSimVelocity.y <= 0.1f) {
+			    && pikiType != Bulbmin && moviePlayer->mDemoState == DEMOSTATE_Inactive && mVelocity.y <= 0.1f) {
 				mFsm->transit(this, PIKISTATE_Drown, nullptr);
 				mEffectsObj->mHeight = mWaterBox->getSeaHeightPtr();
 			}
@@ -340,10 +360,10 @@ void Piki::movieStartDemoAnimation(SysShape::AnimInfo* animInfo)
  */
 void Piki::movieSetTranslation(Vector3f& position, f32 faceDir)
 {
-	mSimVelocity         = Vector3f(0.0f);
-	mVelocity            = Vector3f(0.0f);
-	mAcceleration        = Vector3f(0.0f);
-	mPositionBeforeMovie = mPosition;
+	mVelocity         = Vector3f(0.0f);
+	mTargetVelocity   = Vector3f(0.0f);
+	mAcceleration     = Vector3f(0.0f);
+	mPreviousPosition = mPosition;
 	setPosition(position, false);
 	mFaceDir = faceDir;
 }
@@ -362,9 +382,10 @@ void Piki::startSound(u32 id, bool isNotFree)
 {
 	if (isNotFree) {
 		startSound(id, PSGame::SeMgr::SETSE_Unk0);
-	} else {
-		mSoundObj->startFreePikiSound(id, 90, 0);
+		return;
 	}
+
+	mSoundObj->startFreePikiSound(id, 90, 0);
 }
 
 /**
@@ -375,9 +396,10 @@ void Piki::startSound(u32 id, PSGame::SeMgr::SetSeId setSeId)
 {
 	if (setSeId < 8) {
 		mSoundObj->startFreePikiSetSound(id, setSeId, 90, 0);
-	} else {
-		mSoundObj->startFreePikiSound(id, 90, 0);
+		return;
 	}
+
+	mSoundObj->startFreePikiSound(id, 90, 0);
 }
 
 /**
@@ -432,10 +454,7 @@ bool Piki::canVsBattle() { return mCurrentState->battleOK(); }
  */
 Piki* Piki::getVsBattlePiki()
 {
-	if (getCurrActionID() == PikiAI::ACT_Battle) {
-		return static_cast<PikiAI::ActBattle*>(getCurrAction())->mOther;
-	}
-	return nullptr;
+	return getCurrActionID() == PikiAI::ACT_Battle ? static_cast<PikiAI::ActBattle*>(getCurrAction())->mOther : nullptr;
 }
 
 /**
@@ -477,7 +496,7 @@ void Piki::inWaterCallback(WaterBox* wbox)
 	int pikiType = getKind();
 	if (stateID != PIKISTATE_WaterHanged && stateID != PIKISTATE_Drown && !mCurrentState->dead() && pikiType != Blue
 	    && pikiType != Bulbmin) {
-		if (moviePlayer->mDemoState == 0 && mSimVelocity.y <= 0.1f) {
+		if (moviePlayer->mDemoState == DEMOSTATE_Inactive && mVelocity.y <= 0.1f) {
 			mFsm->transit(this, PIKISTATE_Drown, nullptr);
 		} else {
 			return;
@@ -487,7 +506,7 @@ void Piki::inWaterCallback(WaterBox* wbox)
 	mEffectsObj->mHeight = wbox->getSeaHeightPtr();
 	if (isAlive()) {
 		efx::TPkEffect* effectObj = mEffectsObj;
-		effectObj->doWaterEntry();
+		effectObj->doWaterEntry(effectObj->isFlag(PKEFF_Drown)); // regswap in this inline
 		mSoundObj->startFreePikiSetSound(PSSE_PK_SE_WATER_IN, PSGame::SeMgr::SETSE_PikiLanding, 90, 0);
 	}
 
@@ -601,7 +620,7 @@ void Piki::outWaterCallback()
  */
 bool Piki::might_bury()
 {
-	if (mBounceTriangle && mBounceTriangle->mCode.isBald()) {
+	if (mFloorTriangle && mFloorTriangle->mCode.isBald()) {
 		return false;
 	}
 
@@ -662,90 +681,28 @@ int Piki::getStateID()
 f32 Piki::getSpeed(f32 multiplier)
 {
 	if (doped()) {
-		return pikiMgr->mParms->mPikiParms.mDopeRunSpeed.mValue;
+		return pikiMgr->mParms->mPikiParms.mDopeRunSpeed();
 	}
 
-	f32 baseSpeed = scaleValue(1.0f, pikiMgr->mParms->mPikiParms.mRunSpeed.mValue);
+	f32 baseSpeed = scaleValue(1.0f, pikiMgr->mParms->mPikiParms.mRunSpeed());
 
 	if (mHappaKind == Flower) {
-		baseSpeed = pikiMgr->mParms->mPikiParms.mFlowerRunSpeed.mValue;
+		baseSpeed = pikiMgr->mParms->mPikiParms.mFlowerRunSpeed();
 	} else if (mHappaKind == Bud) {
-		baseSpeed = pikiMgr->mParms->mPikiParms.mBudRunSpeed.mValue;
+		baseSpeed = pikiMgr->mParms->mPikiParms.mBudRunSpeed();
 	}
 
 	int pikiType = getKind();
-	f32 drag     = scaleValue(1.0f, pikiMgr->mParms->mPikiParms.mWalkSpeed.mValue);
+	f32 drag     = scaleValue(1.0f, pikiMgr->mParms->mPikiParms.mWalkSpeed());
 	f32 speed    = multiplier * (baseSpeed - drag) + drag;
 
 	if (pikiType == White) {
-		speed *= pikiMgr->mParms->mPikiParms.mWhiteRunSpeedMultiplier.mValue;
+		speed *= pikiMgr->mParms->mPikiParms.mWhiteRunSpeedMultiplier();
 	} else if (pikiType == Purple) {
-		speed *= pikiMgr->mParms->mPikiParms.mPurpleRunSpeedMultiplier.mValue;
+		speed *= pikiMgr->mParms->mPikiParms.mPurpleRunSpeedMultiplier();
 	}
 
 	return speed;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stfd     f31, 0x10(r1)
-	psq_st   f31, 24(r1), 0, qr0
-	stw      r31, 0xc(r1)
-	mr       r31, r3
-	fmr      f31, f1
-	bl       doped__Q24Game4PikiFv
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_80148F8C
-	lwz      r3, pikiMgr__4Game@sda21(r13)
-	lwz      r3, 0x6c(r3)
-	lfs      f1, 0x11a0(r3)
-	b        lbl_80148FFC
-
-lbl_80148F8C:
-	lwz      r3, pikiMgr__4Game@sda21(r13)
-	lbz      r0, 0x2b9(r31)
-	lwz      r3, 0x6c(r3)
-	lfs      f1, lbl_80518440@sda21(r2)
-	cmplwi   r0, 2
-	lfs      f0, 0x2c8(r3)
-	fmuls    f2, f1, f0
-	bne      lbl_80148FB4
-	lfs      f2, 0x2f0(r3)
-	b        lbl_80148FC0
-
-lbl_80148FB4:
-	cmplwi   r0, 1
-	bne      lbl_80148FC0
-	lfs      f2, 0x318(r3)
-
-lbl_80148FC0:
-	lfs      f1, lbl_80518440@sda21(r2)
-	lfs      f0, 0x2a0(r3)
-	lbz      r0, 0x2b8(r31)
-	fmuls    f1, f1, f0
-	cmpwi    r0, 4
-	fsubs    f0, f2, f1
-	fmadds   f1, f31, f0, f1
-	bne      lbl_80148FEC
-	lfs      f0, 0x1010(r3)
-	fmuls    f1, f1, f0
-	b        lbl_80148FFC
-
-lbl_80148FEC:
-	cmpwi    r0, 3
-	bne      lbl_80148FFC
-	lfs      f0, 0x1038(r3)
-	fmuls    f1, f1, f0
-
-lbl_80148FFC:
-	psq_l    f31, 24(r1), 0, qr0
-	lwz      r0, 0x24(r1)
-	lfd      f31, 0x10(r1)
-	lwz      r31, 0xc(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -755,9 +712,9 @@ lbl_80148FFC:
 void Piki::setSpeed(f32 multiplier, Vector3f& direction)
 {
 	if (multiplier < 0.0f) {
-		mVelocity = direction * -getSpeed(-multiplier);
+		mTargetVelocity = direction * -getSpeed(-multiplier);
 	} else {
-		mVelocity = direction * getSpeed(multiplier);
+		mTargetVelocity = direction * getSpeed(multiplier);
 	}
 }
 
@@ -782,9 +739,9 @@ f32 Piki::getSpeed(f32 multiplier, f32 max)
 void Piki::setSpeed(f32 multiplier, Vector3f& vec, f32 max)
 {
 	if (multiplier < 0.0f) {
-		mVelocity = vec * -getSpeed(-multiplier, max);
+		mTargetVelocity = vec * -getSpeed(-multiplier, max);
 	} else {
-		mVelocity = vec * getSpeed(multiplier, max);
+		mTargetVelocity = vec * getSpeed(multiplier, max);
 	}
 }
 
@@ -794,14 +751,17 @@ void Piki::setSpeed(f32 multiplier, Vector3f& vec, f32 max)
  */
 bool Piki::isPikmin()
 {
-	if (BaseHIOParms::sTekiChappyFlag && isFPFlag(FPFLAGS_Unk8)) {
+	// wild bulbmin are not Pikmin
+	if (BaseHIOParms::sTekiChappyFlag && isFPFlag(FPFLAGS_IsWildBulbmin)) {
 		return false;
 	}
 
+	// things following enemies are not Pikmin
 	if (getCurrActionID() == PikiAI::ACT_Teki) {
 		return false;
 	}
 
+	// all other Piki are Pikmin
 	return true;
 }
 
@@ -825,10 +785,10 @@ bool Piki::isThrowable()
 int Piki::getDownfloorMass()
 {
 	if (getStateID() == PIKISTATE_Hanged) {
-		return 0;
+		return PW_Weightless;
 	}
 
-	return (getKind() == Purple) ? 10 : 1;
+	return (getKind() == Purple) ? PW_PurpleWeight : PW_NormalWeight;
 }
 
 /**
@@ -952,8 +912,8 @@ void Piki::onStickEndSelf(Creature* creature)
 
 	if (mapMgr) {
 		CurrTriInfo triInfo;
-		triInfo.mPosition        = pikiPos;
-		triInfo.mUpdateOnNewMaxY = true;
+		triInfo.mPosition          = pikiPos;
+		triInfo.mGetTopPolygonInfo = true;
 		mapMgr->getCurrTri(triInfo);
 		if (pikiPos.y < triInfo.mMaxY) {
 			pikiPos.y = triInfo.mMaxY;
@@ -1119,6 +1079,7 @@ bool Piki::startDope(int isDoped)
 		mIsDoped = isDoped;
 		extendDopeTime();
 		mEffectsObj->doDoping();
+
 		startSound(PSSE_PK_VC_DOPING, PSGame::SeMgr::SETSE_Unk0);
 		startSound(PSSE_PK_DOPING_IMI, PSGame::SeMgr::SETSE_Unk0);
 
@@ -1366,15 +1327,15 @@ void Piki::changeShape(int color)
 
 	int count = GameStat::alivePikis;
 
-	mEffectsObj->mPikiColor   = color;
-	mEffectsObj->mHamonPosPtr = &mPosition;
-	mEffectsObj->_1C          = &mBaseTrMatrix;
+	mEffectsObj->mPikiColor     = color;
+	mEffectsObj->mHamonPosPtr   = &mPosition;
+	mEffectsObj->mBaseObjMatrix = &mBaseTrMatrix;
 
-	mLeafStemJoint           = mModel->getJoint("happajnt3");
-	mHappaJoint1             = mModel->getJoint("happajnt1");
-	mEffectsObj->_18         = mModel->getJoint("happajnt3")->getWorldMatrix();
-	SysShape::Joint* headJnt = mModel->getJoint("headjnt");
-	headJnt->mJ3d->mFunction = sNeckCallback;
+	mLeafStemJoint              = mModel->getJoint("happajnt3");
+	mHappaJoint1                = mModel->getJoint("happajnt1");
+	mEffectsObj->mHappaJointMtx = mModel->getJoint("happajnt3")->getWorldMatrix();
+	SysShape::Joint* headJnt    = mModel->getJoint("headjnt");
+	headJnt->mJ3d->mFunction    = sNeckCallback;
 }
 
 /**
@@ -1411,14 +1372,7 @@ void Piki::do_updateLookCreature()
 		}
 
 		if (mPikiUpdateContext.updatable()) {
-			int animIdx;
-			if (mAnimator.mSelfAnimator.mAnimInfo) {
-				animIdx = mAnimator.mSelfAnimator.mAnimInfo->mId;
-			} else {
-				animIdx = IPikiAnims::NULLANIM;
-			}
-
-			switch (animIdx) {
+			switch (mAnimator.mSelfAnimator.getAnimIndex()) {
 			default:
 				finishLook();
 				return;

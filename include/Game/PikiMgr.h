@@ -23,9 +23,9 @@ struct PikiContainer;
 
 struct PikiMgr : public MonoObjectMgr<Piki> {
 	enum PikiSpawnMode {
-		PSM_Normal,
-		PSM_Force,
-		PSM_Replace,
+		PSM_Normal,  // checks if we've hit 100 cap by active pikis or sprouts before spawning (wild pikis, out of onyons, etc)
+		PSM_Force,   // does no checks, just spawns (plucking sprouts)
+		PSM_Replace, // checks if we can spawn normally; if not, removes 'extra' wild bulbmin (when entering the next cave floor)
 	};
 
 	PikiMgr();
@@ -33,9 +33,9 @@ struct PikiMgr : public MonoObjectMgr<Piki> {
 	// vtable 1
 	virtual ~PikiMgr() { } // _08 (weak)
 	// vtable 2
+	virtual Piki* birth();                           // _7C
 	virtual void doAnimation();                      // _64 (weak)
 	virtual void doEntry();                          // _68 (weak)
-	virtual Piki* birth();                           // _7C
 	virtual void resetMgr();                         // _80 (weak)
 	virtual void onAlloc();                          // _88
 	virtual void doSimpleDraw(Viewport* vp);         // _8C (weak)
@@ -53,7 +53,7 @@ struct PikiMgr : public MonoObjectMgr<Piki> {
 	SysShape::Model* createLeafModel(int id, int num);
 	void setMovieDraw(bool drawOn);
 	void debugShapeDL(char* text);
-	void setVsXlu(int p1, bool p2);
+	void setVsXlu(int naviIndex, bool ghostIconNotActive);
 	void setupSoundViewerAndBas();
 	int getColorTransportScale(int color);
 	void allocStorePikmins();
@@ -68,6 +68,8 @@ struct PikiMgr : public MonoObjectMgr<Piki> {
 	void caveSaveAllPikmins(bool check1, bool check2);
 	void saveFormationPikmins(PikiContainer& container);
 	void saveAllPikmins(PikiContainer& container);
+
+	inline void updateArrayAt(int i);
 
 	static int mBirthMode;
 	static bool throwPikiDebug;

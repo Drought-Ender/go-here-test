@@ -34,14 +34,9 @@ void Caption::Node::read(Stream& input)
  * __ct
  */
 Caption::Mgr::Mgr()
-    : CNode("キャプションマネージャ")
+    : CNode("繧ｭ繝｣繝励す繝ｧ繝ｳ繝槭ロ繝ｼ繧ｸ繝｣")
+    , mNode(nullptr)
 {
-	mNode  = nullptr;
-	_20[0] = 0;
-	_20[1] = 0;
-	_20[2] = 0;
-	_20[3] = 0;
-
 	mControls = new P2JME::Caption::TControl[3];
 	for (u32 i = 0; i < 3; i++) {
 		mControls[i].init();
@@ -165,7 +160,7 @@ P2JME::Caption::TControl* Caption::Mgr::getFreeMessage()
 {
 	P2JME::Caption::TControl* ret = nullptr;
 	for (u32 i = 0; i < 3; i++) {
-		if ((int)mControls[i].mState == 0) {
+		if (mControls[i].mState == 0) {
 			ret = &mControls[i];
 			break;
 		}

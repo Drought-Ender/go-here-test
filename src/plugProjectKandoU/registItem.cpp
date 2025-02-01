@@ -1,7 +1,6 @@
 #include "Game/Entities/Item.h"
 #include "System.h"
 #include "nans.h"
-#include "types.h"
 
 namespace Game {
 
@@ -24,14 +23,14 @@ inline void GenerateMgr(T2& mgr, char* name)
  */
 void ItemMgr::createManagers(u32 flags)
 {
-	bool inCave      = (flags >> 1) & 1;
-	bool isExitFloor = flags & 1;
+	bool isGround = (flags >> 1) & 1;
+	bool isCave   = flags & 1;
 
 	GenerateMgr<ItemBarrel::Mgr>(ItemBarrel::mgr, "-Barrel-");
 	GenerateMgr<ItemUjamushi::Mgr>(ItemUjamushi::mgr, "-Ujamushi-");
 
 	sys->heapStatusStart("-Weed-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemWeed::mgr = new ItemWeed::Mgr;
 		ItemWeed::mgr->loadResources();
 		itemMgr->addMgr(ItemWeed::mgr);
@@ -45,7 +44,7 @@ void ItemMgr::createManagers(u32 flags)
 	GenerateMgr<ItemPikihead::Mgr>(ItemPikihead::mgr, "-PikiHead-");
 
 	sys->heapStatusStart("-Plant-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemPlant::mgr = new ItemPlant::Mgr;
 		ItemPlant::mgr->loadResources();
 		itemMgr->addMgr(ItemPlant::mgr);
@@ -55,7 +54,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-Plant-");
 
 	sys->heapStatusStart("-Rock-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemRock::mgr = new ItemRock::Mgr;
 		ItemRock::mgr->loadResources();
 		itemMgr->addMgr(ItemRock::mgr);
@@ -74,7 +73,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-Onyon-");
 
 	sys->heapStatusStart("-Hole-", nullptr);
-	if (isExitFloor) {
+	if (isCave) {
 		ItemHole::mgr = new ItemHole::Mgr;
 		ItemHole::mgr->loadResources();
 		itemMgr->addMgr(ItemHole::mgr);
@@ -84,7 +83,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-Hole-");
 
 	sys->heapStatusStart("-Cave-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemCave::mgr = new ItemCave::Mgr;
 		ItemCave::mgr->loadResources();
 		itemMgr->addMgr(ItemCave::mgr);
@@ -94,7 +93,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-Cave-");
 
 	sys->heapStatusStart("-BigFountain-", nullptr);
-	if (isExitFloor) {
+	if (isCave) {
 		ItemBigFountain::mgr = new ItemBigFountain::Mgr;
 		ItemBigFountain::mgr->loadResources();
 		itemMgr->addMgr(ItemBigFountain::mgr);
@@ -104,7 +103,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-BigFountain-");
 
 	sys->heapStatusStart("-Bridge-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemBridge::mgr = new ItemBridge::Mgr;
 		ItemBridge::mgr->loadResources();
 		itemMgr->addMgr(ItemBridge::mgr);
@@ -119,7 +118,7 @@ void ItemMgr::createManagers(u32 flags)
 	sys->heapStatusEnd("-Gate-");
 
 	sys->heapStatusStart("-DengekiGate-", nullptr);
-	if (inCave) {
+	if (isGround) {
 		ItemDengekiGate::mgr = new ItemDengekiGate::Mgr;
 		itemMgr->addMgr(ItemDengekiGate::mgr);
 	} else {
@@ -185,7 +184,5 @@ void ItemMgr::killAllExceptOnyonMgr()
 		ItemHoney::mgr = nullptr;
 	}
 }
-
-const char* UNUSED_CreatureKillArg = "CreatureKillArg";
 
 } // namespace Game

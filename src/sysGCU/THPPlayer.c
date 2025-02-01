@@ -467,7 +467,7 @@ BOOL THPPlayerPrepare(int frame, u8 flag, int audioTrack)
 
 		OldVIPostCallback = VISetPostRetraceCallback(PlayControl);
 
-		OSReport("THPPlayerPrepare()終了\n"); // 'THPPlayerPrepare end'
+		OSReport("THPPlayerPrepare()邨ゆｺ�\n"); // 'THPPlayerPrepare end'
 
 		return TRUE;
 	}
@@ -515,7 +515,7 @@ void THPPlayerStop()
 			AudioDecodeThreadCancel();
 			audioQuitWithMSound();
 
-			OSReport("オーディオ関係を初期化\n"); // 'initialize audio-related information'
+			OSReport("繧ｪ繝ｼ繝�繧｣繧ｪ髢｢菫ゅｒ蛻晄悄蛹暴n"); // 'initialize audio-related information'
 		}
 
 		while (PopUsedTextureSet() != 0) {
@@ -830,7 +830,7 @@ static void MixAudio(s16* buf, s16* buf2, u32 n)
 				}
 
 				volFromTable = VolumeTable[(int)ActivePlayer.mCurVolume];
-				vol1         = 32768.0f * PSM::sTHPDinamicsProc.dinamics((volFromTable * curPtr[0] >> 15) / 32768.0f);
+				vol1         = SHORT_FLOAT_MAX * PSM::sTHPDinamicsProc.dinamics((volFromTable * curPtr[0] >> 15) / SHORT_FLOAT_MAX);
 				// clamp volume
 				if (vol1 < -32768) {
 					vol1 = -32768;
@@ -840,7 +840,7 @@ static void MixAudio(s16* buf, s16* buf2, u32 n)
 				}
 				*aBuf++ = vol1;
 
-				vol2 = 32768.0f * PSM::sTHPDinamicsProc.dinamics((volFromTable * curPtr[1] >> 15) / 32768.0f);
+				vol2 = SHORT_FLOAT_MAX * PSM::sTHPDinamicsProc.dinamics((volFromTable * curPtr[1] >> 15) / SHORT_FLOAT_MAX);
 				if (vol2 < -32768) {
 					vol2 = -32768;
 				}

@@ -14,7 +14,7 @@ static const char umiMushiMgrName[] = "umiMushiMgr";
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "ウミムシマネージャ"; // sea worm manager
+	mName = "繧ｦ繝溘Β繧ｷ繝槭ロ繝ｼ繧ｸ繝｣"; // sea worm manager
 }
 
 /**
@@ -68,7 +68,7 @@ void Mgr::loadTexData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x20000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_CreateNewDL, mMtxBufferSize);
 	P2ASSERTLINE(111, model);
 	return model;
 }

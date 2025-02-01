@@ -76,7 +76,7 @@ void SceneWinLoseReason::doCreateObj(JKRArchive* arc)
 		P2ASSERTLINE(149, screen);
 		screen->mGameOverScreen->setPosY(ObjWinLoseReason::msVal.mYOffsetP1);
 		screen->mType      = 1;
-		screen->mTimeSpeed = ObjWinLoseReason::msVal._18;
+		screen->mTimeSpeed = ObjWinLoseReason::msVal.mTimeSpeed;
 		break;
 	}
 	case 2: // piki extinct
@@ -87,7 +87,7 @@ void SceneWinLoseReason::doCreateObj(JKRArchive* arc)
 		P2ASSERTLINE(159, screen);
 		screen->mGameOverScreen->setPosY(ObjWinLoseReason::msVal.mYOffsetP1);
 		screen->mType      = 1;
-		screen->mTimeSpeed = ObjWinLoseReason::msVal._18;
+		screen->mTimeSpeed = ObjWinLoseReason::msVal.mTimeSpeed;
 		break;
 	}
 	case 3: {
@@ -111,7 +111,7 @@ void SceneWinLoseReason::doCreateObj(JKRArchive* arc)
 		P2ASSERTLINE(180, screen);
 		screen->mGameOverScreen->setPosY(ObjWinLoseReason::msVal.mYOffsetP2);
 		screen->mType      = 2;
-		screen->mTimeSpeed = ObjWinLoseReason::msVal._18;
+		screen->mTimeSpeed = ObjWinLoseReason::msVal.mTimeSpeed;
 		break;
 	}
 	case 2: // piki extinct
@@ -122,7 +122,7 @@ void SceneWinLoseReason::doCreateObj(JKRArchive* arc)
 		P2ASSERTLINE(190, screen);
 		screen->mGameOverScreen->setPosY(ObjWinLoseReason::msVal.mYOffsetP2);
 		screen->mType      = 2;
-		screen->mTimeSpeed = ObjWinLoseReason::msVal._18;
+		screen->mTimeSpeed = ObjWinLoseReason::msVal.mTimeSpeed;
 		break;
 	}
 	case 3: // default (marble?)
@@ -168,24 +168,24 @@ void SceneWinLoseReason::doCreateObj(JKRArchive* arc)
 		int streamID;
 		if (!(flag & 3)) {
 			if (flag & 0x20) {
-				streamID = 0xc001103d; // olimar win via louie dies
+				streamID = P2_STREAM_SOUND_ID(PSSTR_VS_PDOWN_WIN_ORI); // olimar win via louie dies
 			} else {
-				streamID = 0xc0011040; // olimar wins via extinct
+				streamID = P2_STREAM_SOUND_ID(PSSTR_VS_PIK_WIN_ORI); // olimar wins via extinct
 			}
 		} else if (!(flag & 0x30)) {
 			if (flag & 0x2) {
-				streamID = 0xc001103e; // louie win via olimar dies
+				streamID = P2_STREAM_SOUND_ID(PSSTR_VS_PDOWN_WIN_LUI); // louie win via olimar dies
 			} else {
-				streamID = 0xc0011041; // louie win via extinct
+				streamID = P2_STREAM_SOUND_ID(PSSTR_VS_PIK_WIN_LUI); // louie win via extinct
 			}
 		} else {
-			streamID = 0xc0011045; // draw
+			streamID = P2_STREAM_SOUND_ID(PSSTR_VS_BEE_DROW); // draw
 		}
 
 		PSStart2DStream(streamID);
 		PSMuteSE_on2D();
 		PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		PSM::Scene_Game* scene = static_cast<PSM::Scene_Game*>(mgr->getChildScene());
 		scene->stopAllSound(2);
 	}
@@ -205,7 +205,7 @@ void SceneWinLoseReason::doUpdateActive()
 			if (mCounter == ObjWinLoseReason::msVal.mProgressFrame) {
 				Morimura::TGameOverBase* obj = static_cast<Morimura::TGameOverBase*>(mScreenObj[i]);
 				P2ASSERTLINE(272, obj);
-				obj->mTimeSpeed = -ObjWinLoseReason::msVal._18;
+				obj->mTimeSpeed = -ObjWinLoseReason::msVal.mTimeSpeed;
 			} else if (mCounter > ObjWinLoseReason::msVal.mFinishFrame) {
 				mDone[i] = true;
 			}

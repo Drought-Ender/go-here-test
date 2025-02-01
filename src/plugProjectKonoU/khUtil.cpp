@@ -58,10 +58,10 @@ void setInfAlpha(J2DPane* pane)
  */
 f32 getPaneCenterX(J2DPane* pane)
 {
-	JGeometry::TVec3f vec1 = pane->getGlbVtx(0);
-	JGeometry::TVec3f vec2 = pane->getGlbVtx(1);
-	JGeometry::TVec3f vec3 = pane->getGlbVtx(2);
-	JGeometry::TVec3f vec4 = pane->getGlbVtx(3);
+	JGeometry::TVec3f vec1 = pane->getGlbVtx(GLBVTX_BtmLeft);
+	JGeometry::TVec3f vec2 = pane->getGlbVtx(GLBVTX_BtmRight);
+	JGeometry::TVec3f vec3 = pane->getGlbVtx(GLBVTX_TopLeft);
+	JGeometry::TVec3f vec4 = pane->getGlbVtx(GLBVTX_TopRight);
 
 	return (vec1.x + vec2.x + vec3.x + vec4.x) * 0.25f;
 }
@@ -72,10 +72,10 @@ f32 getPaneCenterX(J2DPane* pane)
  */
 f32 getPaneCenterY(J2DPane* pane)
 {
-	JGeometry::TVec3f vec1 = pane->getGlbVtx(0);
-	JGeometry::TVec3f vec2 = pane->getGlbVtx(1);
-	JGeometry::TVec3f vec3 = pane->getGlbVtx(2);
-	JGeometry::TVec3f vec4 = pane->getGlbVtx(3);
+	JGeometry::TVec3f vec1 = pane->getGlbVtx(GLBVTX_BtmLeft);
+	JGeometry::TVec3f vec2 = pane->getGlbVtx(GLBVTX_BtmRight);
+	JGeometry::TVec3f vec3 = pane->getGlbVtx(GLBVTX_TopLeft);
+	JGeometry::TVec3f vec4 = pane->getGlbVtx(GLBVTX_TopRight);
 
 	return (vec1.y + vec2.y + vec3.y + vec4.y) * 0.25f;
 }
@@ -84,12 +84,12 @@ f32 getPaneCenterY(J2DPane* pane)
  * @note Address: 0x8040BAE4
  * @note Size: 0xA4
  */
-khUtilFadePane* khUtilFadePane::create(P2DScreen::Mgr* mgr, u64 tag, u8 c)
+khUtilFadePane* khUtilFadePane::create(P2DScreen::Mgr* mgr, u64 tag, u8 changeSpeed)
 {
 	if (mgr == nullptr) {
 		return nullptr;
 	}
-	khUtilFadePane* pane = new khUtilFadePane(c);
+	khUtilFadePane* pane = new khUtilFadePane(changeSpeed);
 	P2ASSERTLINE(146, pane != nullptr);
 	pane->add(mgr->addCallBack(tag, pane));
 	return pane;
@@ -99,12 +99,12 @@ khUtilFadePane* khUtilFadePane::create(P2DScreen::Mgr* mgr, u64 tag, u8 c)
  * @note Address: 0x8040BB88
  * @note Size: 0x88
  */
-khUtilFadePane::khUtilFadePane(u8 c)
+khUtilFadePane::khUtilFadePane(u8 changeSpeed)
     : CallBackNode()
     , mPaneNode(nullptr)
     , mState(0)
-    , mCurrentAlpha('\0')
-    , mChangeAlpha(c)
+    , mCurrentAlpha(0)
+    , mChangeSpeed(changeSpeed)
 {
 }
 
@@ -116,21 +116,21 @@ void khUtilFadePane::update()
 {
 	switch (mState) {
 	case 0:
-		if (mCurrentAlpha > 255 - mChangeAlpha) {
+		if (mCurrentAlpha > 255 - mChangeSpeed) {
 			mCurrentAlpha = 255;
 			mState        = 1;
 			fadein_finish();
 		} else {
-			mCurrentAlpha += mChangeAlpha;
+			mCurrentAlpha += mChangeSpeed;
 		}
 		break;
 	case 2:
-		if (mCurrentAlpha < mChangeAlpha) {
+		if (mCurrentAlpha < mChangeSpeed) {
 			mCurrentAlpha = 0;
 			mState        = 3;
 			fadeout_finish();
 		} else {
-			mCurrentAlpha -= mChangeAlpha;
+			mCurrentAlpha -= mChangeSpeed;
 		}
 		break;
 	}
@@ -187,14 +187,14 @@ void khUtilFadePane::set_init_alpha(u8 a)
  * @note Address: 0x8040BE70
  * @note Size: 0x158
  */
-khUtilColorAnm::khUtilColorAnm(P2DScreen::Mgr* screen, u64 tag, int panes, int frames)
+khUtilColorAnm::khUtilColorAnm(P2DScreen::Mgr* screen, u64 tag, int colors, int frames)
 {
-	mPaneNum = panes;
-	mLength  = frames;
-	mFrame   = 0;
+	mColorCount = colors;
+	mLength     = frames;
+	mFrame      = 0;
 	mColor.set(0, 0, 0, 0);
-	mColorList = new JUtility::TColor[mPaneNum];
-	for (int i = 0; i < mPaneNum; i++) {
+	mColorList = new JUtility::TColor[mColorCount];
+	for (int i = 0; i < mColorCount; i++) {
 		mColorList[i].set(0, 0, 0, 0);
 	}
 	mDisabledColor.setRGBA(mColor);
@@ -219,7 +219,7 @@ void khUtilColorAnm::update()
 		f32 inverseT;
 
 		// Calculate the animation position between start and end
-		f32 t = (mFrame * (mPaneNum - 1)) / (f32)mLength;
+		f32 t = (mFrame * (mColorCount - 1)) / (f32)mLength;
 
 		// Get the two colors to interpolate between
 		JUtility::TColor src  = getColor((int)t);

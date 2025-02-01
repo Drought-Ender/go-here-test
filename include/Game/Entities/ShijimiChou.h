@@ -216,14 +216,14 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mMaxFlyTime(this, 'fp01', "”òsŠúŠÔ", 300.0f, 0.0f, 1000.0f)                    // 'flight duration'
-		    , mMaxFlyTimePlant(this, 'fp08', "ƒvƒ‰ƒ“ƒc‚©‚ç‚Ì”òsŠúŠÔ", 100.0f, 0.0f, 1000.0f) // 'flight duration from plants'
-		    , mNectarRate(this, 'fp02', "–¨ƒŒ[ƒg", 1.0f, 0.0f, 1.0f)                         // 'honey rate'
-		    , mFlightHeight(this, 'fp03', "”òs‚‚³", 100.0f, 0.0f, 200.0f)                   // 'flight height'
-		    , mPitchRate(this, 'fp04', "”òsƒŒ[ƒg", 0.05f, 0.0f, 1.0f)                       // 'flight rate'
-		    , mPitchAmpRate(this, 'fp05', "”òs‚’á", 1.0f, 0.0f, 10.0f)                      // 'flight altitude'
-		    , mRedSpawnChance(this, 'fp06', "Ô’±—¦", 0.1f, 0.0f, 1.0f)                       // 'red butterfly rate
-		    , mPurpleSpawnChance(this, 'fp07', "•’±—¦", 0.1f, 0.0f, 1.0f)                    // 'black butterfly rate'
+		    , mMaxFlyTime(this, 'fp01', "é£›è¡ŒæœŸé–“", 300.0f, 0.0f, 1000.0f)                    // 'flight duration'
+		    , mMaxFlyTimePlant(this, 'fp08', "ãƒ—ãƒ©ãƒ³ãƒ„ã‹ã‚‰ã®é£›è¡ŒæœŸé–“", 100.0f, 0.0f, 1000.0f) // 'flight duration from plants'
+		    , mNectarRate(this, 'fp02', "èœœãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)                         // 'honey rate'
+		    , mFlightHeight(this, 'fp03', "é£›è¡Œé«˜ã•", 100.0f, 0.0f, 200.0f)                   // 'flight height'
+		    , mPitchRate(this, 'fp04', "é£›è¡Œãƒ¬ãƒ¼ãƒˆ", 0.05f, 0.0f, 1.0f)                       // 'flight rate'
+		    , mPitchAmpRate(this, 'fp05', "é£›è¡Œé«˜ä½", 1.0f, 0.0f, 10.0f)                      // 'flight altitude'
+		    , mRedSpawnChance(this, 'fp06', "èµ¤è¶ç‡", 0.1f, 0.0f, 1.0f)                       // 'red butterfly rate
+		    , mPurpleSpawnChance(this, 'fp07', "é»’è¶ç‡", 0.1f, 0.0f, 1.0f)                    // 'black butterfly rate'
 		{
 		}
 
@@ -242,7 +242,7 @@ struct Parms : public EnemyParmsBase {
 		mFlyType              = 0;
 		mDoUpdateAnimation    = false;
 		mDoManualFlight       = false;
-		mGroupCount           = 25;
+		mGroupCount           = SHIJIMICHOU_GROUP_COUNT;
 		mCanFall              = true;
 		mUseParmFlyType       = false;
 		mTraceGoalWeight      = 4.0f;
@@ -362,12 +362,12 @@ struct StateRest : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	int mRestTimer; // _10
-	int _14;        // _14
-	int _18;        // _18
-	bool _1C;       // _1C
-	bool _1D;       // _1D
-	bool _1E;       // _1E
+	int mRestTimer;       // _10
+	int mRestWaitCounter; // _14
+	int mRestMaxTime;     // _18
+	bool mNeedFinishRest; // _1C
+	bool mIsInRest;       // _1D
+	bool mIsLanded;       // _1E
 };
 
 struct StateWait : public State {

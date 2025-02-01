@@ -1,43 +1,37 @@
-#include "Game/BaseGameSection.h"
-#include "Game/CameraMgr.h"
-#include "Game/MoviePlayer.h"
-#include "Game/rumble.h"
-#include "Game/PelletBirthBuffer.h"
-#include "Game/Cave/Info.h"
-#include "Game/Cave/RandMapUnit.h"
-#include "Game/Farm.h"
-#include "Game/GameLight.h"
-#include "Game/PikiMgr.h"
-#include "Game/Navi.h"
-#include "Game/generalEnemyMgr.h"
-#include "Game/Entities/ItemOnyon.h"
-#include "Game/Entities/ItemPikihead.h"
-#include "Game/PikiState.h"
-#include "Game/DeathMgr.h"
-#include "Game/pathfinder.h"
-#include "Game/AIConstants.h"
 #include "Game/Entities/ItemBigFountain.h"
+#include "Game/Entities/PelletOtakara.h"
 #include "Game/Entities/PelletCarcass.h"
+#include "Game/Entities/PelletNumber.h"
+#include "Game/Entities/ItemPikihead.h"
 #include "Game/Entities/PelletFruit.h"
 #include "Game/Entities/PelletItem.h"
-#include "Game/Entities/PelletNumber.h"
-#include "Game/Entities/PelletOtakara.h"
+#include "Game/PelletBirthBuffer.h"
+#include "Game/Cave/RandMapUnit.h"
+#include "Game/BaseGameSection.h"
+#include "Game/generalEnemyMgr.h"
+#include "Game/MoviePlayer.h"
+#include "Game/AIConstants.h"
+#include "Game/PikiState.h"
+#include "Game/GameLight.h"
+#include "Game/CameraMgr.h"
+#include "Game/DeathMgr.h"
+#include "Game/PikiMgr.h"
+#include "Game/rumble.h"
+#include "Game/Navi.h"
+#include "Game/Farm.h"
 
 #include "JSystem/JFramework/JFWDisplay.h"
-#include "LifeGaugeMgr.h"
+#include "JSystem/J2D/J2DPrint.h"
 #include "Screen/Game2DMgr.h"
-#include "PSSystem/PSCommon.h"
 #include "Sys/DrawBuffers.h"
 #include "TParticle2dMgr.h"
-#include "PikiAI.h"
-#include "Dolphin/rand.h"
-#include "utilityU.h"
 #include "PSGame/Global.h"
-#include "og/ogLib2D.h"
-#include "JSystem/J2D/J2DPrint.h"
-#include "TexCaster.h"
-#include "og/Screen/ogScreen.h"
 #include "efx/OnyonSpot.h"
+#include "Dolphin/rand.h"
+#include "LifeGaugeMgr.h"
+#include "og/ogLib2D.h"
+#include "utilityU.h"
+#include "PikiAI.h"
 #include "nans.h"
 
 namespace og {
@@ -92,14 +86,14 @@ BaseGameSection::BaseGameSection(JKRHeap* heap)
 	mTheExpHeap         = nullptr;
 	theExpHeap          = nullptr;
 	mBackupHeap         = nullptr;
-	_168                = nullptr;
+	mXfbTexture2d       = nullptr;
 	mFbTexture          = nullptr;
 	mXfbImage           = nullptr;
 	mXfbBoundsX         = 0;
 	mXfbBoundsY         = 0;
-	_170                = 0;
-	mTexData1           = 0;
-	_E0                 = 0;
+	mXfbBounds2dY       = 0;
+	mXfbBounds2dX       = 0;
+	mUnusedVal          = 0;
 	mBlackFader         = new BlackFader;
 	mWipeInFader        = new WipeInFader;
 	mWipeOutFader       = new WipeOutFader;
@@ -112,7 +106,7 @@ BaseGameSection::BaseGameSection(JKRHeap* heap)
  */
 void BaseGameSection::useSpecificFBTexture(JUTTexture* texture)
 {
-	JUT_ASSERTLINE(1523, !mFbTexture, "‚Q‰ñ‚Í–³—‚—\n"); // 'it's impossible to do twice lol'
+	JUT_ASSERTLINE(1523, !mFbTexture, "ï¼’å›žã¯ç„¡ç†ï½—\n"); // 'it's impossible to do twice lol'
 	mFbTexture                    = mXfbImage;
 	mXfbImage                     = texture;
 	Game::gameSystem->mXfbTexture = mXfbImage;
@@ -124,7 +118,7 @@ void BaseGameSection::useSpecificFBTexture(JUTTexture* texture)
  */
 void BaseGameSection::restoreFBTexture()
 {
-	JUT_ASSERTLINE(1533, mFbTexture, "useSpecificFBTexture ‚µ‚Ä‚È‚¢‚—\n"); // 'i haven't used useSpecificFBTexture lol'
+	JUT_ASSERTLINE(1533, mFbTexture, "useSpecificFBTexture ã—ã¦ãªã„ï½—\n"); // 'i haven't used useSpecificFBTexture lol'
 	mXfbImage                     = mFbTexture;
 	mFbTexture                    = nullptr;
 	Game::gameSystem->mXfbTexture = mXfbImage;
@@ -138,7 +132,7 @@ BaseGameSection::~BaseGameSection()
 {
 	theExpHeap = nullptr;
 	PSSystem::SceneMgr* sceneMgr;
-	PSSystem::checkSceneMgr(sceneMgr = PSSystem::getSceneMgr());
+	PSSystem::validateSceneMgr(sceneMgr = PSSystem::getSceneMgr());
 	sceneMgr->deleteCurrentScene();
 	TParticle2dMgr::deleteInstance();
 	particleMgr->deleteInstance_TPkEffectMgr();
@@ -168,33 +162,33 @@ void BaseGameSection::loadSync(IDelegate* delegate, bool p2)
  * @note Size: 0x120
  */
 
-u32 BaseGameSection::waitSyncLoad(bool dontPause)
+u32 BaseGameSection::waitSyncLoad(bool allowPause)
 {
 	static int col = 0;
 	col++;
 	endFrame();
-	if (!dontPause) {
+
+	if (!allowPause) {
 		gameSystem->setPause(true, "waitSyncLoad", 3);
 	}
+
 	while (true) {
 		beginFrame();
 		beginRender();
 
 		j3dSys.drawInit();
-		GXSetViewport(0.0f, 0.0f, 608.0f, 480.0f, 0.0f, 1.0f);
-		GXSetScissor(0, 0x10, 0x260, 0x1c0);
+		GXSetViewport(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 1.0f);
+		GXSetScissor(0, 0x10, SCREEN_SCISSOR_WIDTH, SCREEN_SCISSOR_HEIGHT);
 		endRender();
 
-		// I have no clue
-
-		if (mDvdThreadCommand.mMode != 2)
-			;
-
-		else if (!dontPause) {
+		if (mDvdThreadCommand.mMode != DvdThreadCommand::CM_Completed) {
+			// Wait for the DVD thread to finish
+		} else if (!allowPause) {
 			gameSystem->setPause(false, "waitSyncLoad", 3);
 			return;
-		} else
+		} else {
 			break;
+		}
 
 		endFrame();
 	}
@@ -250,8 +244,8 @@ void BaseGameSection::init()
 	sys->setFrameRate(2);
 	System::assert_fragmentation("BaseGameSection::MoviePlayer");
 	initJ3D();
-	_11C   = true;
-	mapMgr = nullptr;
+	mUnusedFlag = true;
+	mapMgr      = nullptr;
 	System::assert_fragmentation("BaseGameSection::InitJ3D");
 	System::assert_fragmentation("BaseGameSection::Before 2D");
 
@@ -263,7 +257,7 @@ void BaseGameSection::init()
 	mXfbBoundsX = 0;
 	onInit();
 	sys->heapStatusEnd("baseGameSection::init");
-	mTreasureGetState = false;
+	mTreasureGetState = 0;
 }
 
 /**
@@ -375,9 +369,9 @@ void BaseGameSection::doDraw(Graphics& gfx)
 	captureRadarmap(gfx);
 	if (gameSystem->paused()) {
 		if (cameraMgr) {
-			cameraMgr->controllerLock(2);
+			cameraMgr->controllerLock(CAMNAVI_Both);
 			cameraMgr->update();
-			cameraMgr->controllerUnLock(2);
+			cameraMgr->controllerUnLock(CAMNAVI_Both);
 		}
 
 	} else if (cameraMgr) {
@@ -452,92 +446,81 @@ inline void j3dStuff(Sys::DrawBuffers*& buffer, Sys::DrawBuffer::CreateArg& draw
 
 	drawArg.mSize = 0x80;
 	drawArg.mName = "normal";
-
-	buffer->get(0)->create(drawArg);
+	buffer->get(DB_NormalLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = (doFog) ? "normal-fogoff" : "normal";
-
-	buffer->get(1)->create(drawArg);
+	buffer->get(DB_NormalFogOffLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "map";
-	if (doFog)
+	if (doFog) {
 		drawArg.mSortType = J3DDrawBuffer::J3DSORT_NonSort;
-
-	buffer->get(2)->create(drawArg);
+	}
+	buffer->get(DB_MapLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "piki";
-	if (doFog)
+	if (doFog) {
 		drawArg.mSortType = J3DDrawBuffer::J3DSORT_Mat;
-
-	buffer->get(3)->create(drawArg);
+	}
+	buffer->get(DB_PikiLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "post";
-
-	buffer->get(4)->create(drawArg);
+	buffer->get(DB_PostRenderLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "2d";
-
-	buffer->get(5)->create(drawArg);
+	buffer->get(DB_2DLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "first";
-
-	buffer->get(6)->create(drawArg);
+	buffer->get(DB_FirstLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "postshadow";
-
-	buffer->get(7)->create(drawArg);
+	buffer->get(DB_PostShadowLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "objectlast";
-
-	buffer->get(8)->create(drawArg);
+	buffer->get(DB_ObjectLastLayer)->create(drawArg);
 
 	drawArg.mSize = 1;
 	drawArg.mName = "farm";
-
-	buffer->get(9)->create(drawArg);
+	buffer->get(DB_FarmLayer)->create(drawArg);
 }
 
 void BaseGameSection::initJ3D()
 {
-	mDrawBuffer1 = new Sys::DrawBuffers;
-	mDrawBuffer2 = new Sys::DrawBuffers;
+	mOpaqueDrawBuffer      = new Sys::DrawBuffers;
+	mTransparentDrawBuffer = new Sys::DrawBuffers;
 
-	mDrawBuffer1->allocate(10);
-	mDrawBuffer1->mName = "OPA";
+	mOpaqueDrawBuffer->allocate(10);
+	mOpaqueDrawBuffer->mName = "OPA";
 	{
 		Sys::DrawBuffer::CreateArg drawArg;
 		drawArg.mSortType = J3DDrawBuffer::J3DSORT_Mat;
 		drawArg.mDrawType = J3DDrawBuffer::J3DDRAW_Head;
-		j3dStuff(mDrawBuffer1, drawArg, true);
+		j3dStuff(mOpaqueDrawBuffer, drawArg, true);
 	}
 
-	mDrawBuffer2->allocate(10);
-	mDrawBuffer2->mName = "XLU";
+	mTransparentDrawBuffer->allocate(10);
+	mTransparentDrawBuffer->mName = "XLU";
 
 	{
 		Sys::DrawBuffer::CreateArg drawArg;
-
 		drawArg.mSortType = J3DDrawBuffer::J3DSORT_Mat;
 		drawArg.mDrawType = J3DDrawBuffer::J3DDRAW_Head;
-
-		drawArg.mFlags.typeView |= 1;
-
-		j3dStuff(mDrawBuffer2, drawArg, false);
+		drawArg.mFlags.set(Sys::DrawBuffer::DRAWBUFF_Unk1);
+		j3dStuff(mTransparentDrawBuffer, drawArg, false);
 	}
 
-	addGenNode(mDrawBuffer1);
-	addGenNode(mDrawBuffer2);
+	addGenNode(mOpaqueDrawBuffer);
+	addGenNode(mTransparentDrawBuffer);
 
-	j3dSys.mDrawBuffer[0] = mDrawBuffer1->get(0)->mBuffer;
-	j3dSys.mDrawBuffer[1] = mDrawBuffer2->get(0)->mBuffer;
+	j3dSys.setDrawBuffer(mOpaqueDrawBuffer->get(DB_NormalLayer)->mBuffer, J3DSys::SYSDRAW_Opa);
+	j3dSys.setDrawBuffer(mTransparentDrawBuffer->get(DB_NormalLayer)->mBuffer, J3DSys::SYSDRAW_Xlu);
 
 	System::FragmentationChecker frag("poyol", false);
 }
@@ -561,16 +544,16 @@ void BaseGameSection::initViewports(Graphics& gfx)
 	mSplitter = new HorizonalSplitter(&gfx);
 	setSplitter(false);
 
-	gfx.getViewport(0)->setCamera(mOlimarCamera);
-	gfx.getViewport(1)->setCamera(mLouieCamera);
+	gfx.getViewport(PLAYER1_VIEWPORT)->setCamera(mOlimarCamera);
+	gfx.getViewport(PLAYER2_VIEWPORT)->setCamera(mLouieCamera);
 
-	shadowMgr->setViewport(gfx.getViewport(0), 0);
-	shadowMgr->setViewport(gfx.getViewport(1), 1);
+	shadowMgr->setViewport(gfx.getViewport(PLAYER1_VIEWPORT), 0);
+	shadowMgr->setViewport(gfx.getViewport(PLAYER2_VIEWPORT), 1);
 
-	cameraMgr->setViewport(gfx.getViewport(0), 0);
-	cameraMgr->setViewport(gfx.getViewport(1), 1);
+	cameraMgr->setViewport(gfx.getViewport(PLAYER1_VIEWPORT), CAMNAVI_Olimar);
+	cameraMgr->setViewport(gfx.getViewport(PLAYER2_VIEWPORT), CAMNAVI_Louie);
 
-	cameraMgr->init(0);
+	cameraMgr->init(CAMNAVI_Olimar);
 	mTreasureZoomCamera         = new ZoomCamera;
 	mTreasureGetViewport        = new Viewport;
 	mTreasureGetViewport->mVpId = 2;
@@ -608,13 +591,13 @@ void BaseGameSection::initGenerators()
 		onceGeneratorMgr->mName = "Generator(Init)";
 		addGenNode(onceGeneratorMgr);
 
-		limitGeneratorMgr        = new GeneratorMgr;
-		limitGeneratorMgr->mName = "Generator(Limit)";
-		limitGeneratorMgr->_6C   = true;
+		limitGeneratorMgr              = new GeneratorMgr;
+		limitGeneratorMgr->mName       = "Generator(Limit)";
+		limitGeneratorMgr->mUnusedFlag = true;
 		addGenNode(limitGeneratorMgr);
 
 		plantsGeneratorMgr        = new GeneratorMgr;
-		plantsGeneratorMgr->mName = "Generator(A•¨)";
+		plantsGeneratorMgr->mName = "Generator(æ¤ç‰©)";
 		addGenNode(plantsGeneratorMgr);
 
 		dayGeneratorMgr        = new GeneratorMgr;
@@ -639,7 +622,7 @@ void BaseGameSection::initGenerators()
 
 		int fileIdx = 0;
 
-		char filenameCharArr[256];
+		char filenameCharArr[PATH_MAX];
 		void* generatorFiles[64];
 		GeneratorMgr* generatorManagers[64];
 
@@ -651,10 +634,7 @@ void BaseGameSection::initGenerators()
 
 		if (defaultGenFile) {
 			RamStream defaultGenTxt(defaultGenFile, -1);
-			defaultGenTxt.mMode = 1;
-			if (defaultGenTxt.mMode == 1) {
-				defaultGenTxt.mTabCount = 0;
-			}
+			defaultGenTxt.setMode(STREAM_MODE_TEXT, 1);
 			generatorMgr->read(defaultGenTxt, false);
 			generatorMgr->updateUseList();
 
@@ -674,10 +654,7 @@ void BaseGameSection::initGenerators()
 			void* plantsgenFile = LoadTextFile(filenameCharArr);
 			if (plantsgenFile) {
 				RamStream plantsGenTxt(plantsgenFile, -1);
-				plantsGenTxt.mMode = 1;
-				if (plantsGenTxt.mMode == 1) {
-					plantsGenTxt.mTabCount = 0;
-				}
+				plantsGenTxt.setMode(STREAM_MODE_TEXT, 1);
 				plantsGeneratorMgr->read(plantsGenTxt, false);
 				plantsGeneratorMgr->updateUseList();
 				generatorFiles[fileIdx]    = plantsgenFile;
@@ -700,10 +677,7 @@ void BaseGameSection::initGenerators()
 			void* initgenFile = LoadTextFile(filenameCharArr);
 			if (initgenFile) {
 				RamStream initgenTxt(initgenFile, -1);
-				initgenTxt.mMode = 1;
-				if (initgenTxt.mMode == 1) {
-					initgenTxt.mTabCount = 0;
-				}
+				initgenTxt.setMode(STREAM_MODE_TEXT, 1);
 				onceGeneratorMgr->read(initgenTxt, false);
 				onceGeneratorMgr->updateUseList();
 				generatorFiles[fileIdx]    = initgenFile;
@@ -731,13 +705,10 @@ void BaseGameSection::initGenerators()
 
 				if (nonLoopFile) {
 					RamStream noonloopTxt(nonLoopFile, -1);
-					noonloopTxt.mMode = 1;
-					if (noonloopTxt.mMode == 1) {
-						noonloopTxt.mTabCount = 0;
-					}
+					noonloopTxt.setMode(STREAM_MODE_TEXT, 1);
 
 					GeneratorMgr* currentNonloopMgr = new GeneratorMgr;
-					currentNonloopMgr->_6C          = true; // is nonrepeating?
+					currentNonloopMgr->mUnusedFlag  = true; // is nonrepeating?
 
 					currentNonloopMgr->read(noonloopTxt, false);
 					currentNonloopMgr->setDayLimit(currentGen->mDayLimit);
@@ -758,11 +729,22 @@ void BaseGameSection::initGenerators()
 			int day = gameSystem->mTimeMgr->mDayCount;
 			// int loopGenCount = courseInfo->mLoopGenInfo.mCount;
 
-			if (day % 30 == 0) {
+			int intervalDay = today % 30;
+
+			int intervalIterations = day / 30;
+
+			// effectively day > 30
+			if (intervalIterations >= 1) {
+
+				int floorDay = intervalIterations * 30;
 
 				for (int i = 0; i < courseInfo->mLoopGenInfo.mCount; i++) {
 					LimitGen* currentGen = static_cast<LimitGen*>(courseInfo->mLoopGenInfo.mOwner.getChildAt(i));
-					if (currentGen->mMinimumDay - 30 > day % 30 || day % 30 > currentGen->mMinimumDay - 30)
+
+					int intervalMin = currentGen->mMinimumDay % 30;
+					int intervalMax = currentGen->mMaximumDay % 30;
+
+					if (intervalMin > intervalDay || intervalDay > intervalMax)
 						continue;
 
 					bool loopLoaded = playData->mLimitGen[courseInfo->mCourseIndex].mLoops.isFlag(i);
@@ -774,16 +756,13 @@ void BaseGameSection::initGenerators()
 					void* loopFile = LoadTextFile(filenameCharArr);
 					if (loopFile) {
 						RamStream loopTxt(loopFile, -1);
-						loopTxt.mMode = 1;
-						if (loopTxt.mMode == 1) {
-							loopTxt.mTabCount = 0;
-						}
+						loopTxt.setMode(STREAM_MODE_TEXT, 1);
 
 						GeneratorMgr* currentLoopMgr = new GeneratorMgr;
-						currentLoopMgr->_6C          = true; // is nonrepeating?
+						currentLoopMgr->mUnusedFlag  = true; // is nonrepeating?
 
 						currentLoopMgr->read(loopTxt, false);
-						currentLoopMgr->setDayLimit(currentGen->mMaximumDay - 30);
+						currentLoopMgr->setDayLimit(floorDay + currentGen->mMaximumDay - 30);
 						currentLoopMgr->updateUseList();
 
 						generatorManagers[fileIdx] = currentLoopMgr;
@@ -805,10 +784,7 @@ void BaseGameSection::initGenerators()
 				void* dayFile = LoadTextFile(filenameCharArr);
 				if (dayFile) {
 					RamStream dayTxt(dayFile, -1);
-					dayTxt.mMode = 1;
-					if (dayTxt.mMode == 1) {
-						dayTxt.mTabCount = 0;
-					}
+					dayTxt.setMode(STREAM_MODE_TEXT, 1);
 					dayGeneratorMgr->read(dayTxt, false);
 					dayGeneratorMgr->updateUseList();
 					generatorFiles[fileIdx]    = dayFile;
@@ -841,28 +817,28 @@ void BaseGameSection::initGenerators()
 	CI_LOOP(iNavi) { naviCount++; }
 	switch (naviCount) {
 	case 0: {
-		bool olimarAlive    = false;
-		Vector3f vec_0x1c30 = Vector3f(0.0f);
+		bool olimarAlive  = false;
+		Vector3f velocity = Vector3f(0.0f);
 
 		f32 mapRotation = mapMgr->getMapRotation();
-		Vector3f vec_0x1c24(-40.0f, 0.0f, 2.0f);
+		Vector3f position(-40.0f, 0.0f, 2.0f);
 		if (gameSystem->isVersusMode()) {
 			Onyon* redOnyon = ItemOnyon::mgr->getOnyon(Red);
 			P2ASSERTLINE(2739, redOnyon);
-			vec_0x1c24 = redOnyon->getPosition();
+			position = redOnyon->getPosition();
 		} else {
 			if (!mapMgr->getDemoMatrix()) {
-				mapMgr->getStartPosition(vec_0x1c24, 0);
-				vec_0x1c24.y = mapMgr->getMinY(vec_0x1c24) + 8.5f;
-				vec_0x1c24.x += -4.526f;
-				vec_0x1c24.z += 7.453f;
+				mapMgr->getStartPosition(position, 0);
+				position.y = mapMgr->getMinY(position) + 8.5f;
+				position.x += -4.526f;
+				position.z += 7.453f;
 			} else {
 				Matrixf* demoMtx = mapMgr->getDemoMatrix();
 				Vector3f vec_0x1c78;
-				PSMTXMultVec((PSQuaternion*)demoMtx, (Vec*)&vec_0x1c24, (Vec*)&vec_0x1c78);
-				vec_0x1c24   = vec_0x1c78;
-				vec_0x1c24.y = mapMgr->getMinY(vec_0x1c24);
-				vec_0x1c30   = Vector3f(0.0f);
+				PSMTXMultVec((PSQuaternion*)demoMtx, (Vec*)&position, (Vec*)&vec_0x1c78);
+				position   = vec_0x1c78;
+				position.y = mapMgr->getMinY(position);
+				velocity.set(0.0f);
 			}
 		}
 		Navi* olimar = naviMgr->birth();
@@ -870,8 +846,8 @@ void BaseGameSection::initGenerators()
 		olimar->mFaceDir = roundAng(mapRotation);
 		olimar->setCamera(mOlimarCamera);
 		olimar->setController(mControllerP1);
-		olimar->setPosition(vec_0x1c24, false);
-		olimar->setVelocity(vec_0x1c30);
+		olimar->setPosition(position, false);
+		olimar->setVelocity(velocity);
 
 		if (playData->mDeadNaviID & 1) {
 
@@ -882,24 +858,24 @@ void BaseGameSection::initGenerators()
 		}
 
 		mapRotation = mapMgr->getMapRotation();
-		vec_0x1c24  = Vector3f(-60.0f, 0.0f, -10.0f);
+		position    = Vector3f(-60.0f, 0.0f, -10.0f);
 		if (gameSystem->isVersusMode()) {
 			Onyon* blueOnyon = ItemOnyon::mgr->getOnyon(Blue);
 			P2ASSERTLINE(2791, blueOnyon);
-			vec_0x1c24 = blueOnyon->getPosition();
+			position = blueOnyon->getPosition();
 		} else {
 			if (!mapMgr->getDemoMatrix()) {
-				mapMgr->getStartPosition(vec_0x1c24, 0);
-				vec_0x1c24.y = mapMgr->getMinY(vec_0x1c24) + 8.5f;
-				vec_0x1c24.x += 18.082f;
-				vec_0x1c24.z += -11.428f;
+				mapMgr->getStartPosition(position, 0);
+				position.y = mapMgr->getMinY(position) + 8.5f;
+				position.x += 18.082f;
+				position.z += -11.428f;
 			} else {
 				Matrixf* demoMtx = mapMgr->getDemoMatrix();
 				Vector3f vec_0x1c78;
-				PSMTXMultVec((PSQuaternion*)demoMtx, (Vec*)&vec_0x1c24, (Vec*)&vec_0x1c78);
-				vec_0x1c24   = vec_0x1c78;
-				vec_0x1c24.y = mapMgr->getMinY(vec_0x1c24);
-				vec_0x1c30   = Vector3f(0.0f);
+				PSMTXMultVec((PSQuaternion*)demoMtx, (Vec*)&position, (Vec*)&vec_0x1c78);
+				position   = vec_0x1c78;
+				position.y = mapMgr->getMinY(position);
+				velocity   = Vector3f(0.0f);
 			}
 		}
 		Navi* louie = naviMgr->birth();
@@ -909,9 +885,9 @@ void BaseGameSection::initGenerators()
 
 		louie->setController(mControllerP2);
 		louie->mFaceDir = roundAng(mapRotation);
-		louie->setPosition(vec_0x1c24, false);
-		louie->setVelocity(vec_0x1c30);
-		if (!(playData->mDeadNaviID & 1)) {
+		louie->setPosition(position, false);
+		louie->setVelocity(velocity);
+		if (!(playData->mDeadNaviID >> 1 & 1)) {
 			louie->mHealth = playData->mNaviLifeMax[1];
 		}
 		if (playData->mDeadNaviID & 2) {
@@ -919,7 +895,7 @@ void BaseGameSection::initGenerators()
 			return;
 		}
 		if (!gameSystem->isMultiplayerMode() && !olimarAlive) {
-			InteractFue callNavi(olimar, 0, 1);
+			InteractFue callNavi(olimar, false, true); // don't combine parties, is new to party
 			louie->stimulate(callNavi);
 		}
 		break;
@@ -974,13 +950,13 @@ void BaseGameSection::saveToGeneratorCache(CourseInfo* courseinfo)
 	generatorCache->beginSave(courseinfo->mCourseIndex);
 	FOREACH_NODE(Generator, generatorCache->getFirstGenerator(), node)
 	{
-		if (node->mReservedNum & 1) {
+		if (node->isReservedFlag(Generator::Reserved_doSaveGen)) {
 			generatorCache->saveGenerator(node);
 		}
 	}
 	FOREACH_NODE(Generator, generatorCache->getFirstGenerator(), node)
 	{
-		if (node->mReservedNum & 1 && node->mReservedNum & 2) {
+		if (node->isReservedFlag(Generator::Reserved_doSaveGen) && node->isReservedFlag(Generator::Reserved_doSaveCreature)) {
 			generatorCache->saveCreature(node);
 		}
 	}
@@ -990,13 +966,13 @@ void BaseGameSection::saveToGeneratorCache(CourseInfo* courseinfo)
 
 void BaseGameSection::pmTogglePlayer()
 {
-	if (mPrevNaviIdx == 0) {
-		setPlayerMode(1);
-		moviePlayer->mViewport     = sys->mGfx->getViewport(1);
+	if (mPrevNaviIdx == NAVIID_Olimar) {
+		setPlayerMode(NAVIID_Louie);
+		moviePlayer->mViewport     = sys->mGfx->getViewport(PLAYER2_VIEWPORT);
 		moviePlayer->mActingCamera = mLouieCamera;
-	} else if (mPrevNaviIdx == 1) {
-		setPlayerMode(0);
-		moviePlayer->mViewport     = sys->mGfx->getViewport(0);
+	} else if (mPrevNaviIdx == NAVIID_Louie) {
+		setPlayerMode(NAVIID_Olimar);
+		moviePlayer->mViewport     = sys->mGfx->getViewport(PLAYER1_VIEWPORT);
 		moviePlayer->mActingCamera = mOlimarCamera;
 	}
 	onTogglePlayer();
@@ -1032,13 +1008,13 @@ void BaseGameSection::setPlayerMode(int mode)
 		Matrixf* viewMtx = mLouieCamera->getViewMatrix(false);
 		PSMTXCopy((PSQuaternion*)viewMtx, (PSQuaternion*)&mOlimarCamera->mCurViewMatrix);
 		mOlimarCamera->update();
-		cameraMgr->changePlayerMode(0, cameraMgrCallback);
+		cameraMgr->changePlayerMode(NAVIID_Olimar, cameraMgrCallback);
 		if (mPlayerMode == 1) {
 			Graphics* gfx = sys->mGfx;
-			gfx->getViewport(0)->setCamera(mOlimarCamera);
-			gfx->getViewport(1)->setCamera(mLouieCamera);
+			gfx->getViewport(PLAYER1_VIEWPORT)->setCamera(mOlimarCamera);
+			gfx->getViewport(PLAYER2_VIEWPORT)->setCamera(mLouieCamera);
 		}
-		Viewport* olimarViewport    = sys->mGfx->getViewport(0);
+		Viewport* olimarViewport    = sys->mGfx->getViewport(PLAYER1_VIEWPORT);
 		sys->mGfx->mCurrentViewport = olimarViewport;
 		mLightMgr->updatePosition(sys->mGfx->mCurrentViewport);
 		break;
@@ -1047,8 +1023,8 @@ void BaseGameSection::setPlayerMode(int mode)
 		if (mPlayerMode == 1) {
 			Graphics* gfx = sys->mGfx;
 
-			gfx->getViewport(0)->setCamera(mLouieCamera);
-			gfx->getViewport(1)->setCamera(mOlimarCamera);
+			gfx->getViewport(PLAYER1_VIEWPORT)->setCamera(mLouieCamera);
+			gfx->getViewport(PLAYER2_VIEWPORT)->setCamera(mOlimarCamera);
 
 			mSecondViewportHeight = 1.0f;
 			mSplitter->split2(1.0f);
@@ -1063,18 +1039,18 @@ void BaseGameSection::setPlayerMode(int mode)
 		PSMTXCopy((PSQuaternion*)viewMtx, (PSQuaternion*)&mLouieCamera->mCurViewMatrix);
 
 		mLouieCamera->update();
-		cameraMgr->changePlayerMode(1, cameraMgrCallback);
+		cameraMgr->changePlayerMode(NAVIID_Louie, cameraMgrCallback);
 
-		Viewport* louieViewport     = sys->mGfx->getViewport(1);
+		Viewport* louieViewport     = sys->mGfx->getViewport(PLAYER2_VIEWPORT);
 		sys->mGfx->mCurrentViewport = louieViewport;
 		mLightMgr->updatePosition(sys->mGfx->mCurrentViewport);
 		break;
 	}
-	case NAVIID_President: {
+	case NAVIID_Multiplayer: {
 		mSecondViewportHeight = 0.5f;
 		mSplit                = 0.0f;
 		mSplitter->split2(0.5f);
-		cameraMgr->changePlayerMode(2, cameraMgrCallback);
+		cameraMgr->changePlayerMode(NAVIID_Multiplayer, cameraMgrCallback);
 		break;
 	}
 	}
@@ -1105,10 +1081,10 @@ void BaseGameSection::onCameraBlendFinished(CameraArg* arg)
  * @note Address: 0x8014DD20
  * @note Size: 0x68
  */
-void BaseGameSection::setFixNearFar(bool b, f32 near, f32 far)
+void BaseGameSection::setFixNearFar(bool isFixed, f32 near, f32 far)
 {
-	mOlimarCamera->setFixNearFar(b, near, far);
-	mLouieCamera->setFixNearFar(b, near, far);
+	mOlimarCamera->setFixNearFar(isFixed, near, far);
+	mLouieCamera->setFixNearFar(isFixed, near, far);
 }
 
 /**
@@ -1119,62 +1095,62 @@ void BaseGameSection::setCamController()
 {
 	Navi* navis[2];
 
-	navis[0] = naviMgr->getAt(NAVIID_Olimar);
-	navis[1] = naviMgr->getAt(NAVIID_Louie);
+	navis[NAVIID_Olimar] = naviMgr->getAt(NAVIID_Olimar);
+	navis[NAVIID_Louie]  = naviMgr->getAt(NAVIID_Louie);
 
 	switch (mPrevNaviIdx) {
-	case 0: {
-		PlayCamera* olimarCam        = mOlimarCamera;
-		navis[0]->mCamera            = olimarCam;
-		navis[0]->mCamera2           = olimarCam;
-		Controller* olimarController = mControllerP1;
-		navis[0]->mController1       = olimarController;
-		navis[0]->mController2       = olimarController;
-		navis[1]->disableController();
-		moviePlayer->mTargetNavi   = navis[0];
-		moviePlayer->mViewport     = sys->mGfx->getViewport(0);
+	case NAVIID_Olimar: {
+		PlayCamera* olimarCam              = mOlimarCamera;
+		navis[NAVIID_Olimar]->mCamera      = olimarCam;
+		navis[NAVIID_Olimar]->mCamera2     = olimarCam;
+		Controller* olimarController       = mControllerP1;
+		navis[NAVIID_Olimar]->mController1 = olimarController;
+		navis[NAVIID_Olimar]->mController2 = olimarController;
+		navis[NAVIID_Louie]->disableController();
+		moviePlayer->mTargetNavi   = navis[NAVIID_Olimar];
+		moviePlayer->mViewport     = sys->mGfx->getViewport(PLAYER1_VIEWPORT);
 		moviePlayer->mActingCamera = mOlimarCamera;
 		if (!gameSystem->isMultiplayerMode()) {
-			PSSetCurCameraNo(0);
+			PSSetCurCameraNo(NAVIID_Olimar);
 			PSPlayerChangeToOrimer();
 		}
 		break;
 	}
-	case 1: {
-		navis[0]->disableController();
-		PlayCamera* louieCam        = mLouieCamera;
-		navis[1]->mCamera           = louieCam;
-		navis[1]->mCamera2          = louieCam;
-		Controller* louieController = mControllerP1;
-		navis[1]->mController1      = louieController;
-		navis[1]->mController2      = louieController;
-		moviePlayer->mTargetNavi    = navis[1];
-		moviePlayer->mViewport      = sys->mGfx->getViewport(1);
-		moviePlayer->mActingCamera  = mLouieCamera;
+	case NAVIID_Louie: {
+		navis[NAVIID_Olimar]->disableController();
+		PlayCamera* louieCam              = mLouieCamera;
+		navis[NAVIID_Louie]->mCamera      = louieCam;
+		navis[NAVIID_Louie]->mCamera2     = louieCam;
+		Controller* louieController       = mControllerP1;
+		navis[NAVIID_Louie]->mController1 = louieController;
+		navis[NAVIID_Louie]->mController2 = louieController;
+		moviePlayer->mTargetNavi          = navis[NAVIID_Louie];
+		moviePlayer->mViewport            = sys->mGfx->getViewport(PLAYER2_VIEWPORT);
+		moviePlayer->mActingCamera        = mLouieCamera;
 		if (!gameSystem->isMultiplayerMode()) {
-			PSSetCurCameraNo(1);
+			PSSetCurCameraNo(NAVIID_Louie);
 			PSPlayerChangeToLugie();
 		}
 		break;
 	}
-	case 2: {
-		PlayCamera* olimarCam        = mOlimarCamera;
-		navis[0]->mCamera            = olimarCam;
-		navis[0]->mCamera2           = olimarCam;
-		Controller* olimarController = mControllerP1;
-		navis[0]->mController1       = olimarController;
-		navis[0]->mController2       = olimarController;
-		PlayCamera* louieCam         = mLouieCamera;
-		navis[1]->mCamera            = louieCam;
-		navis[1]->mCamera2           = louieCam;
-		Controller* louieController  = mControllerP2;
-		navis[1]->mController1       = louieController;
-		navis[1]->mController2       = louieController;
+	case NAVIID_Multiplayer: {
+		PlayCamera* olimarCam              = mOlimarCamera;
+		navis[NAVIID_Olimar]->mCamera      = olimarCam;
+		navis[NAVIID_Olimar]->mCamera2     = olimarCam;
+		Controller* olimarController       = mControllerP1;
+		navis[NAVIID_Olimar]->mController1 = olimarController;
+		navis[NAVIID_Olimar]->mController2 = olimarController;
+		PlayCamera* louieCam               = mLouieCamera;
+		navis[NAVIID_Louie]->mCamera       = louieCam;
+		navis[NAVIID_Louie]->mCamera2      = louieCam;
+		Controller* louieController        = mControllerP2;
+		navis[NAVIID_Louie]->mController1  = louieController;
+		navis[NAVIID_Louie]->mController2  = louieController;
 
-		moviePlayer->mTargetNavi   = navis[0];
+		moviePlayer->mTargetNavi   = navis[NAVIID_Olimar];
 		moviePlayer->mActingCamera = mOlimarCamera;
 		if (gameSystem->isStoryMode()) {
-			PSSetCurCameraNo(0);
+			PSSetCurCameraNo(NAVIID_Olimar);
 		}
 		break;
 	}
@@ -1209,13 +1185,13 @@ void BaseGameSection::setDefaultPSSceneInfo(PSGame::SceneInfo& sceneInfo)
 	P2ASSERTLINE(3197, mOlimarCamera);
 	P2ASSERTLINE(3198, mLouieCamera);
 
-	sceneInfo.mCameras         = 2;
-	sceneInfo.mCam1Position[0] = mOlimarCamera->getSoundPositionPtr();
-	sceneInfo.mCam2Position[0] = mOlimarCamera->getSoundPositionPtr();
-	sceneInfo.mCameraMtx[0]    = mOlimarCamera->getSoundMatrixPtr();
-	sceneInfo.mCam1Position[1] = mLouieCamera->getSoundPositionPtr();
-	sceneInfo.mCam2Position[1] = mLouieCamera->getSoundPositionPtr();
-	sceneInfo.mCameraMtx[1]    = mLouieCamera->getSoundMatrixPtr();
+	sceneInfo.mCameras                     = 2;
+	sceneInfo.mCam1Position[NAVIID_Olimar] = mOlimarCamera->getSoundPositionPtr();
+	sceneInfo.mCam2Position[NAVIID_Olimar] = mOlimarCamera->getSoundPositionPtr();
+	sceneInfo.mCameraMtx[NAVIID_Olimar]    = mOlimarCamera->getSoundMatrixPtr();
+	sceneInfo.mCam1Position[NAVIID_Louie]  = mLouieCamera->getSoundPositionPtr();
+	sceneInfo.mCam2Position[NAVIID_Louie]  = mLouieCamera->getSoundPositionPtr();
+	sceneInfo.mCameraMtx[NAVIID_Louie]     = mLouieCamera->getSoundMatrixPtr();
 	BoundBox box;
 
 	mapMgr->getBoundBox(box);
@@ -1235,7 +1211,6 @@ void BaseGameSection::setDefaultPSSceneInfo(PSGame::SceneInfo& sceneInfo)
  * @note Address: 0x8014E130
  * @note Size: 0x68C
  */
-// void prepareHoleIn__Q24Game15BaseGameSectionFR10Vector3f b()
 void BaseGameSection::prepareHoleIn(Vector3f& suroundPos, bool killPikihead)
 {
 	Screen::gGame2DMgr->mScreenMgr->reset();
@@ -1250,7 +1225,8 @@ void BaseGameSection::prepareHoleIn(Vector3f& suroundPos, bool killPikihead)
 				DeathMgr::inc(DeathCounter::COD_All);
 				if (gameSystem->isChallengeMode()) {
 					GameMessageVsPikminDead deadPikmin;
-					sendMessage(deadPikmin);
+					// REALLY????? WHAT FILE ARE WE IN???
+					gameSystem->mSection->sendMessage(deadPikmin);
 				}
 			}
 		}
@@ -1277,8 +1253,8 @@ void BaseGameSection::prepareHoleIn(Vector3f& suroundPos, bool killPikihead)
 				vec += suroundPos;
 				vec.y = mapMgr->getMinY(vec);
 				piki->setPosition(vec, false);
-				PikiAI::ActFormationInitArg arg(aliveOrima, 1);
-				arg._09 = false;
+				PikiAI::ActFormationInitArg arg(aliveOrima);
+				arg.mIsDemoFollow = true;
 				piki->mBrain->start(PikiAI::ACT_Formation, &arg);
 				piki->movie_begin(false);
 			}
@@ -1293,14 +1269,15 @@ void BaseGameSection::prepareHoleIn(Vector3f& suroundPos, bool killPikihead)
  * @note Address: 0x8014E7BC
  * @note Size: 0x714
  */
-// void prepareFountainOn__Q24Game15BaseGameSectionFR10Vector3f()
 void BaseGameSection::prepareFountainOn(Vector3f& suroundPos)
 {
-	Iterator<BaseItem> iFountain = ItemBigFountain::mgr;
-	CI_LOOP(iFountain)
-	{
-		ItemBigFountain::Item* fountain = static_cast<ItemBigFountain::Item*>(*iFountain);
-		fountain->killAllEffect();
+	if (ItemBigFountain::mgr) {
+		Iterator<BaseItem> iFountain = ItemBigFountain::mgr;
+		CI_LOOP(iFountain)
+		{
+			ItemBigFountain::Item* fountain = static_cast<ItemBigFountain::Item*>(*iFountain);
+			fountain->killAllEffect();
+		}
 	}
 	Screen::gGame2DMgr->mScreenMgr->reset();
 	Navi* aliveOrima = naviMgr->getAliveOrima(ALIVEORIMA_Active);
@@ -1314,7 +1291,8 @@ void BaseGameSection::prepareFountainOn(Vector3f& suroundPos)
 			DeathMgr::inc(DeathCounter::COD_All);
 			if (gameSystem->isChallengeMode()) {
 				GameMessageVsPikminDead deadPikmin;
-				sendMessage(deadPikmin);
+				// OH MY FUCKING GOD NOT AGAIN
+				gameSystem->mSection->sendMessage(deadPikmin);
 			}
 		}
 	}
@@ -1331,10 +1309,13 @@ void BaseGameSection::prepareFountainOn(Vector3f& suroundPos)
 			piki->endStick();
 			piki->mFsm->transitForce(piki, PIKISTATE_Walk, nullptr);
 			piki->getCreatureID();
+
+			PikiAI::ActFormationInitArg arg(aliveOrima, false);
+
 			piki->mNavi = aliveOrima;
 
-			PikiAI::ActFormationInitArg arg(aliveOrima);
-			arg._08 = 1;
+			arg.mIsDemoFollow = true; // MAKE UP YOUR DAMN MIND I STG
+
 			piki->mBrain->start(PikiAI::ACT_Formation, &arg);
 			piki->movie_begin(false);
 		}
@@ -1350,7 +1331,7 @@ void BaseGameSection::prepareFountainOn(Vector3f& suroundPos)
  */
 void BaseGameSection::initLights()
 {
-	mLightMgr           = new GameLightMgr("ƒQ[ƒ€ƒ‰ƒCƒgƒ}ƒl[ƒWƒƒ"); // game light manager
+	mLightMgr           = new GameLightMgr("ã‚²ãƒ¼ãƒ ãƒ©ã‚¤ãƒˆãƒžãƒãƒ¼ã‚¸ãƒ£"); // game light manager
 	mLightMgr->mTimeMgr = gameSystem->mTimeMgr;
 	addGenNode(mLightMgr);
 	particleMgr->mLightMgr = mLightMgr;
@@ -1376,7 +1357,7 @@ void BaseGameSection::drawParticle(Graphics& gfx, int viewport)
 
 		port->setProjection();
 		port->setViewport();
-		if (!gameSystem->isMultiplayerMode() && mPrevNaviIdx != 2) {
+		if (!gameSystem->isMultiplayerMode() && mPrevNaviIdx != NAVIID_Multiplayer) {
 			mLightMgr->mFogMgr->off(gfx);
 			particleMgr->draw(port, 0);
 			mLightMgr->mFogMgr->set(gfx);
@@ -1427,10 +1408,10 @@ void BaseGameSection::draw2D(Graphics& gfx)
 	j3dSys.reinitGX();
 	gfx.mOrthoGraph.setPort();
 	draw_Ogawa2D(gfx);
-	if (_168) {
-		_168->capture(mTexData1, _170, GX_TF_RGB565, false, 0);
+	if (mXfbTexture2d) {
+		mXfbTexture2d->capture(mXfbBounds2dX, mXfbBounds2dY, GX_TF_RGB565, false, 0);
 	}
-	if (!_168 && mXfbFlags & 2) {
+	if (!mXfbTexture2d && mXfbFlags & 2) {
 		mXfbImage->capture(mXfbBoundsX, mXfbBoundsY, GX_TF_RGB565, true, 0);
 		mXfbFlags &= ~2;
 		mXfbFlags |= 1;
@@ -1440,7 +1421,8 @@ void BaseGameSection::draw2D(Graphics& gfx)
 	gfx.mOrthoGraph.setPort();
 	J2DPrint print(JFWSystem::systemFont, 0.0f);
 	print.initiate();
-	print.setColors(JUtility::TColor(0x38, 0x9f, 0xf7, 0xff), JUtility::TColor(0x9e, 0xdb, 0xff, 0xff));
+	print.setCharColor(JUtility::TColor(158, 219, 255, 255));
+	print.setGradColor(JUtility::TColor(56, 159, 247, 255));
 	JKRHeap::sCurrentHeap->getFreeSize();
 	// print was likely showing how much head space was left
 }
@@ -1452,7 +1434,7 @@ void BaseGameSection::draw2D(Graphics& gfx)
 void BaseGameSection::setupViewportMatrix(Graphics&)
 {
 	JUT_PANICLINE(0, "DON'T USE THIS !\n");
-	JUT_PANICLINE(0, "Žg‚Á‚Ä‚È‚¢‚©‚à\n");
+	JUT_PANICLINE(0, "ä½¿ã£ã¦ãªã„ã‹ã‚‚\n");
 	// UNUSED FUNCTION
 }
 
@@ -1466,6 +1448,12 @@ void BaseGameSection::directDraw(Graphics& gfx, Viewport* vp)
 	vp->setProjection();
 	gfx.initPrimDraw(vp->getMatrix(true));
 	doDirectDraw(gfx, vp);
+	if (naviMgr) {
+		Navi* player = naviMgr->getActiveNavi();
+		if (player) {
+			player->doDirectDraw(gfx);
+		}
+	}
 	if (TexCaster::Mgr::sInstance) {
 		gfx.initPrimDraw(vp->getMatrix(true));
 		mLightMgr->mFogMgr->set(gfx);
@@ -1615,13 +1603,13 @@ void BaseGameSection::changeGeneratorCursor(Vector3f& vec) { naviMgr->getAt(NAVI
  */
 void BaseGameSection::doEntry()
 {
-	setDrawBuffer(0);
+	setDrawBuffer(DB_NormalLayer);
 	sys->mTimers->_start("ENT-GSYS", true);
 	gameSystem->doEntry();
 	sys->mTimers->_stop("ENT-GSYS");
 	sys->mTimers->_start("ENT-REST", true);
 	if (particleMgr) {
-		setDrawBuffer(1);
+		setDrawBuffer(DB_NormalFogOffLayer);
 		particleMgr->doEntry();
 	}
 	sys->mTimers->_stop("ENT-REST");
@@ -1683,13 +1671,14 @@ void BaseGameSection::initBlendCamera()
  */
 void BaseGameSection::updateBlendCamera()
 {
-	if (mPrevNaviIdx == 0) {
+	if (mPrevNaviIdx == NAVIID_Olimar) {
 		mBlendFactor -= sys->mDeltaTime / 0.2f;
 		if (mBlendFactor < 0.0f) {
 			mBlendFactor         = 0.0f;
 			mIsBlendCameraActive = false;
 			mSplitter->split2(1.0f);
 		}
+
 	} else {
 		mBlendFactor += sys->mDeltaTime / 0.2f;
 		if (mBlendFactor > 1.0f) {
@@ -1709,8 +1698,8 @@ void BaseGameSection::updateBlendCamera()
 	}
 	if (!mIsBlendCameraActive) {
 		Graphics* gfx = sys->mGfx;
-		gfx->getViewport(0)->setCamera(mOlimarCamera);
-		gfx->getViewport(1)->setCamera(mLouieCamera);
+		gfx->getViewport(PLAYER1_VIEWPORT)->setCamera(mOlimarCamera);
+		gfx->getViewport(PLAYER2_VIEWPORT)->setCamera(mLouieCamera);
 		setCamController();
 	}
 }
@@ -1783,23 +1772,23 @@ void BaseGameSection::endSplit()
  */
 void BaseGameSection::updateSplitter()
 {
-	if (mSplit == 0.0f && moviePlayer->mDemoState == 0 && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
+	if (mSplit == 0.0f && moviePlayer->mDemoState == DEMOSTATE_Inactive && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
 		return;
 	}
 
 	mSecondViewportHeight += mSplit * sys->mDeltaTime;
 	int id = mPrevNaviIdx;
-	if (id == 2 && mSecondViewportHeight <= 0.5f) {
+	if (id == NAVIID_Multiplayer && mSecondViewportHeight <= 0.5f) {
 		mSecondViewportHeight = 0.5f;
 		mSplit                = 0.0f;
 		mSetSplit             = true;
 		setCamController();
-	} else if (id == 0 && mSecondViewportHeight >= 1.0f) {
+	} else if (id == NAVIID_Olimar && mSecondViewportHeight >= 1.0f) {
 		mSecondViewportHeight = 1.0f;
 		mSplit                = 0.0f;
 		mSetSplit             = false;
 		setCamController();
-	} else if (id == 1 && mSecondViewportHeight <= 0.0f) {
+	} else if (id == NAVIID_Louie && mSecondViewportHeight <= 0.0f) {
 		mSecondViewportHeight = 0.0f;
 		mSplit                = 0.0f;
 		setCamController();
@@ -1847,14 +1836,14 @@ void BaseGameSection::clearHeap()
 {
 	TexCaster::Mgr::deleteInstance();
 	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(mgr);
+	PSSystem::validateSceneMgr(mgr);
 	mgr->deleteCurrentScene();
 	GXWaitDrawDone();
 	itemMgr->clearGlobalPointers();
 	platCellMgr = nullptr;
 	cellMgr     = nullptr;
-	mDrawBuffer1->frameInitAll();
-	mDrawBuffer2->frameInitAll();
+	mOpaqueDrawBuffer->frameInitAll();
+	mTransparentDrawBuffer->frameInitAll();
 	particleMgr->killAll();
 	particleMgr->reset();
 	Generator::initialiseSystem();
@@ -1998,7 +1987,7 @@ void BaseGameSection::setupFixMemory_dvdload()
 	mMizuTexture  = new JUTTexture(file);
 	sys->heapStatusStart("fbTexture", nullptr);
 
-	mXfbImage = new JUTTexture((u32)(sys->getRenderModeObj()->fbWidth >> 1), (u32)(sys->getRenderModeObj()->efbHeight >> 1), GX_TF_RGB565);
+	mXfbImage = new JUTTexture((System::getRenderModeWidth() >> 1) & 0x7FFF, (System::getRenderModeHeight() >> 1) & 0x7FFF, GX_TF_RGB565);
 	gameSystem->mXfbTexture = mXfbImage;
 
 	sys->heapStatusEnd("fbTexture");
@@ -2018,7 +2007,7 @@ void BaseGameSection::setupFixMemory_dvdload()
 	efx::OnyonSpotData* spot = new efx::OnyonSpotData;
 	spot->entry();
 	particleMgr->endEntryModelEffect();
-	// reload particleMgr here
+	// Instance_TPkEffectMgr isn't static, checked particleMgr.o
 	particleMgr->Instance_TPkEffectMgr();
 
 	sys->heapStatusEnd("particle");
@@ -2044,235 +2033,6 @@ void BaseGameSection::setupFixMemory_dvdload()
 
 	createScreenRootNode();
 	sys->heapStatusEnd("setupFixMemory");
-
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	lis      r4, lbl_8047C948@ha
-	li       r5, 0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	addi     r31, r4, lbl_8047C948@l
-	addi     r4, r31, 0x2e0
-	stw      r30, 0x18(r1)
-	mr       r30, r3
-	stw      r29, 0x14(r1)
-	stw      r28, 0x10(r1)
-	lwz      r3, sys@sda21(r13)
-	bl       heapStatusStart__6SystemFPcP7JKRHeap
-	li       r0, 0
-	addi     r3, r31, 0x2f0
-	stw      r0, 8(r1)
-	li       r4, 0
-	li       r5, 0
-	li       r6, 0
-	li       r7, 0
-	li       r8, 1
-	li       r9, 0
-	li       r10, 0
-	bl
-loadToMainRAM__12JKRDvdRipperFPCcPUc15JKRExpandSwitchUlP7JKRHeapQ212JKRDvdRipper15EAllocDirectionUlPiPUl
-	mr       r0, r3
-	li       r3, 0x40
-	mr       r28, r0
-	bl       __nw__FUl
-	or.      r29, r3, r3
-	beq      lbl_80150408
-	li       r0, 0
-	mr       r4, r28
-	stw      r0, 0x28(r29)
-	li       r5, 0
-	bl       storeTIMG__10JUTTextureFPC7ResTIMGUc
-	lbz      r0, 0x3b(r29)
-	rlwinm   r0, r0, 0, 0x1e, 0x1e
-	stb      r0, 0x3b(r29)
-
-lbl_80150408:
-	stw      r29, 0xf4(r30)
-	addi     r4, r31, 0x304
-	li       r5, 0
-	lwz      r3, sys@sda21(r13)
-	bl       heapStatusStart__6SystemFPcP7JKRHeap
-	li       r3, 0x40
-	bl       __nw__FUl
-	or.      r29, r3, r3
-	beq      lbl_80150454
-	bl       getRenderModeObj__6SystemFv
-	lhz      r28, 6(r3)
-	bl       getRenderModeObj__6SystemFv
-	lhz      r0, 4(r3)
-	mr       r3, r29
-	rlwinm   r5, r28, 0x1f, 0x11, 0x1f
-	li       r6, 4
-	rlwinm   r4, r0, 0x1f, 0x11, 0x1f
-	bl       __ct__10JUTTextureFii9_GXTexFmt
-	mr       r29, r3
-
-lbl_80150454:
-	stw      r29, 0x154(r30)
-	addi     r4, r31, 0x304
-	lwz      r0, 0x154(r30)
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	stw      r0, 0x54(r3)
-	lwz      r3, sys@sda21(r13)
-	bl       heapStatusEnd__6SystemFPc
-	lwz      r3, sys@sda21(r13)
-	addi     r4, r31, 0x14c
-	li       r5, 0
-	bl       heapStatusStart__6SystemFPcP7JKRHeap
-	bl       globalInstance__11ParticleMgrFv
-	lwz      r3, particleMgr@sda21(r13)
-	lis      r4, 0x18
-	bl       createHeap__11ParticleMgrFUl
-	lwz      r3, particleMgr@sda21(r13)
-	addi     r4, r31, 0x310
-	li       r5, 0x7d0
-	li       r6, 0x12c
-	li       r7, 0x80
-	bl       createMgr__11ParticleMgrFPcUlUlUl
-	lwz      r4, particleMgr@sda21(r13)
-	mr       r3, r30
-	bl       addGenNode__Q24Game14BaseHIOSectionFP5CNode
-	bl       globalInstance__14TParticle2dMgrFv
-	lis      r4, 0x0003E800@ha
-	lwz      r3, particle2dMgr@sda21(r13)
-	addi     r4, r4, 0x0003E800@l
-	bl       createHeap__14TParticle2dMgrFUl
-	lwz      r3, particle2dMgr@sda21(r13)
-	addi     r4, r31, 0x330
-	li       r5, 0x1d4
-	li       r6, 0x28
-	li       r7, 0x80
-	bl       createMgr__14TParticle2dMgrFPcUlUlUl
-	lwz      r4, particle2dMgr@sda21(r13)
-	mr       r3, r30
-	bl       addGenNode__Q24Game14BaseHIOSectionFP5CNode
-	lwz      r3, particleMgr@sda21(r13)
-	bl       beginEntryModelEffect__11ParticleMgrFv
-	li       r3, 0x30
-	bl       __nw__FUl
-	or.      r29, r3, r3
-	beq      lbl_80150520
-	bl       __ct__5CNodeFv
-	lis      r4, __vt__15ModelEffectData@ha
-	lis      r3, __vt__Q23efx13OnyonSpotData@ha
-	addi     r0, r4, __vt__15ModelEffectData@l
-	stw      r0, 0(r29)
-	addi     r0, r3, __vt__Q23efx13OnyonSpotData@l
-	stw      r0, 0(r29)
-
-lbl_80150520:
-	mr       r3, r29
-	bl       entry__15ModelEffectDataFv
-	lwz      r3, particleMgr@sda21(r13)
-	bl       endEntryModelEffect__11ParticleMgrFv
-	lwz      r3, particleMgr@sda21(r13)
-	bl       Instance_TPkEffectMgr__11ParticleMgrFv
-	lwz      r3, sys@sda21(r13)
-	addi     r4, r31, 0x14c
-	bl       heapStatusEnd__6SystemFPc
-	li       r3, 0x18
-	bl       __nw__FUl
-	or.      r0, r3, r3
-	beq      lbl_8015055C
-	bl       __ct__Q24Game9UpdateMgrFv
-	mr       r0, r3
-
-lbl_8015055C:
-	stw      r0, collisionUpdateMgr__4Game@sda21(r13)
-	mr       r3, r0
-	li       r4, 3
-	bl       create__Q24Game9UpdateMgrFi
-	lwz      r3, sys@sda21(r13)
-	addi     r4, r31, 0x358
-	li       r5, 0
-	bl       heapStatusStart__6SystemFPcP7JKRHeap
-	li       r3, 0xd0
-	bl       __nw__FUl
-	or.      r4, r3, r3
-	beq      lbl_80150594
-	bl       __ct__Q24Game7NaviMgrFv
-	mr       r4, r3
-
-lbl_80150594:
-	cmplwi   r4, 0
-	stw      r4, naviMgr__4Game@sda21(r13)
-	beq      lbl_801505A4
-	addi     r4, r4, 0x1c
-
-lbl_801505A4:
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	bl       addObjectMgr__Q24Game10GameSystemFP16GenericObjectMgr
-	lwz      r3, naviMgr__4Game@sda21(r13)
-	lwz      r12, 0(r3)
-	lwz      r12, 0xa4(r12)
-	mtctr    r12
-	bctrl
-	li       r3, 0x80
-	bl       __nw__FUl
-	or.      r4, r3, r3
-	beq      lbl_801505D8
-	bl       __ct__Q24Game7PikiMgrFv
-	mr       r4, r3
-
-lbl_801505D8:
-	cmplwi   r4, 0
-	stw      r4, pikiMgr__4Game@sda21(r13)
-	beq      lbl_801505E8
-	addi     r4, r4, 0x1c
-
-lbl_801505E8:
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	bl       addObjectMgr__Q24Game10GameSystemFP16GenericObjectMgr
-	lwz      r4, pikiMgr__4Game@sda21(r13)
-	mr       r3, r30
-	bl       addGenNode__Q24Game14BaseHIOSectionFP5CNode
-	lwz      r4, naviMgr__4Game@sda21(r13)
-	mr       r3, r30
-	bl       addGenNode__Q24Game14BaseHIOSectionFP5CNode
-	lwz      r3, pikiMgr__4Game@sda21(r13)
-	lwz      r4, 0x114(r30)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x9c(r12)
-	mtctr    r12
-	bctrl
-	lwz      r3, sys@sda21(r13)
-	addi     r4, r31, 0x358
-	bl       heapStatusEnd__6SystemFPc
-	li       r3, 0x40
-	bl       __nw__FUl
-	or.      r0, r3, r3
-	beq      lbl_80150644
-	bl       __ct__Q24Game9PelletMgrFv
-	mr       r0, r3
-
-lbl_80150644:
-	stw      r0, pelletMgr__4Game@sda21(r13)
-	mr       r3, r0
-	li       r4, 0
-	bl       createManagers__Q24Game9PelletMgrFUl
-	lwz      r4, pelletMgr__4Game@sda21(r13)
-	cmplwi   r4, 0
-	beq      lbl_80150664
-	addi     r4, r4, 0x1c
-
-lbl_80150664:
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	bl       addObjectMgr__Q24Game10GameSystemFP16GenericObjectMgr
-	mr       r3, r30
-	bl       createScreenRootNode__Q24Game14BaseHIOSectionFv
-	lwz      r3, sys@sda21(r13)
-	addi     r4, r31, 0x2e0
-	bl       heapStatusEnd__6SystemFPc
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	lwz      r28, 0x10(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 } // namespace Game
@@ -2317,8 +2077,7 @@ bool BaseGameSection::isAllocHalt()
 void BaseGameSection::setupFloatMemory()
 {
 	bool cave = false;
-	gameSystem->mFlags.typeView &= 0xFE; // this matches, but it's a bit odd
-	// gameSystem->resetFlag(0xFFFFFF01); // this matches, but it's extraordinarily stupid
+	gameSystem->resetFlag(GAMESYS_IsSoundSceneActive);
 
 	PSSystem::SingletonBase<PSM::ObjMgr>::newInstance();
 	PSSystem::SingletonBase<PSM::BossBgmFader::Mgr>::newInstance();
@@ -2333,13 +2092,11 @@ void BaseGameSection::setupFloatMemory()
 	lifeGaugeMgr = new LifeGaugeMgr;
 	lifeGaugeMgr->loadResource();
 
-	CarryInfoMgr* mgr;
 	if (gameSystem->isStoryMode()) {
-		mgr = new CarryInfoMgr(48);
+		carryInfoMgr = new CarryInfoMgr(48);
 	} else {
-		mgr = new CarryInfoMgr(64);
+		carryInfoMgr = new CarryInfoMgr(64);
 	}
-	carryInfoMgr = mgr;
 	carryInfoMgr->loadResource();
 
 	platMgr   = new PlatMgr;
@@ -2388,7 +2145,7 @@ void BaseGameSection::setupFloatMemory()
 	sys->heapStatusEnd("itemMgr");
 
 	sys->heapStatusStart("Pikmin-PikiClass", nullptr);
-	pikiMgr->alloc(100);
+	pikiMgr->alloc(MAX_PIKI_COUNT);
 	sys->heapStatusEnd("Pikmin-PikiClass");
 
 	generalEnemyMgr = new GeneralEnemyMgr;
@@ -2501,24 +2258,27 @@ void BaseGameSection::setupFloatMemory()
 		sys->heapStatusEnd("PlatCellMgr");
 	}
 	sys->heapStatusEnd("CellMgr");
+
 	if (cave) {
 		static_cast<RoomMapMgr*>(mapMgr)->placeObjects();
 	}
-	Graphics* gfx = sys->mGfx;
-	initViewports(*gfx);
-	particleMgr->setViewport(*gfx);
+
+	Graphics& gfx = *sys->getGfx();
+	initViewports(gfx);
+	particleMgr->setViewport(gfx);
 	particleMgr->start();
 
 	initGenerators();
 
 	itemMgr->initDependency();
-	cameraMgr->init(0);
+	cameraMgr->init(CAMNAVI_Olimar);
 
-	f32 angle = _aiConstants->mCameraAngle.mData * DEG2RAD * PI;
+	f32 angle = TORADIANS(_aiConstants->mCameraAngle.mData);
 	angle     = roundAng(angle + mapMgr->getMapRotation());
 	mapMgr->getMapRotation();
-	cameraMgr->setCameraAngle(angle, 2);
-	cameraMgr->controllerUnLock(2);
+	cameraMgr->setCameraAngle(angle, CAMNAVI_Both);
+
+	cameraMgr->controllerUnLock(CAMNAVI_Both);
 	sys->heapStatusEnd("setupFloatMemory");
 
 	pikiMgr->setupSoundViewerAndBas();
@@ -2527,7 +2287,7 @@ void BaseGameSection::setupFloatMemory()
 	pelletMgr->setupSoundViewerAndBas();
 
 	onSetSoundScene();
-	gameSystem->setFlag(GAMESYS_IsSoundFXActive);
+	gameSystem->setFlag(GAMESYS_IsSoundSceneActive);
 	if (Farm::farmMgr) {
 		Farm::farmMgr->setupSound();
 	}
@@ -3460,8 +3220,8 @@ lbl_801513A8:
 void BaseGameSection::setDrawBuffer(int index)
 {
 	P2ASSERTBOUNDSLINE(5295, 0, index, 10);
-	j3dSys.mDrawBuffer[0] = mDrawBuffer1->get(index)->mBuffer;
-	j3dSys.mDrawBuffer[1] = mDrawBuffer2->get(index)->mBuffer;
+	j3dSys.mDrawBuffer[0] = mOpaqueDrawBuffer->get(index)->mBuffer;
+	j3dSys.mDrawBuffer[1] = mTransparentDrawBuffer->get(index)->mBuffer;
 }
 
 /**

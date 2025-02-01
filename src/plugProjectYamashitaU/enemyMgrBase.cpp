@@ -29,11 +29,11 @@ EnemyBirthArg::EnemyBirthArg()
  * @note Address: 0x8012EC94
  * @note Size: 0xC4
  */
-EnemyMgrBase::EnemyMgrBase(int objLimit, u8 modelType)
+EnemyMgrBase::EnemyMgrBase(int objLimit, u8 viewNum)
 {
 	mModelData          = nullptr;
 	mAnimMgr            = nullptr;
-	mModelType          = modelType;
+	mMtxBufferSize      = viewNum;
 	mCollPartFactory    = nullptr;
 	mObjLimit           = objLimit;
 	mNumObjects         = 0;
@@ -96,7 +96,7 @@ void EnemyMgrBase::doAnimation()
 {
 	for (int i = 0; i < mObjLimit; i++) {
 		EnemyBase* enemy = getEnemy(i);
-		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->_1C & 1) || enemy->isMovieActor())) {
+		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->mDrawFlag & 1) || enemy->isMovieActor())) {
 			sys->mTimers->_start("e-upd", true);
 			enemy->update();
 			sys->mTimers->_stop("e-upd");
@@ -116,7 +116,7 @@ void EnemyMgrBase::doEntry()
 {
 	for (int i = 0; i < mObjLimit; i++) {
 		EnemyBase* enemy = getEnemy(i);
-		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->_1C & 1) || enemy->isMovieActor())) {
+		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->mDrawFlag & 1) || enemy->isMovieActor())) {
 			enemy->doEntry();
 		}
 	}
@@ -161,7 +161,7 @@ void EnemyMgrBase::doSimulation(f32 arg)
 
 		if (enemy->mPellet) {
 			enemy->doSimulationCarcass(arg);
-		} else if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->_1C & 1) || enemy->isMovieActor())) {
+		} else if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->mDrawFlag & 1) || enemy->isMovieActor())) {
 			enemy->doSimulation(arg);
 		}
 	}
@@ -175,7 +175,7 @@ void EnemyMgrBase::doDirectDraw(Graphics& graphics)
 {
 	for (int i = 0; i < mObjLimit; i++) {
 		EnemyBase* enemy = getEnemy(i);
-		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->_1C & 1) || enemy->isMovieActor())) {
+		if (enemy->isEvent(0, EB_Alive) && (!(generalEnemyMgr->mDrawFlag & 1) || enemy->isMovieActor())) {
 			enemy->doDirectDraw(graphics);
 		}
 	}
@@ -345,11 +345,11 @@ void EnemyMgrBase::resetDebugParm(u32 debugParm) { mParms->resetDebugParm(debugP
  */
 SysShape::Model* EnemyMgrBase::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x20000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_CreateNewDL, mMtxBufferSize);
 
-	Matrixf identity;
-	PSMTXIdentity(identity.mMatrix.mtxView);
-	PSMTXCopy(identity.mMatrix.mtxView, j3dSys.mViewMtx);
+	Mtx mtx;
+	PSMTXIdentity(mtx);
+	j3dSys.setViewMtx(mtx);
 
 	J3DModel* j3dModel = model->mJ3dModel;
 	j3dModel->calc();
@@ -388,7 +388,7 @@ void EnemyMgrBase::loadStoneSetting(const char* filename)
 	void* resource = gParmArc->getResource(filename);
 	if (resource) {
 		RamStream stream(resource, -1);
-		stream.resetPosition(STREAM_MODE_TEXT, STREAM_MODE_TEXT);
+		stream.setMode(STREAM_MODE_TEXT, STREAM_MODE_TEXT);
 		mStoneInfo.setup(stream);
 	}
 }
@@ -538,7 +538,7 @@ void EnemyMgrBase::loadAnimData()
 		animName = EnemyInfoFunc::getEnemyName(getEnemyTypeID(), 0xFFFF);
 	}
 
-	char file[256];
+	char file[PATH_MAX];
 	sprintf(file, "/enemy/data/%s/anim.szs", animName);
 
 	JKRArchive* archive = nullptr;
@@ -578,13 +578,16 @@ void EnemyMgrBase::loadTexData()
  * @note Address: 0x80130394
  * @note Size: 0x2C
  */
-J3DModelData* EnemyMgrBase::doLoadBmd(void* bmd) { return J3DModelLoaderDataBase::load(bmd, 0x240010); }
+J3DModelData* EnemyMgrBase::doLoadBmd(void* bmd)
+{
+	return J3DModelLoaderDataBase::load(bmd, J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL | J3DMLF_UseImmediateMtx);
+}
 
 /**
  * @note Address: 0x801303C0
  * @note Size: 0x28
  */
-J3DModelData* EnemyMgrBase::doLoadBdl(void* bdl) { return J3DModelLoaderDataBase::loadBinaryDisplayList(bdl, 0x2000); }
+J3DModelData* EnemyMgrBase::doLoadBdl(void* bdl) { return J3DModelLoaderDataBase::loadBinaryDisplayList(bdl, J3DMLF_DoBdlMaterialCalc); }
 
 /**
  * @note Address: 0x801303E8

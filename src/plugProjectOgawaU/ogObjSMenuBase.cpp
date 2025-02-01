@@ -30,7 +30,7 @@ ObjSMenuBase::ObjSMenuBase()
 	mCancelToState   = MENUCLOSE_None;
 	mEnableYaji      = false;
 	mAlpha           = 0;
-	_88              = 0.0f;
+	mUnused88        = 0.0f;
 	mButtonStates[1] = Controller::PRESS_R;
 	mButtonStates[0] = Controller::PRESS_L;
 
@@ -44,7 +44,7 @@ ObjSMenuBase::ObjSMenuBase()
 	mTyaji_l    = nullptr;
 	mTyaji_r    = nullptr;
 	mScreenMain = nullptr;
-	_A4         = 1.0f;
+	mUnusedA4   = 1.0f;
 	mPaneNsize  = nullptr;
 	mArrowBlink = new og::Screen::ArrowAlphaBlink;
 }
@@ -87,15 +87,15 @@ void ObjSMenuBase::doCreateAfter(JKRArchive* arc, P2DScreen::Mgr* scrn)
 	mScreenLR->set("s_menu_yajirushi_LR.blo", 0x1040000, arc);
 	og::Screen::setAlphaScreen(mScreenLR);
 
-	mNyaji_l    = og::Screen::TagSearch(mScreenLR, 'Nyaji_l');
+	mNyaji_l    = og::Screen::TagSearch(mScreenLR, 'Nyaji_l'); // overall L button pane
 	mYajiLpos.x = mNyaji_l->mOffset.x;
 	mYajiLpos.y = mNyaji_l->mOffset.y;
-	mNyaji_r    = og::Screen::TagSearch(mScreenLR, 'Nyaji_r');
+	mNyaji_r    = og::Screen::TagSearch(mScreenLR, 'Nyaji_r'); // overall R button pane
 	mYajiRpos.x = mNyaji_r->mOffset.x;
 	mYajiRpos.y = mNyaji_r->mOffset.y;
 
-	mTyaji_l = static_cast<J2DTextBoxEx*>(og::Screen::TagSearch(mScreenLR, 'Tyaji_l'));
-	mTyaji_r = static_cast<J2DTextBoxEx*>(og::Screen::TagSearch(mScreenLR, 'Tyaji_r'));
+	mTyaji_l = static_cast<J2DTextBoxEx*>(og::Screen::TagSearch(mScreenLR, 'Tyaji_l')); // L button textbox (items, etc)
+	mTyaji_r = static_cast<J2DTextBoxEx*>(og::Screen::TagSearch(mScreenLR, 'Tyaji_r')); // R button textbox (menu, etc)
 	og::Screen::setCallBackMessage(mScreenLR);
 }
 
@@ -123,13 +123,13 @@ bool ObjSMenuBase::doUpdate()
 
 	} else {
 		SceneSMenuBase* scene = static_cast<SceneSMenuBase*>(getOwner());
-		if (scene->getGamePad()->mButton.mButtonDown & getButtonState(1)) {
+		if (scene->getGamePad()->isButtonDown(mButtonStates[1])) {
 			ret            = true;
 			mCancelToState = MENUCLOSE_R;
-		} else if (scene->getGamePad()->mButton.mButtonDown & getButtonState(0)) {
+		} else if (scene->getGamePad()->isButtonDown(mButtonStates[0])) {
 			ret            = true;
 			mCancelToState = MENUCLOSE_L;
-		} else if (scene->getGamePad()->mButton.mButtonDown & (Controller::PRESS_START | Controller::PRESS_B)) {
+		} else if (scene->getGamePad()->isButtonDown(Controller::PRESS_START | Controller::PRESS_B)) {
 			mCancelToState = MENUCLOSE_Finish;
 			doUpdateCancelAction();
 			ret = true;
@@ -176,7 +176,7 @@ void ObjSMenuBase::startBackupScene()
 {
 	SceneSMenuBase* scene = static_cast<SceneSMenuBase*>(getOwner());
 	if (scene->setBackupScene() && !scene->startScene(nullptr)) {
-		JUT_PANICLINE(366, "‚¾‚ß‚Å‚·\n");
+		JUT_PANICLINE(366, "ã ã‚ã§ã™\n");
 	}
 }
 
@@ -194,7 +194,7 @@ void ObjSMenuBase::jump_LR(::Screen::SetSceneArg& arg, bool flag)
 		sarg.mSceneType = arg.getSceneType();
 		sarg.mFlag      = flag;
 		if (!scene->startScene(&sarg)) {
-			JUT_PANICLINE(394, "‚¾‚ß‚Å‚·\n");
+			JUT_PANICLINE(394, "ã ã‚ã§ã™\n");
 		}
 	}
 }
@@ -301,12 +301,12 @@ void ObjSMenuBase::updateYaji()
 			angle = 0.0f;
 			init  = true;
 		}
-		angle += msBaseVal._10;
+		angle += msBaseVal.mLRArrowMoveSpeed;
 
 		if (angle > TAU) {
 			angle -= TAU;
 		}
-		newxpos = msBaseVal._0C * sinf(angle);
+		newxpos = msBaseVal.mLRArrowMoveDistance * sinf(angle);
 
 		f32 temp = angle - HALF_PI;
 		if (temp > 0.0f && temp < PI) {
@@ -341,7 +341,7 @@ void ObjSMenuBase::updateYaji()
 	if (msBaseVal.mUpdateYaji) {
 		newAlphaVal = (f32)mAlpha * newalpha;
 	} else {
-		mArrowBlink->setSpeed(msBaseVal._10);
+		mArrowBlink->setSpeed(msBaseVal.mLRArrowMoveSpeed);
 		newalpha    = mArrowBlink->calc();
 		newAlphaVal = (f32)mAlpha * newalpha;
 	}
@@ -370,25 +370,25 @@ bool ObjSMenuBase::updateFadeIn()
 	switch (mState) {
 	case MENUSTATE_OpenL:
 		mFadeLevel += sys->mDeltaTime;
-		if (mFadeLevel > msBaseVal._08) {
+		if (mFadeLevel > msBaseVal.mFadeInOutTime) {
 			ret = true;
-		} else if (pad->mButton.mButtonDown & mButtonStates[1]) {
+		} else if (pad->isButtonDown(mButtonStates[1])) {
 			mCancelToState = MENUCLOSE_R;
 			mExiting       = true;
 		}
-		f32 calc2 = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal._08));
+		f32 calc2 = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal.mFadeInOutTime));
 		mMovePos  = 800.0f * calc2;
 		break;
 
 	case MENUSTATE_OpenR:
 		mFadeLevel += sys->mDeltaTime;
-		if (mFadeLevel > msBaseVal._08) {
+		if (mFadeLevel > msBaseVal.mFadeInOutTime) {
 			ret = true;
-		} else if (pad->mButton.mButtonDown & mButtonStates[0]) {
+		} else if (pad->isButtonDown(mButtonStates[0])) {
 			mCancelToState = MENUCLOSE_L;
 			mExiting       = true;
 		}
-		f32 calc = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal._08));
+		f32 calc = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal.mFadeInOutTime));
 		mMovePos = -800.0f * calc;
 		break;
 
@@ -444,18 +444,18 @@ bool ObjSMenuBase::updateFadeOut()
 	switch (mState) {
 	case MENUSTATE_CloseL:
 		mFadeLevel += sys->mDeltaTime;
-		if (mFadeLevel > msBaseVal._08) {
+		if (mFadeLevel > msBaseVal.mFadeInOutTime) {
 			ret = true;
 		}
-		f32 calc = og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal._08);
+		f32 calc = og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal.mFadeInOutTime);
 		mMovePos = -800.0f * calc;
 		break;
 	case MENUSTATE_CloseR:
 		mFadeLevel += sys->mDeltaTime;
-		if (mFadeLevel > msBaseVal._08) {
+		if (mFadeLevel > msBaseVal.mFadeInOutTime) {
 			ret = true;
 		}
-		f32 calc2 = og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal._08);
+		f32 calc2 = og::Screen::calcSmooth0to1(mFadeLevel, msBaseVal.mFadeInOutTime);
 		mMovePos  = 800.0f * calc2;
 		break;
 	case MENUSTATE_Default:

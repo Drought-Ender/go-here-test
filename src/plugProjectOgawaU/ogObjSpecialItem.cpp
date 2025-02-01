@@ -45,7 +45,7 @@ void ObjSpecialItem::doCreate(JKRArchive* arc)
 	} else if (disp->isID(OWNER_OGA, MEMBER_DUMMY)) {
 		mDisp = new og::Screen::DispMemberSpecialItem();
 	} else {
-		JUT_PANICLINE(81, "ERR! in ObjTest CreateŽ¸”sI\n");
+		JUT_PANICLINE(81, "ERR! in ObjTest Createå¤±æ•—ï¼\n");
 	}
 
 	mScreen = new P2DScreen::Mgr_tuning;
@@ -54,7 +54,7 @@ void ObjSpecialItem::doCreate(JKRArchive* arc)
 
 	J2DPane* pane = mScreen->search('item');
 	if (pane) {
-		pane->mIsVisible = false;
+		pane->hide();
 	}
 
 	mPaneSetP  = mScreen->search('Notsetp');
@@ -119,7 +119,7 @@ bool ObjSpecialItem::doStart(::Screen::StartSceneArg const*)
 	mFadeTimer2 = 0.0f;
 	if (mDisp->mDoPlayBGM) {
 		PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		PSM::Scene_Game* scene = static_cast<PSM::Scene_Game*>(PSSystem::checkChildScene(mgr->getChildScene()));
 		scene->startMainSeq();
 	}

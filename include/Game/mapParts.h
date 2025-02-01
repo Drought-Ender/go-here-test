@@ -115,7 +115,7 @@ struct MapUnit {
 	void save(Stream&);
 	void setupSizeInfo();
 
-	s16 _04;                           // _04
+	s16 mUnusedIdx;                    // _04
 	char* mName;                       // _08
 	J3DModelData* mModelData;          // _0C
 	MapCollision mCollision;           // _10
@@ -125,7 +125,7 @@ struct MapUnit {
 	BoundBox mBoundingBox;             // _7C
 	Vector2<u16> mCellSize;            // _94
 	u8 _98[0x10];                      // _98
-	u8 _A8;                            // _A8
+	u8 mHasCollision;                  // _A8, not used?
 	EditorRouteMgr mRouteMgr;          // _AC
 	int mAnimationCount;               // _E8
 	Sys::MatTexAnimation* mAnimations; // _EC
@@ -159,7 +159,7 @@ struct PartsView : public CNode {
 	u32 _60;                     // _060
 	u8 _64[8];                   // _064
 	s16 mUnitKind;               // _06C, 0=cap, 1=room, 2=corridor
-	BitFlag<u16> _6E;            // _06E
+	BitFlag<u16> mFlags;         // _06E
 	EditorRouteMgr mRouteMgr;    // _070
 	AStarContext mAStarContext;  // _0AC
 	AStarPathfinder mPathFinder; // _110
@@ -229,13 +229,13 @@ struct MapRoom : public CellObject {
 	Sys::MatLoopAnimator* mAnimators;      // _0CC
 	int mDoorNum;                          // _0D0
 	RoomDoorInfo* mDoorInfos;              // _0D4
-	Matrixf _0D8;                          // _0D8
-	Matrixf _108;                          // _108
+	Matrixf mRoomSpaceMtx;                 // _0D8
+	Matrixf mInvRoomSpaceMtx;              // _108
 	MapUnit* mUnit;                        // _138
 	SysShape::Model* mModel;               // _13C
 	Sys::Sphere mBoundingSphere;           // _140
-	Sys::Sphere _150;                      // _150
-	Sys::Cylinder _160;                    // _160
+	Sys::Sphere mRoomVisibilitySphere;     // _150, rendering bounding sphere
+	Sys::Cylinder mRoomVisibilityCylinder; // _160, rendering  bounding cylinder
 	RoomLink* mLink;                       // _180
 	s16 mIndex;                            // _184
 	s16 mUnitKind;                         // _186
@@ -275,7 +275,7 @@ struct RoomMapMgr : public MapMgr {
 	virtual void doSetView(int viewportNumber);                                           // _58
 	virtual void doViewCalc();                                                            // _5C
 	virtual Sys::TriIndexList* traceMove_new(MoveInfo&, f32);                             // _60
-	virtual void traceMove_original(MoveInfo&, f32);                                      // _64
+	virtual Sys::TriIndexList* traceMove_original(MoveInfo&, f32);                        // _64
 
 	MapRoom* getMapRoom(s16 roomIdx);
 	void createRandomMap(int floorNum, Cave::EditMapUnit* editInfo);

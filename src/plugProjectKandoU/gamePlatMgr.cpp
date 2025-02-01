@@ -120,12 +120,12 @@ void PlatInstance::traceMove(MoveInfo& info, f32 step)
 		PSMTXInverse(mtx.mMatrix.mtxView, invMtx.mMatrix.mtxView);
 	}
 
-	Sys::Triangle* bounceTri = info.mBounceTriangle;
+	Sys::Triangle* bounceTri = info.mFloorTriangle;
 	Sys::Triangle* wallTri   = info.mWallTriangle;
 
-	info.mBounceTriangle = nullptr;
-	info.mWallTriangle   = nullptr;
-	info._4C             = nullptr;
+	info.mFloorTriangle = nullptr;
+	info.mWallTriangle  = nullptr;
+	info.mOtherTriangle = nullptr;
 
 	sys->mTimers->_start("plat-obb", true);
 
@@ -140,40 +140,40 @@ void PlatInstance::traceMove(MoveInfo& info, f32 step)
 
 	sys->mTimers->_stop("plat-obb");
 
-	if (info.mInfoOrigin) {
-		if (info.mBounceTriangle) {
+	if (info.mMovingCreature) {
+		if (info.mFloorTriangle) {
 			PlatEvent event;
 			event.mInstance = this;
-			event.mPosition = info.mPosition;
+			event.mNormal   = info.mFloorNormal;
 			event.mObj      = mItem;
 
-			info.mInfoOrigin->platCallback(event);
+			info.mMovingCreature->platCallback(event);
 			mOnCount++;
 
 			if (mItem) {
-				event.mObj = info.mInfoOrigin;
+				event.mObj = info.mMovingCreature;
 				mItem->platCallback(event);
 			}
 		} else {
-			info.mBounceTriangle = bounceTri;
+			info.mFloorTriangle = bounceTri;
 		}
 
 		if (info.mWallTriangle) {
 			PlatEvent event;
 			event.mInstance = this;
-			event.mPosition = info.mReflectPosition;
+			event.mNormal   = info.mWallNormal;
 			event.mObj      = mItem;
-			info.mInfoOrigin->platCallback(event);
+			info.mMovingCreature->platCallback(event);
 		} else {
 			info.mWallTriangle = wallTri;
 		}
 
-		if (info._4C) {
+		if (info.mOtherTriangle) {
 			PlatEvent event;
 			event.mInstance = this;
-			event.mPosition = info._68;
+			event.mNormal   = info.mOtherNormal;
 			event.mObj      = mItem;
-			info.mInfoOrigin->platCallback(event);
+			info.mMovingCreature->platCallback(event);
 		}
 	}
 
@@ -364,9 +364,9 @@ PlatInstance* PlatMgr::addInstance(PlatAddInstanceArg& arg)
 			sphere.mRadius = arg.mRadius;
 		}
 
-		int val;
+		int layerIndex;
 		Recti rect;
-		Game::platCellMgr->calcExtent(sphere, val, rect);
+		Game::platCellMgr->calcExtent(sphere, layerIndex, rect);
 		Game::platCellMgr->entry(instance, sphere);
 
 		if (instance->mItem) {
@@ -419,10 +419,7 @@ void PlatMgr::traceMove(MoveInfo& info, f32 step)
 void PlatMgr::getCurrTri(CurrTriInfo& info)
 {
 	if (mUseCellMgr && platCellMgr) {
-		Sys::Sphere searchSphere;
-		searchSphere.mPosition = info.mPosition;
-		searchSphere.mRadius   = 0.0f;
-
+		Sys::Sphere searchSphere(info.mPosition, 0.0f);
 		CellIteratorArg iterArg(searchSphere);
 		iterArg.mCellMgr  = platCellMgr;
 		iterArg.mOptimise = true;
@@ -435,6 +432,7 @@ void PlatMgr::getCurrTri(CurrTriInfo& info)
 				instance->getCurrTri(info);
 			}
 		}
+
 		return;
 	}
 

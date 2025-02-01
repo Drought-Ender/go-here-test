@@ -63,7 +63,7 @@ Section::~Section() { ebi::title::TTitleMgr::deleteInstance(); }
 void Section::doExit()
 {
 	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(mgr);
+	PSSystem::validateSceneMgr(mgr);
 	mgr->deleteCurrentScene();
 	mThpPlayer->stop();
 	if (!Screen::gGame2DMgr->mScreenMgr->reset()) {
@@ -110,7 +110,7 @@ void Section::init()
 	sys->heapStatusStart("JMANewSinTable", nullptr);
 	sys->heapStatusEnd("JMANewSinTable");
 
-	initHIO(new HIORootNode(this, "タイトルセクション")); // "Title Section"
+	initHIO(new HIORootNode(this, "繧ｿ繧､繝医Ν繧ｻ繧ｯ繧ｷ繝ｧ繝ｳ")); // "Title Section"
 
 	sys->heapStatusStart("frameBuffer", nullptr);
 	setDisplay(JFWDisplay::createManager(nullptr, mDisplayHeap, JUTXfb::DoubleBuffer, false), 1);
@@ -124,8 +124,9 @@ void Section::init()
 	// this entire menu class seems to be for a scrapped debug menu
 	mMenu      = new Menu(mController1, JFWSystem::systemFont, false);
 	mMenu->_48 = 260;
-	mMenu->addKeyEvent(Menu::KeyEvent::UNK1, 512, new Delegate1<Section, Menu&>(this, &menuCancel));
-	mMenu->addKeyEvent(Menu::KeyEvent::UNK0, 256, new Delegate1<Section, Menu&>(this, &menuSelect));
+	mMenu->addKeyEvent(Menu::KeyEvent::U6, Controller::PRESS_B, new Delegate1<Section, Menu&>(this, &menuCancel));
+	mMenu->addKeyEvent(Menu::KeyEvent::INVOKE_ACTION_ON_BUTTON_PRESS, Controller::PRESS_A,
+	                   new Delegate1<Section, Menu&>(this, &menuSelect));
 	int sects = 0;
 	for (int i = 0; i < GameFlow::SN_SECTION_COUNT; i++) {
 		SectionInfo* data = GameFlow::getSectionInfo(i);
@@ -250,19 +251,19 @@ void Section::updateMenu()
 	if (mDoCheckShortCut) {
 		mMenu->doUpdate(false);
 		if (mMenu->mState == 2 || mMenu->mState == 1) {
-			if (mController1->mButton.mButtonDown & Controller::PRESS_DPAD_UP && Game::gGameConfig.mParms.mShortCutUp.mData >= 0) {
+			if (mController1->getButtonDown() & Controller::PRESS_DPAD_UP && Game::gGameConfig.mParms.mShortCutUp.mData >= 0) {
 				GameFlow::mActiveSectionFlag = Game::gGameConfig.mParms.mShortCutUp.mData;
 				mIsMainActive                = false;
 			}
-			if (mController1->mButton.mButtonDown & Controller::PRESS_DPAD_DOWN && Game::gGameConfig.mParms.mShortCutDown.mData >= 0) {
+			if (mController1->getButtonDown() & Controller::PRESS_DPAD_DOWN && Game::gGameConfig.mParms.mShortCutDown.mData >= 0) {
 				GameFlow::mActiveSectionFlag = Game::gGameConfig.mParms.mShortCutDown.mData;
 				mIsMainActive                = false;
 			}
-			if (mController1->mButton.mButtonDown & Controller::PRESS_DPAD_LEFT && Game::gGameConfig.mParms.mShortCutLeft.mData >= 0) {
+			if (mController1->getButtonDown() & Controller::PRESS_DPAD_LEFT && Game::gGameConfig.mParms.mShortCutLeft.mData >= 0) {
 				GameFlow::mActiveSectionFlag = Game::gGameConfig.mParms.mShortCutLeft.mData;
 				mIsMainActive                = false;
 			}
-			if (mController1->mButton.mButtonDown & Controller::PRESS_DPAD_RIGHT && Game::gGameConfig.mParms.mShortCutRight.mData >= 0) {
+			if (mController1->getButtonDown() & Controller::PRESS_DPAD_RIGHT && Game::gGameConfig.mParms.mShortCutRight.mData >= 0) {
 				GameFlow::mActiveSectionFlag = Game::gGameConfig.mParms.mShortCutRight.mData;
 				mIsMainActive                = false;
 			}
@@ -279,11 +280,11 @@ void Section::doUpdateMainTitle()
 	mGoToDemoTimer += sys->mDeltaTime;
 	updateMenu();
 	mMainTitleMgr.update();
-	if (mController1->isButton(~JUTGamePad::False)) {
+	if (mController1->isButtonHeld(~JUTGamePad::False)) {
 		mGoToDemoTimer = 0.0f;
 	}
 
-	if (mController1->mButton.mButtonDown & Controller::PRESS_Y) {
+	if (mController1->getButtonDown() & Controller::PRESS_Y) {
 		OSReport("code size           %dKB\n", ((int)JKRHeap::getCodeEnd() - (int)JKRHeap::getCodeStart()) / 1024);
 		OSReport("GameSystemHeap Free %dKB\n", (int)sys->mSysHeap->getTotalFreeSize() / 1024);
 	}
@@ -292,11 +293,12 @@ void Section::doUpdateMainTitle()
 	PSSystem::SeqBase* seq;
 	if (mMainTitleMgr.mDoEndBGM) {
 		mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		mgr->checkScene();
 		PSSystem::SeqBase* seq = PSSystem::getSeqData(mgr, BGM_MainTheme);
-		f32 rate               = (ebi::TMainTitleMgr::kFadeOutTime / sys->mDeltaTime);
-		rate                   = (rate >= 0.0f) ? rate + 0.5f : rate - 0.5f;
+
+		f32 rate = (ebi::TMainTitleMgr::kFadeOutTime / sys->mDeltaTime);
+		rate     = ROUND_F32_TO_U8(rate);
 		seq->stopSeq((int)rate);
 	}
 
@@ -318,7 +320,7 @@ void Section::doUpdateMainTitle()
 			mOptionMgr.start();
 			mIsMainActive = true;
 			mgr           = PSSystem::getSceneMgr();
-			PSSystem::checkSceneMgr(mgr);
+			PSSystem::validateSceneMgr(mgr);
 			mgr->checkScene();
 			seq = PSSystem::getSeqData(mgr, BGM_Options);
 			seq->startSeq();
@@ -331,7 +333,7 @@ void Section::doUpdateMainTitle()
 				disp.mImageArchive = mHiScoreTex;
 				Screen::gGame2DMgr->open_HighScore(disp);
 				mgr = PSSystem::getSceneMgr();
-				PSSystem::checkSceneMgr(mgr);
+				PSSystem::validateSceneMgr(mgr);
 				mgr->checkScene();
 				seq = PSSystem::getSeqData(mgr, BGM_HiScore);
 				seq->startSeq();
@@ -343,7 +345,7 @@ void Section::doUpdateMainTitle()
 			mOmakeMgr.start();
 			mIsMainActive = true;
 			mgr           = PSSystem::getSceneMgr();
-			PSSystem::checkSceneMgr(mgr);
+			PSSystem::validateSceneMgr(mgr);
 			mgr->checkScene();
 			seq = PSSystem::getSeqData(mgr, BGM_Bonus);
 			seq->startSeq();
@@ -399,18 +401,18 @@ void Section::doUpdateOmake()
 	mOmakeMgr.update();
 	if (mOmakeMgr.mIsFinished) {
 		mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		mgr->checkScene();
 		PSSystem::SeqBase* seq = PSSystem::getSeqData(mgr, BGM_Bonus);
-		f32 rate               = ebi::E2DFader::kFadeTime / sys->mDeltaTime;
-		rate                   = (rate >= 0.0f) ? rate + 0.5f : rate - 0.5f;
+		f32 rate               = (ebi::TMainTitleMgr::kFadeOutTime / sys->mDeltaTime);
+		rate                   = ROUND_F32_TO_U8(rate);
 		seq->stopSeq((int)rate);
 	}
 
 	if (mOmakeMgr.isMovieState()) {
 		if (mMovieIndex < 0) {
 			mgr = PSSystem::getSceneMgr();
-			PSSystem::checkSceneMgr(mgr);
+			PSSystem::validateSceneMgr(mgr);
 			mgr->checkScene();
 			PSSystem::SeqBase* seq = PSSystem::getSeqData(mgr, BGM_Bonus);
 			seq->stopSeq(0);
@@ -425,8 +427,8 @@ void Section::doUpdateOmake()
 		}
 		mThpPlayer->update();
 		if (mThpPlayer->isFinishLoading()) {
-			if (mThpPlayer->isFinishPlaying() || mController1->mButton.mButtonDown & Controller::PRESS_B) {
-				if (mController1->mButton.mButtonDown & Controller::PRESS_B) {
+			if (mThpPlayer->isFinishPlaying() || mController1->getButtonDown() & Controller::PRESS_B) {
+				if (mController1->getButtonDown() & Controller::PRESS_B) {
 					PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_CANCEL, 0);
 				}
 				mThpPlayer->pause();
@@ -434,7 +436,7 @@ void Section::doUpdateOmake()
 				mOmakeMgr.restartFromMovieState();
 				mMovieIndex = -1;
 				mgr         = PSSystem::getSceneMgr();
-				PSSystem::checkSceneMgr(mgr);
+				PSSystem::validateSceneMgr(mgr);
 				mgr->checkScene();
 				seq = PSSystem::getSeqData(mgr, BGM_Bonus);
 				seq->startSeq();
@@ -447,7 +449,7 @@ void Section::doUpdateOmake()
 		int idk;
 		mMainTitleMgr.startMenuSet(idk, ebi::TMainTitleMgr::Select_Bonus);
 		mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		mgr->checkScene();
 		seq = PSSystem::getSeqData(mgr, BGM_MainTheme);
 		seq->startSeq();
@@ -464,8 +466,8 @@ void Section::doUpdateOption()
 	if (mOptionMgr.mIsFinished) {
 
 		PSSystem::SeqBase* seq = PSSystemGetSeqCheck(BGM_Options);
-		f32 rate               = ebi::E2DFader::kFadeTime / sys->mDeltaTime;
-		rate                   = (rate >= 0.0f) ? rate + 0.5f : rate - 0.5f;
+		f32 rate               = (ebi::TMainTitleMgr::kFadeOutTime / sys->mDeltaTime);
+		rate                   = ROUND_F32_TO_U8(rate);
 		seq->stopSeq((int)rate);
 	}
 	if (mOptionMgr.isFinish()) {
@@ -572,7 +574,7 @@ bool Section::doLoading()
 	bool done = sys->dvdLoadSyncNoBlock(&mThreadCommand);
 	if (done) {
 		sys->dvdLoadUseCallBack(&mThreadCommand, mButtonCallback);
-		PSMStartMainSeq();
+		PSMGetSceneMgrCheck()->doStartMainSeq();
 	}
 	return u8(done == 0);
 }
@@ -611,49 +613,49 @@ void Section::loadResource()
 
 	switch (id) {
 	case 0:
-		sSeasonIndex = ebi::title::TTitleMgr::Winter;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Winter;
 		break;
 	case 1:
-		sSeasonIndex = ebi::title::TTitleMgr::Winter;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Winter;
 		break;
 	case 2:
-		sSeasonIndex = ebi::title::TTitleMgr::Spring;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Spring;
 		break;
 	case 3:
-		sSeasonIndex = ebi::title::TTitleMgr::Spring;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Spring;
 		break;
 	case 4:
-		sSeasonIndex = ebi::title::TTitleMgr::Spring;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Spring;
 		break;
 	case 5:
-		sSeasonIndex = ebi::title::TTitleMgr::Summer;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Summer;
 		break;
 	case 6:
-		sSeasonIndex = ebi::title::TTitleMgr::Summer;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Summer;
 		break;
 	case 7:
-		sSeasonIndex = ebi::title::TTitleMgr::Summer;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Summer;
 		break;
 	case 8:
-		sSeasonIndex = ebi::title::TTitleMgr::Autumn;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Autumn;
 		break;
 	case 9:
-		sSeasonIndex = ebi::title::TTitleMgr::Autumn;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Autumn;
 		break;
 	case 10:
-		sSeasonIndex = ebi::title::TTitleMgr::Autumn;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Autumn;
 		break;
 	case 11:
-		sSeasonIndex = ebi::title::TTitleMgr::Winter;
+		sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Winter;
 		break;
 	default:
-		if ((s8)(++sSeasonIndex) > ebi::title::TTitleMgr::Winter) {
-			sSeasonIndex = ebi::title::TTitleMgr::Spring;
+		if ((s8)(++sSeasonIndex) > ebi::title::TTitleMgr::LEVEL_Winter) {
+			sSeasonIndex = ebi::title::TTitleMgr::LEVEL_Spring;
 		}
 	}
 
 	if (Game::gGameConfig.mParms.mKFesVersion.mData) {
-		mMainTitleMgr.setMode(ebi::title::TTitleMgr::Summer);
+		mMainTitleMgr.setMode(ebi::title::TTitleMgr::LEVEL_Summer);
 	} else {
 		mMainTitleMgr.setMode(sSeasonIndex);
 	}

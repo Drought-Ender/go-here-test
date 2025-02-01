@@ -4,10 +4,6 @@
 #include "SysShape/Animator.h"
 #include "BitFlag.h"
 
-#define EANIM_FLAG_STOPPED  (1 << 0) // 1
-#define EANIM_FLAG_FINISHED (1 << 1) // 2
-#define EANIM_FLAG_PLAYING  (1 << 2) // 4
-
 namespace Game {
 struct EnemyAnimatorBase {
 	EnemyAnimatorBase();
@@ -50,7 +46,7 @@ struct EnemyBlendAnimatorBase : public EnemyAnimatorBase {
 	virtual void setAnimMgr(SysShape::AnimMgr* mgr);  // _0C
 	virtual SysShape::Animator& getAnimator();        // _10
 	virtual SysShape::Animator& getAnimator(int idx); // _14
-	virtual void animate(f32);                        // _18
+	virtual void animate(f32 speed);                  // _18
 	/**
 	 * @reifiedAddress{8010AA4C}
 	 * @reifiedFile{plugProjectYamashitaU/pelplant.cpp}

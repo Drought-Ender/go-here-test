@@ -12,6 +12,7 @@
 #include "efx/TSyncGroup.h"
 
 namespace efx {
+
 TCallBack_StaticClipping TBase::mCallBack_StaticClipping;
 
 /**
@@ -53,15 +54,19 @@ void TOneEmitter::del(Context* context)
 void TOneEmitter::executeAfter(JPABaseEmitter* emitter)
 {
 	particleMgr->setGlobalColor(emitter);
-	for (Context* context = (Context*)mContext.mChild; context; context = (Context*)context->mNext) {
-		Vector3f v1 = context->mPosition;
-		if (particleMgr->cullByResFlg(v1, mEffectID) == false) {
-			int createCount = emitter->getCurrentCreateNumber();
-			for (int i = 0; i < createCount; i++) {
-				JPABaseParticle* particle = emitter->createParticle();
-				if (particle) {
-					particle->mOffsetPosition.set(v1.x, v1.y, v1.z);
-				}
+
+	FOREACH_NODE(Context, mContext.mChild, context)
+	{
+		Vector3f contextPos = context->mPosition;
+		if (particleMgr->cullByResFlg(contextPos, mEffectID)) {
+			continue;
+		}
+
+		int createCount = emitter->getCurrentCreateNumber();
+		for (int i = 0; i < createCount; i++) {
+			JPABaseParticle* particle = emitter->createParticle();
+			if (particle) {
+				particle->mOffsetPosition.set(contextPos.x, contextPos.y, contextPos.z);
 			}
 		}
 	}
@@ -77,12 +82,14 @@ bool TOneEmitter::create(Arg*)
 	if (mEmitter) {
 		return false;
 	}
+
 	mEmitter = particleMgr->create(mEffectID, Vector3f::zero, 0);
 	if (mEmitter) {
-		mEmitter->mFlags |= 0x40;
-		mEmitter->mFlags |= 0x01;
+		mEmitter->setFlag(JPAEMIT_Immortal);
+		mEmitter->setFlag(JPAEMIT_StopEmitting);
 		mEmitter->mEmitterCallback = this;
 	}
+
 	return (mEmitter);
 }
 
@@ -144,8 +151,8 @@ bool TOneEmitterChasePos::create(Arg* arg)
 	}
 	mEmitter = particleMgr->create(mEffectID, Vector3f::zero, 0);
 	if (mEmitter) {
-		mEmitter->mFlags |= 0x40;
-		mEmitter->mFlags |= 0x01;
+		mEmitter->setFlag(JPAEMIT_Immortal);
+		mEmitter->setFlag(JPAEMIT_StopEmitting);
 		mEmitter->mEmitterCallback = this;
 	}
 	return (mEmitter);
@@ -159,15 +166,19 @@ bool TOneEmitterChasePos::create(Arg* arg)
 void TOneEmitterChasePos::executeAfter(JPABaseEmitter* emitter)
 {
 	particleMgr->setGlobalColor(emitter);
-	for (ContextChasePos* context = (ContextChasePos*)mContext.mChild; context; context = (ContextChasePos*)context->mNext) {
-		Vector3f* v1 = context->mPosition;
-		if (particleMgr->cullByResFlg(*v1, mEffectID) == false) {
-			int createCount = emitter->getCurrentCreateNumber();
-			for (int i = 0; i < createCount; i++) {
-				JPABaseParticle* particle = emitter->createParticle();
-				if (particle) {
-					particle->mOffsetPosition.set(v1->x, v1->y, v1->z);
-				}
+
+	FOREACH_NODE(ContextChasePos, mContext.mChild, context)
+	{
+		Vector3f* contextPos = context->mPosition;
+		if (particleMgr->cullByResFlg(*contextPos, mEffectID)) {
+			continue;
+		}
+
+		int createCount = emitter->getCurrentCreateNumber();
+		for (int i = 0; i < createCount; i++) {
+			JPABaseParticle* particle = emitter->createParticle();
+			if (particle) {
+				particle->mOffsetPosition.set(contextPos->x, contextPos->y, contextPos->z);
 			}
 		}
 	}
@@ -208,14 +219,14 @@ void TOneEmitterChasePos::forceKill()
  */
 bool TOneEmitterSimple::create(Arg* arg)
 {
-	_14 = 0;
+	mCurrPosIndex = 0;
 	if (mEmitter) {
 		return false;
 	}
 	mEmitter = particleMgr->create(mEffectID, Vector3f::zero, 0);
 	if (mEmitter) {
-		mEmitter->mFlags |= 0x40;
-		mEmitter->mFlags |= 0x01;
+		mEmitter->setFlag(JPAEMIT_Immortal);
+		mEmitter->setFlag(JPAEMIT_StopEmitting);
 		mEmitter->mMaxFrame        = 0;
 		mEmitter->mEmitterCallback = this;
 	}
@@ -230,9 +241,9 @@ bool TOneEmitterSimple::create(Arg* arg)
 void TOneEmitterSimple::executeAfter(JPABaseEmitter* emitter)
 {
 	particleMgr->setGlobalColor(emitter);
-	P2ASSERTLINE(447, _14 <= _18);
-	for (int i = 0; i < _14; i++) {
-		Vector3f v1 = _10[i];
+	P2ASSERTLINE(447, mCurrPosIndex <= mPositionNum);
+	for (int i = 0; i < mCurrPosIndex; i++) {
+		Vector3f v1 = mPositionList[i];
 		if (particleMgr->cullByResFlg(v1, mEffectID) == false) {
 			int createCount = (int)emitter->mRate;
 			for (int i = 0; i < createCount; i++) {
@@ -243,8 +254,7 @@ void TOneEmitterSimple::executeAfter(JPABaseEmitter* emitter)
 			}
 		}
 	}
-
-	_14 = 0;
+	mCurrPosIndex = 0;
 }
 
 /**
@@ -431,7 +441,7 @@ bool TSync::create(Arg* arg)
 	mEmitter = particleMgr->create(mEffectID, position, 0);
 	if (mEmitter) {
 		mEmitter->mEmitterCallback = this;
-		mEmitter->mFlags |= 0x40;
+		mEmitter->setFlag(JPAEMIT_Immortal);
 	} else {
 		return false;
 	}
@@ -447,10 +457,11 @@ bool TSync::create(Arg* arg)
 void TSync::execute(JPABaseEmitter* emitter)
 {
 	bool check = false;
-	// TODO: This "check" is probably an inlined function or macro...
-	if ((emitter->mFlags & 8) != 0 && emitter->getParticleNumber() == 0) {
+
+	if (mEmitter->isFlag(JPAEMIT_EnableDeleteEmitter) && emitter->getParticleNumber() == 0) {
 		check = true;
 	}
+
 	if (check) {
 		fade();
 	} else {
@@ -468,9 +479,9 @@ void TSync::executeAfter(JPABaseEmitter* emitter)
 	particleMgr->setGlobalColor(emitter);
 	if (particleMgr->cullByResFlg(emitter) == 0) {
 		if (mFlags & 1) {
-			emitter->mFlags |= 4;
+			emitter->setFlag(JPAEMIT_StopDraw);
 		} else {
-			emitter->mFlags &= ~4;
+			emitter->resetFlag(JPAEMIT_StopDraw);
 		}
 	}
 	doExecuteAfter(emitter);
@@ -581,24 +592,32 @@ void TChasePosPos::doExecuteEmitterOperation(JPABaseEmitter* emitter)
  * @note Address: 0x803AFC80
  * @note Size: 0xF8
  */
-#pragma dont_inline on
 void makeMtxZAxisAlongPosPos(Mtx mtx, Vector3f& p2, Vector3f& p3)
 {
-	Vector3f diff = p3 - p2;
-	diff.normalise();
-	// some cross product/outer product to generate Mtx
-	mtx[0][0] = diff.x;
-	mtx[0][1] = diff.y;
-	mtx[0][2] = diff.z;
-	mtx[0][3] = diff.x;
-	mtx[1][0] = diff.x;
-	mtx[1][1] = diff.x;
-	mtx[1][2] = diff.x;
-	mtx[1][3] = diff.x;
-	mtx[2][0] = diff.x;
-	mtx[2][1] = diff.x;
-	mtx[2][2] = diff.x;
-	mtx[2][3] = diff.x;
+	Vector3f zVec(p3.x - p2.x, p3.y - p2.y, p3.z - p2.z);
+	Vector3f midPt(p2.x + p3.x, p2.y + p3.y, p2.z + p3.z);
+	midPt *= 0.5f;
+
+	zVec.normalise();
+
+	Vector3f yAxis(0.0f, 1.0f, 0.0f);
+	Vector3f xVec = cross(yAxis, zVec);
+	Vector3f yVec = cross(zVec, xVec);
+
+	mtx[0][0] = xVec.x;
+	mtx[0][1] = yVec.x;
+	mtx[0][2] = zVec.x;
+	mtx[0][3] = midPt.x;
+
+	mtx[1][0] = xVec.y;
+	mtx[1][1] = yVec.y;
+	mtx[1][2] = zVec.y;
+	mtx[1][3] = midPt.y;
+
+	mtx[2][0] = xVec.z;
+	mtx[2][1] = yVec.z;
+	mtx[2][2] = zVec.z;
+	mtx[2][3] = midPt.z;
 
 	/*
 	lfs      f0, 4(r4)
@@ -671,7 +690,6 @@ lbl_803AFD10:
 	blr
 	*/
 }
-#pragma dont_inline reset
 
 /**
  * doExecuteEmitterOperation__Q23efx23TChasePosPosLocalZScaleFP14JPABaseEmitter
@@ -686,103 +704,10 @@ void TChasePosPosLocalZScale::doExecuteEmitterOperation(JPABaseEmitter* emitter)
 	Vector3f vec1 = *mPosPtrA;
 	Vector3f vec2 = *mPosPtrB;
 	makeMtxZAxisAlongPosPos(mtxZ, vec1, vec2);
-	f32 dist = _distanceBetween(vec2, vec1);
+	f32 dist = Vector3f::distance(vec2, vec1);
 	emitter->setGlobalRTMatrix(mtxZ);
-	emitter->mLocalScl.z = dist / _18;
-
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stw      r31, 0x5c(r1)
-	stw      r30, 0x58(r1)
-	mr       r30, r3
-	mr       r31, r4
-	lwz      r0, 0x10(r3)
-	cmplwi   r0, 0
-	bne      lbl_803AFDC4
-	lis      r3, lbl_80495880@ha
-	lis      r5, lbl_8049588C@ha
-	addi     r3, r3, lbl_80495880@l
-	li       r4, 0x350
-	addi     r5, r5, lbl_8049588C@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803AFDC4:
-	lwz      r0, 0x14(r30)
-	cmplwi   r0, 0
-	bne      lbl_803AFDEC
-	lis      r3, lbl_80495880@ha
-	lis      r5, lbl_8049588C@ha
-	addi     r3, r3, lbl_80495880@l
-	li       r4, 0x351
-	addi     r5, r5, lbl_8049588C@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803AFDEC:
-	lwz      r6, 0x10(r30)
-	addi     r3, r1, 0x20
-	addi     r4, r1, 0x14
-	addi     r5, r1, 8
-	lfs      f0, 0(r6)
-	stfs     f0, 0x14(r1)
-	lfs      f0, 4(r6)
-	stfs     f0, 0x18(r1)
-	lfs      f0, 8(r6)
-	stfs     f0, 0x1c(r1)
-	lwz      r6, 0x14(r30)
-	lfs      f0, 0(r6)
-	stfs     f0, 8(r1)
-	lfs      f0, 4(r6)
-	stfs     f0, 0xc(r1)
-	lfs      f0, 8(r6)
-	stfs     f0, 0x10(r1)
-	bl       "makeMtxZAxisAlongPosPos__3efxFPA4_fR10Vector3<f>R10Vector3<f>"
-	lfs      f1, 0xc(r1)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 0x10(r1)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 8(r1)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	lfs      f0, lbl_8051F614@sda21(r2)
-	fmuls    f2, f2, f2
-	fmadds   f1, f1, f1, f3
-	fadds    f31, f2, f1
-	fcmpo    cr0, f31, f0
-	ble      lbl_803AFE84
-	ble      lbl_803AFE88
-	frsqrte  f0, f31
-	fmuls    f31, f0, f31
-	b        lbl_803AFE88
-
-lbl_803AFE84:
-	fmr      f31, f0
-
-lbl_803AFE88:
-	addi     r3, r1, 0x20
-	addi     r4, r31, 0x68
-	addi     r5, r31, 0xa4
-	bl       "JPASetRMtxTVecfromMtx__FPA4_CfPA4_fPQ29JGeometry8TVec3<f>"
-	lfs      f0, 0x18(r30)
-	fdivs    f2, f31, f0
-	stfs     f2, 8(r31)
-	psq_l    f31, 104(r1), 0, qr0
-	lwz      r0, 0x74(r1)
-	lfd      f31, 0x60(r1)
-	lwz      r31, 0x5c(r1)
-	lwz      r30, 0x58(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
+	dist /= mZScale;
+	emitter->mLocalScl.set(emitter->mLocalScl.x, emitter->mLocalScl.y, dist);
 }
 
 /**
@@ -792,108 +717,17 @@ lbl_803AFE88:
  */
 void TChasePosPosLocalYScale::doExecuteEmitterOperation(JPABaseEmitter* emitter)
 {
-	P2ASSERTLINE(880, _10);
-	P2ASSERTLINE(881, _14);
+	f32 newY;
+	P2ASSERTLINE(880, mPosListStart);
+	P2ASSERTLINE(881, mPosListEnd);
 	Mtx mtxZ;
-	Vector3f vec1 = *_10;
-	Vector3f vec2 = *_14;
+	Vector3f vec1 = *mPosListStart;
+	Vector3f vec2 = *mPosListEnd;
 	makeMtxZAxisAlongPosPos(mtxZ, vec1, vec2);
-	f32 dist = _distanceBetween(vec2, vec1);
+	f32 dist = Vector3f::distance(vec2, vec1);
 	emitter->setGlobalRTMatrix(mtxZ);
-	emitter->mLocalScl.y = dist / _18;
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stw      r31, 0x5c(r1)
-	stw      r30, 0x58(r1)
-	mr       r30, r3
-	mr       r31, r4
-	lwz      r0, 0x10(r3)
-	cmplwi   r0, 0
-	bne      lbl_803AFF10
-	lis      r3, lbl_80495880@ha
-	lis      r5, lbl_8049588C@ha
-	addi     r3, r3, lbl_80495880@l
-	li       r4, 0x370
-	addi     r5, r5, lbl_8049588C@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803AFF10:
-	lwz      r0, 0x14(r30)
-	cmplwi   r0, 0
-	bne      lbl_803AFF38
-	lis      r3, lbl_80495880@ha
-	lis      r5, lbl_8049588C@ha
-	addi     r3, r3, lbl_80495880@l
-	li       r4, 0x371
-	addi     r5, r5, lbl_8049588C@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803AFF38:
-	lwz      r6, 0x10(r30)
-	addi     r3, r1, 0x20
-	addi     r4, r1, 0x14
-	addi     r5, r1, 8
-	lfs      f0, 0(r6)
-	stfs     f0, 0x14(r1)
-	lfs      f0, 4(r6)
-	stfs     f0, 0x18(r1)
-	lfs      f0, 8(r6)
-	stfs     f0, 0x1c(r1)
-	lwz      r6, 0x14(r30)
-	lfs      f0, 0(r6)
-	stfs     f0, 8(r1)
-	lfs      f0, 4(r6)
-	stfs     f0, 0xc(r1)
-	lfs      f0, 8(r6)
-	stfs     f0, 0x10(r1)
-	bl       "makeMtxZAxisAlongPosPos__3efxFPA4_fR10Vector3<f>R10Vector3<f>"
-	lfs      f1, 0xc(r1)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 0x10(r1)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 8(r1)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	lfs      f0, lbl_8051F614@sda21(r2)
-	fmuls    f2, f2, f2
-	fmadds   f1, f1, f1, f3
-	fadds    f31, f2, f1
-	fcmpo    cr0, f31, f0
-	ble      lbl_803AFFD0
-	ble      lbl_803AFFD4
-	frsqrte  f0, f31
-	fmuls    f31, f0, f31
-	b        lbl_803AFFD4
-
-lbl_803AFFD0:
-	fmr      f31, f0
-
-lbl_803AFFD4:
-	addi     r3, r1, 0x20
-	addi     r4, r31, 0x68
-	addi     r5, r31, 0xa4
-	bl       "JPASetRMtxTVecfromMtx__FPA4_CfPA4_fPQ29JGeometry8TVec3<f>"
-	lfs      f0, 0x18(r30)
-	fdivs    f2, f31, f0
-	stfs     f2, 4(r31)
-	psq_l    f31, 104(r1), 0, qr0
-	lwz      r0, 0x74(r1)
-	lfd      f31, 0x60(r1)
-	lwz      r31, 0x5c(r1)
-	lwz      r30, 0x58(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
+	dist /= mYScale;
+	emitter->mLocalScl.set(emitter->mLocalScl.x, dist, emitter->mLocalScl.z);
 }
 
 /**
@@ -1347,17 +1181,17 @@ void TChasePosYRot3::setYRot(f32* rotation)
  * @note Address: N/A
  * @note Size: 0xB4
  */
-TChasePosPosLocalYScale2::TChasePosPosLocalYScale2(Vector3f* p1, Vector3f* p2, f32 p3, u16 effectID1, u16 effectID2)
+TChasePosPosLocalYScale2::TChasePosPosLocalYScale2(Vector3f* p1, Vector3f* p2, f32 scale, u16 effectID1, u16 effectID2)
 {
 	// UNUSED FUNCTION
-	mItems[0]._10       = p1;
-	mItems[0]._14       = p2;
-	mItems[0]._18       = p3;
-	mItems[0].mEffectID = effectID1;
-	mItems[1]._10       = p1;
-	mItems[1]._14       = p2;
-	mItems[1]._18       = p3;
-	mItems[1].mEffectID = effectID2;
+	mItems[0].mPosListStart = p1;
+	mItems[0].mPosListEnd   = p2;
+	mItems[0].mYScale       = scale;
+	mItems[0].mEffectID     = effectID1;
+	mItems[1].mPosListStart = p1;
+	mItems[1].mPosListEnd   = p2;
+	mItems[1].mYScale       = scale;
+	mItems[1].mEffectID     = effectID2;
 }
 
 /**
@@ -1369,10 +1203,10 @@ TChasePosPosLocalYScale2::TChasePosPosLocalYScale2(Vector3f* p1, Vector3f* p2, f
 void TChasePosPosLocalYScale2::setPosptr(Vector3f* p1, Vector3f* p2)
 {
 	// UNUSED FUNCTION
-	mItems[0]._10 = p1;
-	mItems[0]._14 = p2;
-	mItems[1]._10 = p1;
-	mItems[1]._14 = p2;
+	mItems[0].mPosListStart = p1;
+	mItems[0].mPosListEnd   = p2;
+	mItems[1].mPosListStart = p1;
+	mItems[1].mPosListEnd   = p2;
 }
 
 /**
@@ -1380,20 +1214,20 @@ void TChasePosPosLocalYScale2::setPosptr(Vector3f* p1, Vector3f* p2)
  * @note Address: 0x803B0BCC
  * @note Size: 0xC8
  */
-TChasePosPosLocalYScale3::TChasePosPosLocalYScale3(Vector3f* p1, Vector3f* p2, f32 p3, u16 effectID1, u16 effectID2, u16 effectID3)
+TChasePosPosLocalYScale3::TChasePosPosLocalYScale3(Vector3f* p1, Vector3f* p2, f32 scale, u16 effectID1, u16 effectID2, u16 effectID3)
 {
-	mItems[0]._10       = p1;
-	mItems[0]._14       = p2;
-	mItems[0]._18       = p3;
-	mItems[0].mEffectID = effectID1;
-	mItems[1]._10       = p1;
-	mItems[1]._14       = p2;
-	mItems[1]._18       = p3;
-	mItems[1].mEffectID = effectID2;
-	mItems[2]._10       = p1;
-	mItems[2]._14       = p2;
-	mItems[2]._18       = p3;
-	mItems[2].mEffectID = effectID3;
+	mItems[0].mPosListStart = p1;
+	mItems[0].mPosListEnd   = p2;
+	mItems[0].mYScale       = scale;
+	mItems[0].mEffectID     = effectID1;
+	mItems[1].mPosListStart = p1;
+	mItems[1].mPosListEnd   = p2;
+	mItems[1].mYScale       = scale;
+	mItems[1].mEffectID     = effectID2;
+	mItems[2].mPosListStart = p1;
+	mItems[2].mPosListEnd   = p2;
+	mItems[2].mYScale       = scale;
+	mItems[2].mEffectID     = effectID3;
 }
 
 /**
@@ -1403,12 +1237,12 @@ TChasePosPosLocalYScale3::TChasePosPosLocalYScale3(Vector3f* p1, Vector3f* p2, f
  */
 void TChasePosPosLocalYScale3::setPosptr(Vector3f* p1, Vector3f* p2)
 {
-	mItems[0]._10 = p1;
-	mItems[0]._14 = p2;
-	mItems[1]._10 = p1;
-	mItems[1]._14 = p2;
-	mItems[2]._10 = p1;
-	mItems[2]._14 = p2;
+	mItems[0].mPosListStart = p1;
+	mItems[0].mPosListEnd   = p2;
+	mItems[1].mPosListStart = p1;
+	mItems[1].mPosListEnd   = p2;
+	mItems[2].mPosListStart = p1;
+	mItems[2].mPosListEnd   = p2;
 }
 
 /**
@@ -1417,16 +1251,16 @@ void TChasePosPosLocalYScale3::setPosptr(Vector3f* p1, Vector3f* p2)
  * @note Address: N/A
  * @note Size: 0xB4
  */
-TChasePosPosLocalZScale2::TChasePosPosLocalZScale2(Vector3f* p1, Vector3f* p2, f32 p3, u16 effectID1, u16 effectID2)
+TChasePosPosLocalZScale2::TChasePosPosLocalZScale2(Vector3f* p1, Vector3f* p2, f32 scale, u16 effectID1, u16 effectID2)
 {
 	// UNUSED FUNCTION
 	mItems[0].mPosPtrA  = p1;
 	mItems[0].mPosPtrB  = p2;
-	mItems[0]._18       = p3;
+	mItems[0].mZScale   = scale;
 	mItems[0].mEffectID = effectID1;
 	mItems[1].mPosPtrA  = p1;
 	mItems[1].mPosPtrB  = p2;
-	mItems[1]._18       = p3;
+	mItems[1].mZScale   = scale;
 	mItems[1].mEffectID = effectID2;
 }
 
@@ -1449,19 +1283,19 @@ void TChasePosPosLocalZScale2::setPosptr(Vector3f* p1, Vector3f* p2)
  * @note Address: 0x803B0D08
  * @note Size: 0xC8
  */
-TChasePosPosLocalZScale3::TChasePosPosLocalZScale3(Vector3f* p1, Vector3f* p2, f32 p3, u16 effectID1, u16 effectID2, u16 effectID3)
+TChasePosPosLocalZScale3::TChasePosPosLocalZScale3(Vector3f* p1, Vector3f* p2, f32 scale, u16 effectID1, u16 effectID2, u16 effectID3)
 {
 	mItems[0].mPosPtrA  = p1;
 	mItems[0].mPosPtrB  = p2;
-	mItems[0]._18       = p3;
+	mItems[0].mZScale   = scale;
 	mItems[0].mEffectID = effectID1;
 	mItems[1].mPosPtrA  = p1;
 	mItems[1].mPosPtrB  = p2;
-	mItems[1]._18       = p3;
+	mItems[1].mZScale   = scale;
 	mItems[1].mEffectID = effectID2;
 	mItems[2].mPosPtrA  = p1;
 	mItems[2].mPosPtrB  = p2;
-	mItems[2]._18       = p3;
+	mItems[2].mZScale   = scale;
 	mItems[2].mEffectID = effectID3;
 }
 
@@ -1475,6 +1309,183 @@ void TChasePosPosLocalZScale3::setPosptr(Vector3f* p1, Vector3f* p2)
 	for (int i = 0; i < 3; i++) {
 		mItems[i].mPosPtrA = p1;
 		mItems[i].mPosPtrB = p2;
+	}
+}
+
+///////// TSYNCGROUP DEFINITIONS /////////
+// N = 2
+template <typename T>
+bool TSyncGroup2<T>::create(Arg* arg)
+{
+	for (u32 i = 0; i < 2; i++) {
+		if (!mItems[i].create(arg)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <typename T>
+void TSyncGroup2<T>::fade()
+{
+	for (u32 i = 0; i < 2; i++) {
+		mItems[i].fade();
+	}
+}
+
+template <typename T>
+void TSyncGroup2<T>::forceKill()
+{
+	for (u32 i = 0; i < 2; i++) {
+		mItems[i].forceKill();
+	}
+}
+
+template <typename T>
+void TSyncGroup2<T>::startDemoDrawOff()
+{
+	for (u32 i = 0; i < 2; i++) {
+		mItems[i].startDemoDrawOff();
+	}
+}
+
+template <typename T>
+void TSyncGroup2<T>::endDemoDrawOn()
+{
+	for (u32 i = 0; i < 2; i++) {
+		mItems[i].endDemoDrawOn();
+	}
+}
+
+// N = 3
+template <typename T>
+bool TSyncGroup3<T>::create(Arg* arg)
+{
+	for (u32 i = 0; i < 3; i++) {
+		if (!mItems[i].create(arg)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <typename T>
+void TSyncGroup3<T>::fade()
+{
+	for (u32 i = 0; i < 3; i++) {
+		mItems[i].fade();
+	}
+}
+
+template <typename T>
+void TSyncGroup3<T>::forceKill()
+{
+	for (u32 i = 0; i < 3; i++) {
+		mItems[i].forceKill();
+	}
+}
+
+template <typename T>
+void TSyncGroup3<T>::startDemoDrawOff()
+{
+	for (u32 i = 0; i < 3; i++) {
+		mItems[i].startDemoDrawOff();
+	}
+}
+
+template <typename T>
+void TSyncGroup3<T>::endDemoDrawOn()
+{
+	for (u32 i = 0; i < 3; i++) {
+		mItems[i].endDemoDrawOn();
+	}
+}
+
+// N = 4
+template <typename T>
+bool TSyncGroup4<T>::create(Arg* arg)
+{
+	for (u32 i = 0; i < 4; i++) {
+		if (!mItems[i].create(arg)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <typename T>
+void TSyncGroup4<T>::fade()
+{
+	for (u32 i = 0; i < 4; i++) {
+		mItems[i].fade();
+	}
+}
+
+template <typename T>
+void TSyncGroup4<T>::forceKill()
+{
+	for (u32 i = 0; i < 4; i++) {
+		mItems[i].forceKill();
+	}
+}
+
+template <typename T>
+void TSyncGroup4<T>::startDemoDrawOff()
+{
+	for (u32 i = 0; i < 4; i++) {
+		mItems[i].startDemoDrawOff();
+	}
+}
+
+template <typename T>
+void TSyncGroup4<T>::endDemoDrawOn()
+{
+	for (u32 i = 0; i < 4; i++) {
+		mItems[i].endDemoDrawOn();
+	}
+}
+
+// N = 6
+template <typename T>
+bool TSyncGroup6<T>::create(Arg* arg)
+{
+	for (u32 i = 0; i < 6; i++) {
+		if (!mItems[i].create(arg)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <typename T>
+void TSyncGroup6<T>::fade()
+{
+	for (u32 i = 0; i < 6; i++) {
+		mItems[i].fade();
+	}
+}
+
+template <typename T>
+void TSyncGroup6<T>::forceKill()
+{
+	for (u32 i = 0; i < 6; i++) {
+		mItems[i].forceKill();
+	}
+}
+
+template <typename T>
+void TSyncGroup6<T>::startDemoDrawOff()
+{
+	for (u32 i = 0; i < 6; i++) {
+		mItems[i].startDemoDrawOff();
+	}
+}
+
+template <typename T>
+void TSyncGroup6<T>::endDemoDrawOn()
+{
+	for (u32 i = 0; i < 6; i++) {
+		mItems[i].endDemoDrawOn();
 	}
 }
 

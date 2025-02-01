@@ -16,7 +16,7 @@ static f32 sLODRadius[4] = { 45.0f, 60.0f, 103.0f, 133.0f }; // one, five, ten, 
 } // namespace Pelplant
 } // namespace Game
 
-const char* unused[] = { __FILE__, "/enemy/data/pelplant", "/enemy/parm/pelplant" };
+static const char* unused[] = { __FILE__, "/enemy/data/pelplant", "/enemy/parm/pelplant" };
 
 static f32 negSin(f32 x) { return -JMath::sincosTable_.mTable[((int)(x *= -325.9493f) & 0x7ffU)].first; }
 static f32 posSin(f32 x) { return JMath::sincosTable_.mTable[((int)(x *= 325.9493f) & 0x7ffU)].first; }
@@ -231,11 +231,11 @@ void Obj::getShadowParam(ShadowParam& param)
 	param.mPosition = mPosition;
 	param.mPosition.y += 2.0f;
 
-	if (mBounceTriangle) {
-		Plane* plane                      = &mBounceTriangle->mTrianglePlane;
-		param.mBoundingSphere.mPosition.x = plane->a;
-		param.mBoundingSphere.mPosition.y = plane->b;
-		param.mBoundingSphere.mPosition.z = plane->c;
+	if (mFloorTriangle) {
+		Plane* plane                      = &mFloorTriangle->mTrianglePlane;
+		param.mBoundingSphere.mPosition.x = plane->mNormal.x;
+		param.mBoundingSphere.mPosition.y = plane->mNormal.y;
+		param.mBoundingSphere.mPosition.z = plane->mNormal.z;
 	} else {
 		param.mBoundingSphere.mPosition = Vector3f(0.0f, 1.0f, 0.0f);
 	}
@@ -264,9 +264,7 @@ void Obj::doAnimationUpdateAnimator()
 	static_cast<EnemyBlendAnimatorBase*>(mAnimator)->animate(&func, EnemyAnimatorBase::defaultAnimSpeed * sys->mDeltaTime,
 	                                                         EnemyAnimatorBase::defaultAnimSpeed * sys->mDeltaTime,
 	                                                         EnemyAnimatorBase::defaultAnimSpeed * sys->mDeltaTime);
-	SysShape::Model* model = mModel;
-	model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc
-	    = (J3DMtxCalcAnmBase*)(static_cast<EnemyBlendAnimatorBase*>(mAnimator)->mAnimator.getCalc());
+	static_cast<EnemyBlendAnimatorBase*>(mAnimator)->mAnimator.setModelCalc(mModel, 0);
 }
 
 /**
@@ -482,8 +480,7 @@ bool Obj::damageCallBack(Creature* source, f32 damage, CollPart* part)
  */
 bool Obj::farmCallBack(Creature* c, f32 power)
 {
-	// If power > 0, round up + 1; else we round down -1
-	mFarmPow = (s8)(power >= 0.0f ? power + 0.5f : power - 0.5f);
+	mFarmPow = ROUND_F32_TO_U8(power);
 
 	if (mFarmPow < 0) {
 		resetPelFlag(PELPLANTFLAG_Growing);
@@ -586,7 +583,7 @@ bool Obj::neckJointCallBack(J3DJoint* joint, int p2)
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "ペレット草マネージャ"; // pellet plant manager
+	mName = "繝壹Ξ繝�繝郁拷繝槭ロ繝ｼ繧ｸ繝｣"; // pellet plant manager
 }
 
 /**
@@ -640,8 +637,8 @@ void Obj::doGetLifeGaugeParam(LifeGaugeParam& param)
 {
 	mRootJointMtx->getTranslation(param.mPosition);
 	param.mPosition.y += 60.0f;
-	param.mCurHealthPercentage = mHealth / mMaxHealth;
-	param.mRadius              = 10.0f;
+	param.mCurrHealthRatio = mHealth / mMaxHealth;
+	param.mRadius          = 10.0f;
 }
 
 } // namespace Pelplant

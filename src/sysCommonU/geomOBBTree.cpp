@@ -1003,11 +1003,11 @@ void OBB::determineDivPlane(Sys::VertexTable& vertTable, Sys::TriangleTable& tri
 		int numAbove    = 0;
 		int numBelow    = 0;
 
-		Vector3f* currAxis = &mAxes[i];
-		currPlane.a        = currAxis->x;
-		currPlane.b        = currAxis->y;
-		currPlane.c        = currAxis->z;
-		currPlane.d        = dot(*currAxis, mPosition);
+		Vector3f* currAxis  = &mAxes[i];
+		currPlane.mNormal.x = currAxis->x;
+		currPlane.mNormal.y = currAxis->y;
+		currPlane.mNormal.z = currAxis->z;
+		currPlane.mOffset   = currAxis->dot(mPosition);
 
 		// loop through all triangles
 		for (int j = 0; j < mTriIndexList.mCount; j++) {
@@ -1038,10 +1038,8 @@ void OBB::determineDivPlane(Sys::VertexTable& vertTable, Sys::TriangleTable& tri
 
 	Vector3f correctAxis = mAxes[axisID];
 	// divPlane has normal = axis with min cuts, and goes through center/position of box
-	mDivPlane.a = correctAxis.x;
-	mDivPlane.b = correctAxis.y;
-	mDivPlane.c = correctAxis.z;
-	mDivPlane.d = dot(correctAxis, mPosition);
+	mDivPlane.mNormal = correctAxis;
+	mDivPlane.mOffset = correctAxis.dot(mPosition);
 	/*
 	stwu     r1, -0x80(r1)
 	mflr     r0
@@ -1591,12 +1589,13 @@ void OBB::getCurrTri(Game::CurrTriInfo& info)
 	}
 
 	f32 dist;
-	if (mDivPlane.b == 0.0f) {
+	if (mDivPlane.mNormal.y == 0.0f) {
 		dist = mDivPlane.calcDist(info.mPosition);
 	} else {
 		Vector3f vec = info.mPosition;
-		vec.y        = (mDivPlane.d - (mDivPlane.a * info.mPosition.x) - (mDivPlane.c * info.mPosition.z)) / mDivPlane.b;
-		dist         = mDivPlane.calcDist(vec);
+		vec.y        = (mDivPlane.mOffset - (mDivPlane.mNormal.x * info.mPosition.x) - (mDivPlane.mNormal.z * info.mPosition.z))
+		      / mDivPlane.mNormal.y;
+		dist = mDivPlane.calcDist(vec);
 	}
 
 	if (dist > 0.01f) {
@@ -1630,10 +1629,8 @@ void OBB::getCurrTriTriList(Game::CurrTriInfo& info)
 			if (info.mMaxY > position.y) {
 				info.mMaxY = position.y;
 
-				if (info.mUpdateOnNewMaxY) {
-					info.mNormalVec.x = currTri->mTrianglePlane.a;
-					info.mNormalVec.y = currTri->mTrianglePlane.b;
-					info.mNormalVec.z = currTri->mTrianglePlane.c;
+				if (info.mGetTopPolygonInfo) {
+					info.mNormalVec   = currTri->mTrianglePlane.mNormal;
 					info.mTriangle    = currTri;
 					info.mGetFullInfo = true;
 				}
@@ -1643,10 +1640,8 @@ void OBB::getCurrTriTriList(Game::CurrTriInfo& info)
 			if (info.mMinY < position.y) {
 				info.mMinY = position.y;
 
-				if (!info.mUpdateOnNewMaxY) {
-					info.mNormalVec.x = currTri->mTrianglePlane.a;
-					info.mNormalVec.y = currTri->mTrianglePlane.b;
-					info.mNormalVec.z = currTri->mTrianglePlane.c;
+				if (!info.mGetTopPolygonInfo) {
+					info.mNormalVec   = currTri->mTrianglePlane.mNormal;
 					info.mTriangle    = currTri;
 					info.mGetFullInfo = true;
 				}
@@ -2546,7 +2541,7 @@ bool OBB::findRayIntersectionTriList(Sys::RayIntersectInfo& rayInfo, Matrixf& tr
 			if (sqSep < rayInfo.mDistance) {
 				rayInfo.mDistance          = sqSep;
 				rayInfo.mIntersectPosition = transformMtx.mtxMult(intersectVec);
-				rayInfo.mNormalY           = currTri->mTrianglePlane.b;
+				rayInfo.mNormalY           = currTri->mTrianglePlane.mNormal.y;
 			}
 		}
 	}
@@ -2570,184 +2565,55 @@ Sys::TriIndexList* OBB::findTriLists(Sys::Sphere& ball)
 	f32 ballDist = mDivPlane.calcDist(ball.mPosition);
 
 	if (ballDist > rad) {
+
 		if (mHalfA) {
 			TriIndexList* triListTemp = mHalfA->findTriLists(ball);
-			if (triListTemp) {
-				return triListTemp;
-			}
-		} else {
-			goto nullreturn;
+			return (triListTemp) ? triListTemp : nullptr;
 		}
-		return nullptr;
-	}
-	if (ballDist < -rad) {
+
+	} else if (ballDist < -rad) {
+
 		if (mHalfB) {
 			TriIndexList* triListTemp = mHalfB->findTriLists(ball);
-			if (triListTemp) {
-				return triListTemp;
-			}
-		} else {
-			goto nullreturn;
+			return (triListTemp) ? triListTemp : nullptr;
 		}
-		return nullptr;
-	}
 
-	if (mHalfA) {
-		TriIndexList* triListTemp1 = mHalfA->findTriLists(ball);
-		if (triListTemp1) {
-			triList = triListTemp1;
-		}
-	}
-
-	if (mHalfB) {
-		TriIndexList* triListTemp2 = mHalfB->findTriLists(ball);
-		if (triListTemp2) {
-			if (triList) {
-				triList->concat(triListTemp2);
-			} else {
-				triList = triListTemp2;
-			}
-		} else {
-			goto trireturn;
-		}
-		return triList;
 	} else {
-		goto trireturn;
+
+		if (mHalfA) {
+			TriIndexList* triListTemp1 = mHalfA->findTriLists(ball);
+			if (triListTemp1) {
+				triList = triListTemp1;
+			}
+		}
+
+		if (mHalfB) {
+			TriIndexList* triListTemp2 = mHalfB->findTriLists(ball);
+			if (triListTemp2) {
+				if (triList) {
+					triList->concat(triListTemp2);
+				} else {
+					triList = triListTemp2;
+				}
+				return triList;
+			}
+		}
+
+		return triList;
 	}
-	return triList;
 
-trireturn:
-	return triList;
-
+	// probably just a sign of an inline
+	goto nullreturn;
 nullreturn:
+
 	return nullptr;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	li       r31, 0
-	stw      r30, 0x18(r1)
-	mr       r30, r4
-	li       r4, 0
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	lwz      r3, 0xc0(r3)
-	cmplwi   r3, 0
-	bne      lbl_8041F384
-	lwz      r0, 0xc4(r29)
-	cmplwi   r0, 0
-	bne      lbl_8041F384
-	li       r4, 1
-
-lbl_8041F384:
-	clrlwi.  r0, r4, 0x18
-	beq      lbl_8041F3A8
-	li       r0, 0
-	addi     r3, r29, 0xd8
-	stw      r0, 0xe8(r29)
-	stw      r0, 0xe4(r29)
-	stw      r0, 0xe0(r29)
-	stw      r0, 0xdc(r29)
-	b        lbl_8041F49C
-
-lbl_8041F3A8:
-	lfs      f1, 4(r30)
-	lfs      f0, 0xcc(r29)
-	lfs      f2, 0(r30)
-	fmuls    f0, f1, f0
-	lfs      f1, 0xc8(r29)
-	lfs      f4, 8(r30)
-	lfs      f3, 0xd0(r29)
-	fmadds   f1, f2, f1, f0
-	lfs      f0, 0xd4(r29)
-	lfs      f2, 0xc(r30)
-	fmadds   f1, f4, f3, f1
-	fsubs    f1, f1, f0
-	fcmpo    cr0, f1, f2
-	ble      lbl_8041F404
-	cmplwi   r3, 0
-	beq      lbl_8041F498
-	mr       r4, r30
-	bl       findTriLists__Q23Sys3OBBFRQ23Sys6Sphere
-	cmplwi   r3, 0
-	beq      lbl_8041F3FC
-	b        lbl_8041F49C
-
-lbl_8041F3FC:
-	li       r3, 0
-	b        lbl_8041F49C
-
-lbl_8041F404:
-	fneg     f0, f2
-	fcmpo    cr0, f1, f0
-	bge      lbl_8041F438
-	lwz      r3, 0xc4(r29)
-	cmplwi   r3, 0
-	beq      lbl_8041F498
-	mr       r4, r30
-	bl       findTriLists__Q23Sys3OBBFRQ23Sys6Sphere
-	cmplwi   r3, 0
-	beq      lbl_8041F430
-	b        lbl_8041F49C
-
-lbl_8041F430:
-	li       r3, 0
-	b        lbl_8041F49C
-
-lbl_8041F438:
-	cmplwi   r3, 0
-	beq      lbl_8041F454
-	mr       r4, r30
-	bl       findTriLists__Q23Sys3OBBFRQ23Sys6Sphere
-	cmplwi   r3, 0
-	beq      lbl_8041F454
-	mr       r31, r3
-
-lbl_8041F454:
-	lwz      r3, 0xc4(r29)
-	cmplwi   r3, 0
-	beq      lbl_8041F490
-	mr       r4, r30
-	bl       findTriLists__Q23Sys3OBBFRQ23Sys6Sphere
-	or.      r4, r3, r3
-	beq      lbl_8041F490
-	cmplwi   r31, 0
-	beq      lbl_8041F484
-	mr       r3, r31
-	bl       concat__5CNodeFP5CNode
-	b        lbl_8041F488
-
-lbl_8041F484:
-	mr       r31, r4
-
-lbl_8041F488:
-	mr       r3, r31
-	b        lbl_8041F49C
-
-lbl_8041F490:
-	mr       r3, r31
-	b        lbl_8041F49C
-
-lbl_8041F498:
-	li       r3, 0
-
-lbl_8041F49C:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
  * @note Address: 0x8041F4B8
  * @note Size: 0x2C
  */
-f32 OBBTree::getMinY(Vector3f& pos) { getOBB()->getMinY(pos, *mTriangleTable, -128000.0f); }
+f32 OBBTree::getMinY(Vector3f& pos) { getOBB()->getMinY(pos, *mTriangleTable, FLOAT_DIST_MIN); }
 
 /**
  * @note Address: 0x8041F4E4
@@ -2762,13 +2628,13 @@ f32 OBB::getMinY(Vector3f& pos, Sys::TriangleTable& triTable, f32 inputMin)
 		return getMinYTriList(pos, triTable);
 	}
 
-	if (0.0f == mDivPlane.b) {
+	if (0.0f == mDivPlane.mNormal.y) {
 		divDist = mDivPlane.calcDist(pos);
 	} else {
 		Vector3f planeVec = pos;
-		planeVec.y        = -(mDivPlane.a * planeVec.x - mDivPlane.d);
-		planeVec.y        = -(mDivPlane.c * planeVec.z - planeVec.y);
-		planeVec.y        = planeVec.y / mDivPlane.b;
+		planeVec.y        = -(mDivPlane.mNormal.x * planeVec.x - mDivPlane.mOffset);
+		planeVec.y        = -(mDivPlane.mNormal.z * planeVec.z - planeVec.y);
+		planeVec.y        = planeVec.y / mDivPlane.mNormal.y;
 		divDist           = mDivPlane.calcDist(planeVec);
 	}
 
@@ -3352,7 +3218,7 @@ lbl_8041FB74:
  */
 f32 OBB::getMinYTriList(Vector3f& vec, Sys::TriangleTable& triTable)
 {
-	f32 min = -128000.0f;
+	f32 min = FLOAT_DIST_MIN;
 	for (int i = 0; i < mTriIndexList.mCount; i++) {
 		Triangle* currTri = triTable.getTriangle(mTriIndexList.mObjects[i]);
 		Vector3f testVec  = vec;

@@ -4,11 +4,12 @@
 #include "Dolphin/mtx.h"
 #include "Dolphin/vec.h"
 #include "JSystem/JStudio/stb.h"
-#include "JSystem/JStudio/fvb/fvb.h"
+#include "JSystem/JStudio/fvb.h"
+#include "JSystem/JStudio/TFactory.h"
 #include "types.h"
 
 namespace JStudio {
-struct TControl : stb::TControl {
+struct TControl : public stb::TControl {
 	struct TTransform_translation_rotation_scaling {
 		/** @fabricated */
 		Vec& getTranslation() { return mVecs[0]; }
@@ -36,6 +37,11 @@ struct TControl : stb::TControl {
 		Vec mPosition;
 	};
 
+	struct TTransform_position_direction {
+		Vec mPosition;  // _00
+		Vec mDirection; // _0C
+	};
+
 	TControl();
 
 	virtual ~TControl(); // _08
@@ -46,22 +52,86 @@ struct TControl : stb::TControl {
 	// unused/inlined:
 	void forward_value(u32);
 
-	inline void create(JStudio::stb::TFactory* factory, JStudio::fvb::TFactory* fvb)
+	void setFactory(TFactory* factory)
 	{
-		mFactory     = factory;
-		_60.pFactory = fvb;
+		stb::TFactory* stb_factory = factory;
+		fvb::TFactory* fvb_factory = factory == nullptr ? nullptr : &factory->mFvbFactory;
+		stb::TControl::setFactory(stb_factory);
+		mFvbControl.setFactory(fvb_factory);
 	}
 
-	f64 _58;           // _58
-	fvb::TControl _60; // _60 - JStudio::fvb::TControl?
-	u8 _74;            // _74
-	u8 _75;            // _75
-	Vec _78;           // _78
-	Vec _84;           // _84
-	f32 _90;           // _90
-	f32 _94;           // _94
-	Mtx _98;           // _98
-	Mtx _C8;           // _C8
+	fvb::TObject* fvb_getObject(const void* id, u32 length) { return mFvbControl.getObject(id, length); }
+
+	fvb::TObject* fvb_getObject_index(u32 index) { return mFvbControl.getObject_index(index); }
+
+	TFunctionValue* getFunctionValue(const void* id, u32 length)
+	{
+		fvb::TObject* obj = fvb_getObject(id, length);
+		if (obj == nullptr) {
+			return nullptr;
+		}
+		return &obj->referFunctionValue();
+	}
+
+	TFunctionValue* getFunctionValue_index(u32 index)
+	{
+		fvb::TObject* obj = fvb_getObject_index(index);
+		if (obj == nullptr) {
+			return nullptr;
+		}
+		return &obj->referFunctionValue();
+	}
+
+	inline f32 getOnGetRotY() const { return mTransformOnGet_RotY; }
+	inline f32 getOnSetRotY() const { return mTransformOnSet_RotY; }
+
+	f64 getSecondsPerFrame() const { return mSecondsPerFrame; }
+
+	bool transformOnSet_isEnabled() const { return mTransformOnSet; }
+	void transformOnSet_enable(bool param_0) { mTransformOnSet = param_0; }
+	bool transformOnGet_isEnabled() const { return mTransformOnGet; }
+	void transformOnGet_enable(bool param_0) { mTransformOnGet = param_0; }
+
+	f32 transformOnSet_getRotationY() const { return mTransformOnSet_RotY; }
+	CMtxP transformOnSet_getMatrix() const { return mTransformOnSet_Mtx; }
+	CMtxP transformOnGet_getMatrix() const { return mTransformOnGet_Mtx; }
+
+	const TTransform_position_direction* transformOnGet_transform_ifEnabled(const TTransform_position_direction& posDir,
+	                                                                        TTransform_position_direction* transformedPosDir) const
+	{
+		if (!transformOnGet_isEnabled()) {
+			return &posDir;
+		} else {
+			transformOnGet_transform(posDir, transformedPosDir);
+			return transformedPosDir;
+		}
+	}
+	void transformOnGet_transform(const TTransform_position_direction& posDir, TTransform_position_direction* transformedPosDir) const
+	{
+		transformOnGet_transformTranslation(posDir.mPosition, &transformedPosDir->mPosition);
+		transformOnGet_transformDirection(posDir.mDirection, &transformedPosDir->mDirection);
+	}
+	void transformOnGet_transformTranslation(const Vec& pos, Vec* transformedPos) const
+	{
+		PSMTXMultVec(transformOnGet_getMatrix(), &pos, transformedPos);
+	}
+	void transformOnGet_transformDirection(const Vec& dir, Vec* transformedDir) const
+	{
+		PSMTXMultVecSR(transformOnGet_getMatrix(), &dir, transformedDir);
+	}
+
+	// _00     = VTBL
+	// _00-_58 = stb::TControl
+	f64 mSecondsPerFrame;       // _58
+	fvb::TControl mFvbControl;  // _60 - JStudio::fvb::TControl?
+	bool mTransformOnSet;       // _74
+	bool mTransformOnGet;       // _75
+	Vec mTransformOnSet_Origin; // _78
+	Vec mTransformOnGet_Origin; // _84
+	f32 mTransformOnSet_RotY;   // _90
+	f32 mTransformOnGet_RotY;   // _94
+	Mtx mTransformOnSet_Mtx;    // _98
+	Mtx mTransformOnGet_Mtx;    // _C8
 };
 } // namespace JStudio
 

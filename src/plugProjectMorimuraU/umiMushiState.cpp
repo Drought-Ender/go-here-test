@@ -70,7 +70,7 @@ void StateWait::exec(EnemyBase* enemy)
 		OBJ(enemy)->mNextState = UMIMUSHI_Dead;
 	}
 
-	if (CG_PARMS(OBJ(enemy))->_A11 || (enemy->mCurAnim->mIsPlaying && enemy->mCurAnim->mType == KEYEVENT_END)) {
+	if (CG_PARMS(OBJ(enemy))->mIsAIAlwaysActiveOnWait || (enemy->mCurAnim->mIsPlaying && enemy->mCurAnim->mType == KEYEVENT_END)) {
 		if (OBJ(enemy)->mNextState < 0) {
 			if (EnemyFunc::isStartFlick(enemy, false)) {
 				transit(enemy, UMIMUSHI_Flick, nullptr);
@@ -386,7 +386,7 @@ void StateTurn::exec(EnemyBase* enemy)
 		} else {
 			if (nextState != UMIMUSHI_Find && nextState != UMIMUSHI_Flick) {
 				OBJ(enemy)->turnFunc();
-				if (CG_PARMS(OBJ(enemy))->_A12 && OBJ(enemy)->isChangeNavi()) {
+				if (CG_PARMS(OBJ(enemy))->mDoUseFindState && OBJ(enemy)->isChangeNavi()) {
 					OBJ(enemy)->mNextState = UMIMUSHI_Find;
 				}
 			}
@@ -429,11 +429,11 @@ void StateFlick::init(EnemyBase* enemy, StateArg* stateArg)
 
 	if (enemy->getEnemyTypeID() == EnemyTypeID::EnemyID_UmiMushi) {
 		Vector3f pos = enemy->getPosition();
-		cameraMgr->startVibration(9, pos, 2);
-		rumbleMgr->startRumble(13, pos, RUMBLEID_Both);
+		cameraMgr->startVibration(VIBTYPE_MidSlowShort, pos, CAMNAVI_Both);
+		rumbleMgr->startRumble(RUMBLETYPE_Fixed13, pos, RUMBLEID_Both);
 
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(enemy->mSoundObj); // get sound object
-		PSM::checkBoss(soundObj);                                                  // make sure we have sound object
+		PSM::assertIsBoss(soundObj);                                               // make sure we have sound object
 		if (soundObj) {                                                            // REALLY MAKE SURE WE HAVE SOUND OBJECT
 			soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Flick);
 		}
@@ -496,7 +496,7 @@ void StateAttack::init(EnemyBase* enemy, StateArg* stateArg)
 	if (enemy->getEnemyTypeID() == EnemyTypeID::EnemyID_UmiMushi) {
 
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(enemy->mSoundObj); // get sound object
-		PSM::checkBoss(soundObj);                                                  // make sure we have sound object
+		PSM::assertIsBoss(soundObj);                                               // make sure we have sound object
 		if (soundObj) {                                                            // REALLY MAKE SURE WE HAVE SOUND OBJECT
 			soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Attack);
 		}
@@ -529,12 +529,12 @@ void StateAttack::exec(EnemyBase* enemy)
 			OBJ(enemy)->attackEffect();
 			if (enemy->getEnemyTypeID() == EnemyTypeID::EnemyID_UmiMushi) {
 				Vector3f pos = enemy->getPosition();
-				rumbleMgr->startRumble(12, pos, RUMBLEID_Both);
+				rumbleMgr->startRumble(RUMBLETYPE_Fixed12, pos, RUMBLEID_Both);
 			}
 			break;
 
 		case KEYEVENT_5:
-			if (CG_PARMS(enemy)->_A13) {
+			if (CG_PARMS(enemy)->mCanEatNavis) {
 				Iterator<Navi> iter(naviMgr);
 				CI_LOOP(iter)
 				{

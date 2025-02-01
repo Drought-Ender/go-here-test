@@ -102,10 +102,10 @@ void StateBorn::init(EnemyBase* enemy, StateArg* stateArg)
  */
 void StateBorn::exec(EnemyBase* enemy)
 {
-	if (enemy->mBounceTriangle) {
+	if (enemy->mFloorTriangle) {
 
 		Vector3f vec = enemy->mTargetVelocity;
-		weightVecXZ(vec, 0.95f);
+		vec.scale2D(0.95f);
 		enemy->mTargetVelocity = vec;
 
 		enemy->finishMotion();
@@ -157,30 +157,18 @@ void StateMove::exec(EnemyBase* enemy)
 	if (creature) {
 
 		// Vector3f targetPos = creature->getPosition();
-		f32 angleDist = baby->turnToTarget(creature);
+		f32 angleDist = baby->turnToTarget(creature, CG_GENERALPARMS(baby).mTurnSpeed(), CG_GENERALPARMS(baby).mMaxTurnAngle());
 
-		f32 limit   = PI * (DEG2RAD * CG_GENERALPARMS(baby).mMaxAttackAngle());
-		f32 absDist = FABS(angleDist);
+		f32 limit = PI * (DEG2RAD * CG_GENERALPARMS(baby).mMaxAttackAngle());
 
-		if (absDist <= limit) {
-			f32 speed    = CG_GENERALPARMS(baby).mMoveSpeed.mValue;
-			f32 sintheta = (f32)sin(baby->getFaceDir());
-			f32 y        = baby->getTargetVelocity().y;
-			f32 costheta = (f32)cos(baby->getFaceDir());
-
-			baby->mTargetVelocity = Vector3f(speed * sintheta, y, speed * costheta);
-
+		if (FABS(angleDist) <= limit) {
+			baby->setTargetVelocity();
 		} else {
-			f32 speed    = CG_GENERALPARMS(baby).mMoveSpeed.mValue * 0.25f;
-			f32 sintheta = (f32)sin(baby->getFaceDir());
-			f32 y        = baby->getTargetVelocity().y;
-			f32 costheta = (f32)cos(baby->getFaceDir());
-
-			baby->mTargetVelocity = Vector3f(speed * sintheta, y, speed * costheta);
+			baby->setTargetVelocity(0.25f);
 		}
 
-		if (baby->isTargetAttackable(creature, angleDist, CG_GENERALPARMS(baby).mMaxAttackRange.mValue,
-		                             CG_GENERALPARMS(baby).mMaxAttackAngle.mValue)) {
+		if (baby->isTargetAttackable(creature, angleDist, CG_GENERALPARMS(baby).mMaxAttackRange(),
+		                             CG_GENERALPARMS(baby).mMaxAttackAngle())) {
 			transit(baby, BABY_Attack, nullptr);
 		}
 

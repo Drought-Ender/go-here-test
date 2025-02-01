@@ -179,15 +179,15 @@ bool CellIterator::satisfy()
 
 	if (!mArg.mOptimise) {
 		if (!mArg.mUseCustomRadius) {
-			f32 radius = mArg.mSphere.mRadius + boundingSphere.mRadius;
-			radius *= radius;
-			if (sqrDistanceXZ(objPos, mArg.mSphere.mPosition) > radius) {
+			objPos = objPos - mArg.mSphere.mPosition;
+
+			if (isWithinSphere(objPos, mArg.mSphere.mRadius + boundingSphere.mRadius)) {
 				return false;
 			}
 		} else {
-			f32 radius = mArg.mSphere.mRadius + boundingSphere.mRadius;
-			radius *= radius;
-			if (sqrDistanceXZ(objPos, mArg.mSphere.mPosition) > radius) {
+			objPos -= mArg.mSphere.mPosition;
+
+			if (isWithinSphere(objPos, mArg.mSphere.mRadius + boundingSphere.mRadius)) {
 				return false;
 			}
 		}
@@ -195,121 +195,6 @@ bool CellIterator::satisfy()
 
 	mCurrLeg->mObject->mPassID = mPassID;
 	return true;
-	/*
-	stwu     r1, -0x50(r1)
-	mflr     r0
-	stw      r0, 0x54(r1)
-	stfd     f31, 0x40(r1)
-	psq_st   f31, 72(r1), 0, qr0
-	stfd     f30, 0x30(r1)
-	psq_st   f30, 56(r1), 0, qr0
-	stw      r31, 0x2c(r1)
-	stw      r30, 0x28(r1)
-	mr       r30, r3
-	lwz      r3, 0(r3)
-	cmplwi   r3, 0
-	bne      lbl_8022E7B4
-	li       r3, 0
-	b        lbl_8022E8DC
-
-lbl_8022E7B4:
-	beq      lbl_8022E7CC
-	lwz      r4, 0xc(r3)
-	lwz      r0, 0x20(r30)
-	lwz      r3, 0xa4(r4)
-	cmplw    r3, r0
-	bne      lbl_8022E7D4
-
-lbl_8022E7CC:
-	li       r3, 0
-	b        lbl_8022E8DC
-
-lbl_8022E7D4:
-	lwz      r3, 0x34(r30)
-	cmplwi   r3, 0
-	beq      lbl_8022E800
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_8022E800
-	li       r3, 0
-	b        lbl_8022E8DC
-
-lbl_8022E800:
-	lwz      r4, 0(r30)
-	addi     r3, r1, 8
-	lwz      r31, 0xc(r4)
-	mr       r4, r31
-	lwz      r12, 0(r31)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r31
-	addi     r4, r1, 0x14
-	lwz      r12, 0(r31)
-	lfs      f31, 8(r1)
-	lwz      r12, 0x10(r12)
-	lfs      f30, 0x10(r1)
-	mtctr    r12
-	bctrl
-	lbz      r0, 0x40(r30)
-	cmplwi   r0, 0
-	bne      lbl_8022E8C8
-	lwz      r0, 0x38(r30)
-	cmpwi    r0, 0
-	bne      lbl_8022E890
-	lfs      f0, 0x2c(r30)
-	lfs      f2, 0x24(r30)
-	fsubs    f3, f30, f0
-	lfs      f1, 0x30(r30)
-	lfs      f0, 0x20(r1)
-	fsubs    f2, f31, f2
-	fadds    f1, f1, f0
-	fmuls    f0, f3, f3
-	fmuls    f1, f1, f1
-	fmadds   f0, f2, f2, f0
-	fcmpo    cr0, f0, f1
-	ble      lbl_8022E8C8
-	li       r3, 0
-	b        lbl_8022E8DC
-
-lbl_8022E890:
-	lfs      f0, 0x2c(r30)
-	lfs      f2, 0x24(r30)
-	fsubs    f30, f30, f0
-	lfs      f1, 0x30(r30)
-	lfs      f0, 0x20(r1)
-	fsubs    f31, f31, f2
-	fadds    f1, f1, f0
-	fmuls    f0, f30, f30
-	fmuls    f1, f1, f1
-	fmadds   f0, f31, f31, f0
-	fcmpo    cr0, f0, f1
-	ble      lbl_8022E8C8
-	li       r3, 0
-	b        lbl_8022E8DC
-
-lbl_8022E8C8:
-	lwz      r4, 0(r30)
-	li       r3, 1
-	lwz      r0, 0x20(r30)
-	lwz      r4, 0xc(r4)
-	stw      r0, 0xa4(r4)
-
-lbl_8022E8DC:
-	psq_l    f31, 72(r1), 0, qr0
-	lfd      f31, 0x40(r1)
-	psq_l    f30, 56(r1), 0, qr0
-	lfd      f30, 0x30(r1)
-	lwz      r31, 0x2c(r1)
-	lwz      r0, 0x54(r1)
-	lwz      r30, 0x28(r1)
-	mtlr     r0
-	addi     r1, r1, 0x50
-	blr
-	*/
 }
 
 /**
@@ -318,20 +203,22 @@ lbl_8022E8DC:
  */
 void CellIterator::calcExtent()
 {
-	CellPyramid* mgr = mArg.mCellMgr;
-	f32 r            = mArg.mSphere.mRadius;
-	f32 z            = mArg.mSphere.mPosition.z;
-	f32 x            = mArg.mSphere.mPosition.x;
+	// Get the cell manager and sphere properties from mArg
+	CellPyramid* cellManager = mArg.mCellMgr;
+	Vector3f spherePosition  = mArg.mSphere.mPosition;
+	f32 sphereRadius         = mArg.mSphere.mRadius;
 
-	f32 a = mArg.mCellMgr->mBounds.y;
-	f32 b = mArg.mCellMgr->mBounds.x;
+	// Get the bounds from the cell manager
+	Vector2f bounds(cellManager->mBounds.x, cellManager->mBounds.y);
 
-	f32 norm = 1.0f / (mgr->mScale * mgr->mLayers[mCurrLayerIdx].mLayerSize);
+	// Calculate the normalization factor
+	f32 normalizationFactor = 1.0f / (cellManager->mScale * cellManager->getLayer(mCurrLayerIdx)->mLayerSize);
 
-	mMinX = (x - r - a) * norm;
-	mMinY = (z - r - b) * norm;
-	mMaxX = (x + r - a) * norm;
-	mMaxY = (z + r - b) * norm;
+	// Calculate the minimum and maximum x and y values
+	mMinX = (spherePosition.x - sphereRadius - bounds.x) * normalizationFactor;
+	mMinY = (spherePosition.z - sphereRadius - bounds.y) * normalizationFactor;
+	mMaxX = (spherePosition.x + sphereRadius - bounds.x) * normalizationFactor;
+	mMaxY = (spherePosition.z + sphereRadius - bounds.y) * normalizationFactor;
 
 	if (mMinX > mMaxX) {
 		JUT_PANICLINE(249, "x %f>%f", mMinX, mMaxX);

@@ -42,24 +42,24 @@ struct TChannel {
 	void replyFinishRequest();
 	void forceStop();
 	bool isFinish() const;
-	void setWaveInfo(const JASWaveInfo&, u32, u32);
-	void setOscInfo(u32);
+	void setWaveInfo(const JASWaveInfo& info, u32 dataOffset, u32 blockCount);
+	void setOscInfo(u32 bytesPerBlock);
 	void initAutoMixer();
-	void setAutoMixer(u16, u8, u8, u8, u8);
-	void setPitch(u16);
-	void setMixerInitDelayMax(u8);
-	void setMixerInitVolume(u8, s16);
-	void setMixerInitDelaySamples(u8, u8);
-	void setMixerDelaySamples(u8, u8);
-	void setMixerVolume(u8, s16);
-	void setPauseFlag(u8);
+	void setAutoMixer(u16 level, u8, u8, u8, u8);
+	void setPitch(u16 pitch);
+	void setMixerInitDelayMax(u8 mixerInitDelayMax);
+	void setMixerInitVolume(u8 index, s16 volume);
+	void setMixerInitDelaySamples(u8 index, u8 samples);
+	void setMixerDelaySamples(u8 index, u8 samples);
+	void setMixerVolume(u8 index, s16 volume);
+	void setPauseFlag(u8 pauseFlag);
 	void flush();
 	void initFilter();
-	void setFilterMode(u16);
-	void setIIRFilterParam(s16*);
-	void setFIR8FilterParam(s16*);
-	void setDistFilter(s16);
-	void setBusConnect(u8, u8);
+	void setFilterMode(u16 filterMode);
+	void setIIRFilterParam(s16* params);
+	void setFIR8FilterParam(s16* params);
+	void setDistFilter(s16 distFilter);
+	void setBusConnect(u8 index, u8 connectType);
 
 	// unused/inlined:
 	bool isActive() const;
@@ -69,50 +69,52 @@ struct TChannel {
 	void updateAMPan(u8, u8);
 	void updateAMFX(u8);
 
-	u16 mIsActive;           // _00
-	u16 mIsFinished;         // _02
-	s16 mPitch;              // _04
-	u16 _06;                 // _06
-	u16 _08;                 // _08
-	u16 _0A;                 // _0A
-	u16 mPauseFlag;          // _0C
-	u16 mMixerInitDelayMax;  // _0E
-	TMixer mMixer[4];        // _10
-	u8 _30[0x20];            // _30
-	u16 _50;                 // _50
-	u16 _52;                 // _52
-	u16 mCurrentMixerValue;  // _54
-	u16 mMixerLevel;         // _56
-	u16 mIsMixerInitialized; // _58
-	u16 _5A;                 // _5A
-	u8 _5C[4];               // _5C
-	u16 _60;                 // _60
-	u16 _62;                 // _62
-	u16 mSamplesPerBlock;    // _64
-	u16 _66;                 // _66
-	u32 mBlockCount;         // _68
-	u8 _6C[0xC];             // _6C
-	s16 _78[4];              // _78
-	s16 _80[20];             // _80
-	s16 _A8[4];              // _A8
-	u16 _B0[0x10];           // _B0
-	u8 _D0[0x30];            // _D0
-	u16 mBytesPerBlock;      // _100
-	u16 _102;                // _102
-	s16 _104;                // _104
-	s16 _106;                // _106
-	u16 mFilterMode;         // _108
-	u16 mForcedStop;         // _10A
-	u32 _10C;                // _10C
-	u32 _110;                // _110
-	u32 _114;                // _114
-	u32 mDataOffset;         // _118
-	u32 _11C;                // _11C
-	s16 mFir8FilterParam[8]; // _120
-	u8 _130[0x18];           // _130
-	s16 mIirFilterParam[4];  // _148
-	s16 mDistFilter;         // _150
-	u8 _152[0x2E];           // _152
+	u16 mIsActive;            // _00
+	u16 mIsFinished;          // _02
+	s16 mPitch;               // _04
+	u16 _06;                  // _06
+	u16 mIsPlaying;           // _08
+	u16 _0A;                  // _0A
+	u16 mPauseFlag;           // _0C
+	u16 mMixerInitDelayMax;   // _0E
+	TMixer mMixer[4];         // _10
+	u8 _30[0x20];             // _30
+	u16 mVolumeAndPan;        // _50
+	u16 mFxMixAndDolby;       // _52
+	u16 mCurrentMixerValue;   // _54
+	u16 mMixerLevel;          // _56
+	u16 mIsMixerInitialized;  // _58
+	u16 _5A;                  // _5A
+	u8 _5C[4];                // _5C
+	u16 _60;                  // _60
+	u16 _62;                  // _62
+	u16 mSamplesPerBlock;     // _64
+	u16 _66;                  // _66
+	u32 mBlockCount;          // _68
+	u8 _6C[0x4];              // _6C
+	u32 mSampleOffset;        // _70
+	u32 mCurrentSampleOffset; // _74
+	s16 _78[4];               // _78
+	s16 _80[20];              // _80
+	s16 _A8[4];               // _A8
+	u16 _B0[0x10];            // _B0
+	u8 _D0[0x30];             // _D0
+	u16 mBytesPerBlock;       // _100
+	u16 mLoopOffset;          // _102
+	s16 mLast;                // _104
+	s16 mPenult;              // _106
+	u16 mFilterMode;          // _108
+	u16 mForcedStop;          // _10A
+	u32 _10C;                 // _10C
+	u32 mLoopStartOffset;     // _110
+	u32 mNextSampleOffset;    // _114
+	u32 mDataOffset;          // _118
+	u32 mSampleCount;         // _11C
+	s16 mFir8FilterParam[8];  // _120
+	u8 _130[0x18];            // _130
+	s16 mIirFilterParam[4];   // _148
+	s16 mDistFilter;          // _150
+	u8 _152[0x2E];            // _152
 };
 
 struct FxlineConfig_ {
@@ -176,12 +178,12 @@ struct JASDSPChannel {
 	void getNumBreak();
 
 	s32 _00;
-	s16 _04;
-	u32 _08;
+	s16 mPriority;
+	u32 mFlags; // some kind of bitflag?
 	u32 _0C;
-	Callback _10;
-	void* _14;
-	JASDsp::TChannel* _18;
+	Callback mCallback;
+	void* mCallbackArgs;
+	JASDsp::TChannel* mChannel;
 
 	static JASDSPChannel* sDspChannels;
 };

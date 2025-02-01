@@ -86,14 +86,14 @@ struct Obj : public EnemyBase {
 	// _00 		= VTBL
 	// _00-_2BC	= EnemyBase
 	FSM* mFsm;                 // _2BC
-	u8 _2C0;                   // _2C0
+	u8 mCanSearchBridge;       // _2C0
 	bool mIsUnderground;       // _2C1
 	u16 mAppearCheck;          // _2C2
 	StateID mNextState;        // _2C4
 	MouthSlots mMouthSlots;    // _2C8
 	ItemBridge::Item* mBridge; // _2D0
-	f32 _2CC;                  // _2D4
-	f32 _2D0;                  // _2D8
+	f32 mBridgeGoalRandOffsX;  // _2D4
+	f32 mBridgeTargetMaxWidth; // _2D8
 	                           // _2DC = PelletView
 };
 
@@ -118,8 +118,8 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mPoisonDamage(this, 'fp01', "白ピクミン", 300.0f, 0.0f, 10000.0f) // 'white pikmin'
-		    , mBridgeDamage(this, 'fp02', "橋食いパワー", 50.0f, 0.0f, 100.0f)  // 'bridge eating power'
+		    , mPoisonDamage(this, 'fp01', "逋ｽ繝斐け繝溘Φ", 300.0f, 0.0f, 10000.0f) // 'white pikmin'
+		    , mBridgeDamage(this, 'fp02', "讖矩｣溘＞繝代Ρ繝ｼ", 50.0f, 0.0f, 100.0f)  // 'bridge eating power'
 		{
 		}
 

@@ -441,8 +441,8 @@ void StateTurn::exec(EnemyBase* enemy)
 				enemy->finishMotion();
 				OBJ(enemy)->setAnimationSpeed(60.0f);
 			} else {
-				if (enemy->isTargetOutOfRange(enemy->mTargetCreature, angle, CG_GENERALPARMS(enemy).mPrivateRadius(),
-				                              CG_GENERALPARMS(enemy).mSightRadius(), CG_GENERALPARMS(enemy).mFov(), viewAngle)) {
+				if (enemy->isTargetWithinRange(enemy->mTargetCreature, angle, CG_GENERALPARMS(enemy).mPrivateRadius(),
+				                               CG_GENERALPARMS(enemy).mSightRadius(), CG_GENERALPARMS(enemy).mFov(), viewAngle)) {
 					mNextState = KOCHAPPY_TurnToHome;
 					enemy->finishMotion();
 				} else {
@@ -1029,9 +1029,9 @@ void StateWalk::exec(EnemyBase* enemy)
 				enemy->finishMotion();
 				enemy->mTargetVelocity = Vector3f(0.0f);
 				OBJ(enemy)->setAnimationSpeed(60.0f);
-			} else if (enemy->isTargetOutOfRange(enemy->mTargetCreature, angle, CG_GENERALPARMS(enemy).mPrivateRadius(),
-			                                     CG_GENERALPARMS(enemy).mSightRadius(), CG_GENERALPARMS(enemy).mFov(),
-			                                     CG_GENERALPARMS(enemy).mViewAngle())) {
+			} else if (enemy->isTargetWithinRange(enemy->mTargetCreature, angle, CG_GENERALPARMS(enemy).mPrivateRadius(),
+			                                      CG_GENERALPARMS(enemy).mSightRadius(), CG_GENERALPARMS(enemy).mFov(),
+			                                      CG_GENERALPARMS(enemy).mViewAngle())) {
 				mNextState = KOCHAPPY_TurnToHome;
 				enemy->finishMotion();
 				enemy->mTargetVelocity = Vector3f(0.0f);
@@ -2777,8 +2777,8 @@ StateDemo::StateDemo(int stateID)
 void StateDemo::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	enemy->kill(nullptr);
-	if (gameSystem->mSection->getTimerType() != 3 && !playData->isDemoFlag(DEMO_Unlock_Captain_Switch)) {
-		gameSystem->mSection->enableTimer(5.0f, 3);
+	if (gameSystem->mSection->getTimerType() != DEMOTIMER_Unlock_Switch_To_Louie && !playData->isDemoFlag(DEMO_Unlock_Captain_Switch)) {
+		gameSystem->mSection->enableTimer(5.0f, DEMOTIMER_Unlock_Switch_To_Louie);
 	}
 }
 

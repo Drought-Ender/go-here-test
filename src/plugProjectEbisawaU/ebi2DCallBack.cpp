@@ -56,7 +56,20 @@ void E2DCallBack_BlinkFontColor::do_update()
 		EUTColor_complement(mFonts[0].mWhite, mFonts[1].mWhite, weight0, weight1, &white);
 		EUTColor_complement(mFonts[0].mBlack, mFonts[1].mBlack, weight0, weight1, &black);
 
-		setPaneColors(0);
+		JUtility::TColor charColor;
+		charColor.set(color1);
+		JUtility::TColor gradColor;
+		gradColor.set(color2);
+		JUtility::TColor tbWhite;
+		tbWhite.set(white);
+		JUtility::TColor tbBlack;
+		tbBlack.set(black);
+
+		J2DTextBox* pane = static_cast<J2DTextBox*>(mPane);
+		pane->setCharColor(charColor);
+		pane->setGradColor(gradColor);
+		pane->setWhite(tbWhite);
+		pane->setBlack(tbBlack);
 	}
 	/*
 	stwu     r1, -0x90(r1)
@@ -293,8 +306,8 @@ void E2DCallBack_AnmBase::loadAnm(char* path, JKRArchive* archive, s32 frame, s3
 	mFrameCtrl.mFrame = (s16)frame;
 	mFrameCtrl.mLoop  = (s16)frame;
 
-	if (mAnim->mFrameLength < maxFrame) {
-		maxFrame = mAnim->mFrameLength;
+	if (mAnim->getFrameMax() < maxFrame) {
+		maxFrame = mAnim->getFrameMax();
 	}
 	mFrameCtrl.mEnd = maxFrame;
 }
@@ -316,8 +329,8 @@ void E2DCallBack_AnmBase::play(f32 speed, J3DAnmAttr attr, bool doPlayFromStart)
 		mFrameCtrl.mFrame = mFrameCtrl.mStart;
 	}
 
-	mAnim->mCurrentFrame = mFrameCtrl.mFrame;
-	mIsFinished          = false;
+	mAnim->setFrame(mFrameCtrl.mFrame);
+	mIsFinished = false;
 }
 
 /**
@@ -336,8 +349,8 @@ void E2DCallBack_AnmBase::playBack(f32 speed, bool doPlayFromEnd)
 		mFrameCtrl.mFrame = mFrameCtrl.mEnd;
 	}
 
-	mAnim->mCurrentFrame = mFrameCtrl.mFrame;
-	mIsFinished          = false;
+	mAnim->setFrame(mFrameCtrl.mFrame);
+	mIsFinished = false;
 }
 
 /**
@@ -365,8 +378,8 @@ void E2DCallBack_AnmBase::disconnect()
  */
 void E2DCallBack_AnmBase::setStartFrame()
 {
-	mFrameCtrl.mFrame    = mFrameCtrl.mStart;
-	mAnim->mCurrentFrame = mFrameCtrl.mFrame;
+	mFrameCtrl.mFrame = mFrameCtrl.mStart;
+	mAnim->setFrame(mFrameCtrl.mFrame);
 }
 
 /**
@@ -375,8 +388,8 @@ void E2DCallBack_AnmBase::setStartFrame()
  */
 void E2DCallBack_AnmBase::setEndFrame()
 {
-	mFrameCtrl.mFrame    = mFrameCtrl.mEnd;
-	mAnim->mCurrentFrame = mFrameCtrl.mFrame;
+	mFrameCtrl.mFrame = mFrameCtrl.mEnd;
+	mAnim->setFrame(mFrameCtrl.mFrame);
 }
 
 /**
@@ -385,10 +398,10 @@ void E2DCallBack_AnmBase::setEndFrame()
  */
 void E2DCallBack_AnmBase::setRandFrame()
 {
-	f32 startFrame       = mFrameCtrl.mStart;
-	f32 endFrame         = mFrameCtrl.mEnd;
-	mFrameCtrl.mFrame    = randEbisawaFloat() * (endFrame - startFrame) + startFrame;
-	mAnim->mCurrentFrame = mFrameCtrl.mFrame;
+	f32 startFrame    = mFrameCtrl.mStart;
+	f32 endFrame      = mFrameCtrl.mEnd;
+	mFrameCtrl.mFrame = randEbisawaFloat() * (endFrame - startFrame) + startFrame;
+	mAnim->setFrame(mFrameCtrl.mFrame);
 }
 
 /**
@@ -410,7 +423,7 @@ void E2DCallBack_AnmBase::do_update()
 {
 	if (mPane) {
 		mFrameCtrl.update();
-		mAnim->mCurrentFrame = mFrameCtrl.mFrame;
+		mAnim->setFrame(mFrameCtrl.mFrame);
 	}
 	if (mFrameCtrl.mState & 1) {
 		mIsFinished = true;

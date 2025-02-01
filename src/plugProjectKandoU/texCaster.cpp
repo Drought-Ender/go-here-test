@@ -78,7 +78,27 @@ void Caster::fadeout(f32)
  */
 void Caster::makeDL()
 {
-	// UNUSED FUNCTION
+	mDisplayListSize = OSRoundDown32B(mTriangleCount * 12 + 34);
+	mDisplayList     = new (0x20) u8[mDisplayListSize];
+
+	int index       = 0;
+	mDisplayList[0] = 0x90;
+	mDisplayList[1] = 3 * (mTriangleCount >> 16);
+
+	for (int i = 0; i < mTriangleCount; ++i) {
+		int j                   = index + 1;
+		mDisplayList[index + 3] = (index >> 8) & 0xFF;
+		mDisplayList[index + 4] = index & 0xFF;
+		mDisplayList[index + 5] = (j >> 8) & 0xFF;
+		mDisplayList[index + 6] = j & 0xFF;
+		index += 3;
+	}
+
+	for (int i = index; i < mDisplayListSize; i += 8) {
+		memset(mDisplayList + i, 0, 8);
+	}
+
+	DCFlushRange(mDisplayList, mDisplayListSize);
 }
 
 /**
@@ -198,8 +218,8 @@ Caster* Mgr::create(Sys::Sphere& sphere, f32 rotationAngle)
 {
 	Sys::CreateTriangleArg triArg;
 	triArg.mBoundingSphere = sphere;
-	triArg._10             = 0.22f;
-	triArg._14             = 0.5f;
+	triArg.mScale          = 0.22f;
+	triArg.mScaleLimit     = 0.5f;
 	Game::mapMgr->createTriangles(triArg);
 
 	if (triArg.mCount == 0) {
@@ -207,7 +227,7 @@ Caster* Mgr::create(Sys::Sphere& sphere, f32 rotationAngle)
 		triArg.mVertices = new Vector3f[6];
 
 		Vector3f spherePos = sphere.mPosition;
-		float sphereRad    = sphere.mRadius;
+		f32 sphereRad      = sphere.mRadius;
 
 		triArg.mVertices[0] = Vector3f(spherePos.x - sphereRad, spherePos.y, spherePos.z - sphereRad);
 		triArg.mVertices[1] = Vector3f(spherePos.x + sphereRad, spherePos.y, spherePos.z + sphereRad);
@@ -217,7 +237,7 @@ Caster* Mgr::create(Sys::Sphere& sphere, f32 rotationAngle)
 		triArg.mVertices[5] = Vector3f(spherePos.x + sphereRad, spherePos.y, spherePos.z + sphereRad);
 
 		for (int i = 0; i < 6; i++) {
-			triArg.mVertices[i].y += triArg._10;
+			triArg.mVertices[i].y += triArg.mScale;
 		}
 	}
 
@@ -231,9 +251,9 @@ Caster* Mgr::create(Sys::Sphere& sphere, f32 rotationAngle)
 		for (int vertexIndex = 0; vertexIndex < 3; vertexIndex++) {
 			// Calculate the texture position for each vertex
 			Vector3f currentVertex = caster->mVertices[triangleIndex * 3 + vertexIndex];
-			float deltaZ           = currentVertex.z - sphere.mPosition.z;
-			float deltaX           = currentVertex.x - sphere.mPosition.x;
-			float scaleFactor      = (30.0f / sphere.mRadius) * 0.03125f;
+			f32 deltaZ             = currentVertex.z - sphere.mPosition.z;
+			f32 deltaX             = currentVertex.x - sphere.mPosition.x;
+			f32 scaleFactor        = (30.0f / sphere.mRadius) * 0.03125f;
 
 			// Rotate the texture coordinates based on some angle rotationAngle
 			Vector2f rotationVector(sin(rotationAngle), cos(rotationAngle));
@@ -246,20 +266,7 @@ Caster* Mgr::create(Sys::Sphere& sphere, f32 rotationAngle)
 		}
 	}
 
-	caster->mDisplayListSize = OSRoundDown32B(caster->mTriangleCount * 12 + 34);
-	caster->mDisplayList     = new (0x20) u8[caster->mDisplayListSize];
-
-	// this is wrong
-	caster->mDisplayList[0] = 0x90;
-	caster->mDisplayList[1] = (caster->mTriangleCount * 3) * 16;
-	caster->mDisplayList[2] = (caster->mTriangleCount * 3);
-
-	// this is wrong
-	for (int i = 0; i < caster->mDisplayListSize; i++) {
-		caster->mDisplayList[i] = i * 2;
-	}
-
-	DCFlushRange(caster->mDisplayList, caster->mDisplayListSize);
+	caster->makeDL();
 	mCaster.add(caster);
 	return caster;
 	/*
@@ -667,11 +674,7 @@ void Mgr::drawInit(Graphics& gfx)
 void Mgr::draw(Graphics& gfx)
 {
 	drawInit(gfx);
-
-	Caster* child = static_cast<Caster*>(mCaster.mChild);
-	for (child; child; child = static_cast<Caster*>(child->mNext)) {
-		child->draw(gfx);
-	}
+	FOREACH_NODE(Caster, mCaster.mChild, child) { child->draw(gfx); }
 }
 
 } // namespace TexCaster

@@ -8,6 +8,7 @@
 #include "PSSystem/PSSystemIF.h"
 #include "Dolphin/rand.h"
 #include "efx2d/T2DChangesmoke.h"
+#include "Screen/Game2DMgr.h"
 #include "nans.h"
 
 static const int unusedArray[] = { 0, 0, 0 };
@@ -202,7 +203,7 @@ TZukanBase::TZukanBase(char* name)
     , mInfoVal2(0)
     , mInfoVal3(0)
     , mDisplayIndex(0)
-    , mState(0)
+    , mState(Screen::Game2DMgr::CHECK2D_Zukan_Default)
     , mCurrObjectID(0)
 {
 
@@ -378,7 +379,7 @@ void TZukanBase::doCreate(JKRArchive* archive)
 	mRequestTimer = 0xffffffce;
 	indexPaneInit(screen);
 	J2DPane* idpane = mIndexPaneList[0]->mPane;
-	float diff      = mIndexPaneList[1]->mPane->mOffset.y - idpane->mOffset.y;
+	f32 diff        = mIndexPaneList[1]->mPane->mOffset.y - idpane->mOffset.y;
 	idpane->show();
 
 	mIndexGroup                 = new TIndexGroup;
@@ -404,10 +405,10 @@ bool TZukanBase::doUpdate()
 		doUpdateIn();
 	}
 
-	if (!mIsInDemo && mState < 2) {
-		mState = 0;
+	if (!mIsInDemo && mState < Screen::Game2DMgr::CHECK2D_Zukan_ExitStart) {
+		mState = Screen::Game2DMgr::CHECK2D_Zukan_Default;
 		if (mIsDrawScene) {
-			mState            = 1;
+			mState            = Screen::Game2DMgr::CHECK2D_Zukan_Changing;
 			mIsDrawScene      = false;
 			mIsEffectRequired = false;
 			if (mIsBigWindowOpened) {
@@ -419,7 +420,7 @@ bool TZukanBase::doUpdate()
 		           && mIndexPaneList[mCurrActiveRowSel]->getIndex() == mCurrIndex) {
 			if (!mIsEffectRequired) {
 				if (mRequestTimer > mRequestTimerMax) {
-					mState = 1;
+					mState = Screen::Game2DMgr::CHECK2D_Zukan_Changing;
 					if (mIsSection) {
 						mIsEffectRequired = true;
 					}
@@ -463,11 +464,11 @@ bool TZukanBase::doUpdate()
 	}
 
 	bool isHorizontalScroll = false;
-	if (!mIsInDemo && !mCanInput && mState < 2) {
+	if (!mIsInDemo && !mCanInput && mState < Screen::Game2DMgr::CHECK2D_Zukan_ExitStart) {
 		mIsInFadeInOut = true;
 	}
 
-	if (!mIsInDemo && mCanInput && mState < 2 && !isOpenConfirmWindow()) {
+	if (!mIsInDemo && mCanInput && mState < Screen::Game2DMgr::CHECK2D_Zukan_ExitStart && !isOpenConfirmWindow()) {
 		mIsInFadeInOut = false;
 		if (!mIsBigWindowOpened && !mWindow->mState) {
 			Controller* pad = mController;
@@ -531,10 +532,10 @@ bool TZukanBase::doUpdate()
 		if (!mIndexGroup->mStateID && !isHorizontalScroll) {
 			Controller* pad = mController;
 			if (pad->getButtonDown() & Controller::PRESS_X) {
-				mState = 1;
+				mState = Screen::Game2DMgr::CHECK2D_Zukan_Changing;
 				doPushXButton();
 			} else if (pad->getButtonDown() & Controller::PRESS_Y) {
-				mState = 1;
+				mState = Screen::Game2DMgr::CHECK2D_Zukan_Changing;
 				doPushYButton();
 			} else if (pad->getButtonDown() & (Controller::PRESS_L | Controller::PRESS_R)) {
 				if (mIsBigWindowOpened) {
@@ -548,7 +549,7 @@ bool TZukanBase::doUpdate()
 			} else if (pad->getButtonDown() & Controller::PRESS_B) {
 				doPushBButton();
 			} else if (pad->getButtonDown() & Controller::PRESS_A) {
-				mState = 1;
+				mState = Screen::Game2DMgr::CHECK2D_Zukan_Changing;
 				if (mCameraFadeInLevel < 0.5f) {
 					if (!mIsBigWindowOpened) {
 						PSSystem::spSysIF->playSystemSe(PSSE_SY_CAMERAVIEW_CHANGE, 0);
@@ -591,8 +592,8 @@ bool TZukanBase::doUpdate()
 		}
 	}
 
-	if (getDispDataZukan()->mDispWorldMapInfoWin0->mResult == 1 && !mIsSection && mState < 2) {
-		mState = 2;
+	if (getDispDataZukan()->mDispWorldMapInfoWin0->mResult == 1 && !mIsSection && mState < Screen::Game2DMgr::CHECK2D_Zukan_ExitStart) {
+		mState = Screen::Game2DMgr::CHECK2D_Zukan_ExitStart;
 		getOwner()->endScene(nullptr);
 	}
 
@@ -720,7 +721,7 @@ bool TZukanBase::doUpdate()
 	mPaneModel->setOffset(xpos, ypos);
 	mPaneWindowBack->setOffset(xpos, ypos);
 	mPaneWindowBack_Child->setOffset(xpos, ypos);
-	if (mState == 1) {
+	if (mState == Screen::Game2DMgr::CHECK2D_Zukan_Changing) {
 		mCurrObjectID = getModelIndex(mIndexPaneList[mCurrActiveRowSel]->getIndex());
 		if (!mIsCurrentSelUnlocked) {
 			mCurrObjectID = -1;
@@ -940,8 +941,8 @@ void TZukanBase::doDraw(Graphics& gfx)
  */
 void TZukanBase::doUpdateFadeoutFinish()
 {
-	if (mState == 2) {
-		mState = 3;
+	if (mState == Screen::Game2DMgr::CHECK2D_Zukan_ExitStart) {
+		mState = Screen::Game2DMgr::CHECK2D_Zukan_ExitFinished;
 	}
 }
 
@@ -1647,7 +1648,7 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 		mIsPreDebt = false;
 	}
 
-	if (Game::playData && Game::playData->mStoryFlags & Game::STORY_DebtPaid) {
+	if (Game::playData && Game::playData->isStoryFlag(Game::STORY_DebtPaid)) {
 		mIsPreDebt = false;
 	}
 
@@ -1859,7 +1860,7 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 
 	TZukanBase::doCreate(arc);
 
-	f32 yoffs = mIndexPaneList[1]->getPaneOffsetY() - mIndexPaneList[0]->getPaneOffsetY();
+	f32 yoffs = getHeight();
 
 	if (mIsPreDebt && mMaxSelectZukan <= (mNumActiveRows - 1) * 3) {
 		mCanScroll = false;
@@ -1868,9 +1869,8 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 	f32 xoffs = 0.0f;
 	for (int i = 0; i < 6; i++) {
 		for (int j = 0; j < mNumActiveRows; j++) {
-			f32 y = mIndexPaneList[j]->mYOffset;
-			mIndexPaneList[j]->mPane->setOffsetY(y + yoffs);
-			mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->mPane->mOffset.y;
+			mIndexPaneList[j]->setOffset(yoffs);
+			mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 		}
 		updateIndex(false);
 		TIndexGroup* grp   = mIndexGroup;
@@ -1898,17 +1898,12 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 
 	if (index >= 0) {
 		int backupindex = index;
-		int max2        = mMaxSelectZukan;
 		if (mIsPreDebt) {
 			for (int i = 0; i < mMaxPane; i++) {
-				// backupindex = i;
 				if (index == mViewablePanelIDList[i]) {
 					index = i;
 					break;
 				}
-				// 	break;
-				// max2--;
-				// backupindex = index;
 			}
 		}
 		if (index > 2) {
@@ -1925,7 +1920,8 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 					if (mIndexPaneList[mCurrActiveRowSel]->mSizeType != TIndexPane::Size_Small) {
 						yoffs = -yoffs * 0.5f;
 						for (int j = 0; j < mNumActiveRows; j++) {
-							updateIDPaneYOffset(j, yoffs);
+							mIndexPaneList[j]->setOffset(yoffs);
+							mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 						}
 						mRightOffset = 1;
 					} else {
@@ -1937,7 +1933,8 @@ void TEnemyZukan::doCreate(JKRArchive* arc)
 				}
 
 				for (int j = 0; j < mNumActiveRows; j++) {
-					updateIDPaneYOffset(j, -yoffs);
+					mIndexPaneList[j]->setOffset(-yoffs);
+					mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 				}
 				updateIndex(true);
 				TIndexGroup* grp   = mIndexGroup;
@@ -2719,7 +2716,7 @@ u32 TEnemyZukan::getPrice(int index)
 			return 0;
 		}
 
-		Game::PelletConfigList* list = Game::PelletList::Mgr::getConfigList(Game::PelletList::CARCASS);
+		Game::PelletConfigList* list = Game::PelletList::Mgr::getConfigList(Game::PelletList::PLK_Carcass);
 		Game::PelletConfig* config   = list->getPelletConfig(Game::EnemyInfoFunc::getEnemyName(id, 0xffff));
 		if (config) {
 			return config->mParams.mMoney.mData;
@@ -2898,7 +2895,7 @@ bool TItemZukan::doUpdate()
 		case 2:
 			break;
 		case ZUKANDEMO_Reading:
-			if (mController->mButton.mButtonDown & (Controller::PRESS_A | Controller::PRESS_B)) {
+			if (mController->getButtonDown() & (Controller::PRESS_A | Controller::PRESS_B)) {
 				mEfxTimer  = 0;
 				mDemoState = ZUKANDEMO_AppearEffect;
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MESSAGE_EXIT, 0);
@@ -3264,7 +3261,7 @@ void TItemZukan::doCreate(JKRArchive* arc)
 		mIsPreDebt = false;
 	}
 
-	if (Game::playData && Game::playData->mStoryFlags & Game::STORY_DebtPaid) {
+	if (Game::playData && Game::playData->isStoryFlag(Game::STORY_DebtPaid)) {
 		mIsPreDebt = false;
 	}
 	mCanComplete = true;
@@ -3484,7 +3481,7 @@ void TItemZukan::doCreate(JKRArchive* arc)
 	mYajiScreen = new TScreenBase(arc, 0);
 	mYajiScreen->create("new_otakarazukan_yajirusi.blo", 0x20000);
 
-	if (mShowAllObjects || (Game::playData && Game::playData->mStoryFlags & Game::STORY_DebtPaid)) {
+	if (mShowAllObjects || (Game::playData && Game::playData->isStoryFlag(Game::STORY_DebtPaid))) {
 		mCurrCharacterIconID = 0;
 		mWindow->setWindowColor(mMessageWindowColor[1]);
 		mWindow->onIcon(1);
@@ -3524,7 +3521,7 @@ void TItemZukan::doCreate(JKRArchive* arc)
 
 	TZukanBase::doCreate(arc);
 
-	f32 yoffs       = mIndexPaneList[1]->mPane->getOffsetY() - mIndexPaneList[0]->mPane->getOffsetY();
+	f32 yoffs       = getHeight();
 	mMaxSelectZukan = mMaxPane;
 
 	if (!mIsPreDebt) {
@@ -3534,7 +3531,8 @@ void TItemZukan::doCreate(JKRArchive* arc)
 	f32 xoffs = 0.0f;
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < mNumActiveRows; j++) {
-			updateIDPaneYOffset(j, yoffs);
+			mIndexPaneList[j]->setOffset(yoffs);
+			mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 		}
 		updateIndex(false);
 		TIndexGroup* grp   = mIndexGroup;
@@ -3580,7 +3578,8 @@ void TItemZukan::doCreate(JKRArchive* arc)
 		if (index > 2) {
 			for (int i = 0; i < index / 3; i++) {
 				for (int j = 0; j < mNumActiveRows; j++) {
-					updateIDPaneYOffset(j, -yoffs);
+					mIndexPaneList[j]->setOffset(-yoffs);
+					mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 				}
 				updateIndex(true);
 				TIndexGroup* grp   = mIndexGroup;
@@ -3596,8 +3595,7 @@ void TItemZukan::doCreate(JKRArchive* arc)
 	mCurrIndex = mIndexPaneList[mCurrActiveRowSel]->getIndex();
 	if (mCurrIndex >= 0) {
 		J2DPane* pane = mPaneMessageDemo;
-		u64 tag       = getXMsgID(mCurrIndex);
-		pane->setMsgID(tag);
+		pane->setMsgID(getXMsgID(mCurrIndex));
 	}
 
 	backup->becomeCurrentHeap();
@@ -3616,16 +3614,16 @@ void TItemZukan::doDemoDraw(Graphics& gfx)
 
 	J2DPane* pane1 = mMainScreen->mScreenObj->search('Pzbtn3');
 	pane1->setAlpha(alpha);
-	static_cast<J2DPicture*>(pane1)->draw(pane1->getGlbVtx(0).x, pane1->getGlbVtx(1).y, pane1->getWidth(), pane1->getHeight(), false, false,
-	                                      false);
+	static_cast<J2DPicture*>(pane1)->draw(pane1->getGlbVtx(GLBVTX_BtmLeft).x, pane1->getGlbVtx(GLBVTX_BtmRight).y, pane1->getWidth(),
+	                                      pane1->getHeight(), false, false, false);
 	pane1->calcMtx();
 	pane1->setAlpha(255);
 
 	J2DPane* pane2;
 	pane2 = mMainScreen->mScreenObj->search('Pzbtn2');
 	pane2->setAlpha(alpha);
-	static_cast<J2DPicture*>(pane2)->draw(pane2->getGlbVtx(0).x, pane2->getGlbVtx(1).y, pane2->getWidth(), pane2->getHeight(), false, false,
-	                                      false);
+	static_cast<J2DPicture*>(pane2)->draw(pane2->getGlbVtx(GLBVTX_BtmLeft).x, pane2->getGlbVtx(GLBVTX_BtmRight).y, pane2->getWidth(),
+	                                      pane2->getHeight(), false, false, false);
 	pane2->calcMtx();
 	pane2->setAlpha(255);
 
@@ -3640,7 +3638,7 @@ void TItemZukan::doDemoDraw(Graphics& gfx)
 
 	for (int i = 0; i < mNumActiveRows; i++) {
 		for (int j = 0; j < 3; j++) {
-			TIconInfo* icon = mIndexPaneList[i]->mIconInfos[j];
+			TIconInfo* icon = getIndexPane(i)->getIconInfo(j);
 			if (mSelection == icon->mCategoryID && icon->mPane->isVisible()) {
 				u8 alpha = mMessageBoxBGAlpha * mCategoryAlphaRate;
 				J2DPictureEx* pane2;
@@ -3648,22 +3646,24 @@ void TItemZukan::doDemoDraw(Graphics& gfx)
 				J2DPictureEx* pane1 = icon->mPic;
 				u8 oldalpha         = pane1->mAlpha;
 				pane1->setAlpha(alpha);
-				pane1->draw(pane1->getGlbVtx(0).x + 8.0f, pane1->getGlbVtx(0).y + 2.5f, pane1->getWidth(), pane1->getHeight(), false, false,
-				            false);
+				pane1->draw(pane1->getGlbVtx(GLBVTX_BtmLeft).x + 8.0f, pane1->getGlbVtx(GLBVTX_BtmLeft).y + 2.5f, pane1->getWidth(),
+				            pane1->getHeight(), false, false, false);
 				pane1->calcMtx();
 				pane1->setAlpha(oldalpha);
 
-				pane2    = static_cast<J2DPictureEx*>(mIndexPaneList[i]->mIconInfos[j]->mPane);
+				pane2    = static_cast<J2DPictureEx*>(getIndexPane(i)->getIconInfo(j)->mPane);
 				oldalpha = pane2->mAlpha;
 				pane2->setAlpha(mMessageBoxBGAlpha);
-				pane2->draw(pane2->getGlbVtx(0).x, pane2->getGlbVtx(0).y, pane2->getWidth(), pane2->getHeight(), false, false, false);
+				pane2->draw(pane2->getGlbVtx(GLBVTX_BtmLeft).x, pane2->getGlbVtx(GLBVTX_BtmLeft).y, pane2->getWidth(), pane2->getHeight(),
+				            false, false, false);
 				pane2->calcMtx();
 				pane2->setAlpha(oldalpha);
 
-				pane3    = static_cast<J2DPictureEx*>(mIndexPaneList[i]->mIconInfos[j]->mPane2);
+				pane3    = static_cast<J2DPictureEx*>(getIndexPane(i)->getIconInfo(j)->mPane2);
 				oldalpha = pane3->mAlpha;
 				pane3->setAlpha(mMessageBoxBGAlpha);
-				pane3->draw(pane3->getGlbVtx(0).x, pane3->getGlbVtx(0).y, pane3->getWidth(), pane3->getHeight(), false, false, false);
+				pane3->draw(pane3->getGlbVtx(GLBVTX_BtmLeft).x, pane3->getGlbVtx(GLBVTX_BtmLeft).y, pane3->getWidth(), pane3->getHeight(),
+				            false, false, false);
 				pane3->calcMtx();
 				pane3->setAlpha(oldalpha);
 			}
@@ -3684,13 +3684,13 @@ void TItemZukan::doDemoDraw(Graphics& gfx)
 		mIconScreen->draw(gfx, *graf);
 
 		for (int i = 0; i < mNumActiveRows; i++) {
-			if (mIndexPaneList[i]->mPane->isVisible()) {
+			if (getIndexPane(i)->mPane->isVisible()) {
 				for (int j = 0; j < 3; j++) {
-					TIconInfo* icon = mIndexPaneList[i]->mIconInfos[j];
+					TIconInfo* icon = getIndexPane(i)->getIconInfo(j);
 					if (mSelection == icon->mCategoryID) {
 						if (mSelection == icon->mCategoryID && icon->mParentIndex) {
-							mPaneNew1->mGlobalMtx[0][3] = mNewOffset.x + mIndexPaneList[i]->mIconInfos[j]->mPane->mGlobalMtx[0][3];
-							mPaneNew1->mGlobalMtx[1][3] = mNewOffset.y + mIndexPaneList[i]->mIconInfos[j]->mPane->mGlobalMtx[1][3];
+							mPaneNew1->mGlobalMtx[0][3] = mNewOffset.x + getIndexPane(i)->getIconInfo(j)->mPane->mGlobalMtx[0][3];
+							mPaneNew1->mGlobalMtx[1][3] = mNewOffset.y + getIndexPane(i)->getIconInfo(j)->mPane->mGlobalMtx[1][3];
 							mMessageNew->draw(gfx, *graf);
 						}
 					}
@@ -4521,12 +4521,12 @@ void TCallbackScrollMsg::reset()
 
 		P2JME::Window::TRenderingProcessor* proc = static_cast<P2JME::Window::TRenderingProcessor*>(mControl->mTextRenderProc);
 		proc->setTextBoxInfo(mPane);
-		f32 space              = TZukanBase::mLineSpace;
-		proc->_C0              = space;
-		proc->_C8              = space;
-		proc->mSpeed           = TZukanBase::mWarpRadius;
-		mControl->_6C          = TZukanBase::mScrollValueCoe;
-		mControl->mScrollSpeed = TZukanBase::mScrollSpeedCoe;
+		f32 space               = TZukanBase::mLineSpace;
+		proc->mActiveLineHeight = space;
+		proc->mLineHeight       = space;
+		proc->mSpeed            = TZukanBase::mWarpRadius;
+		mControl->mScrollVal    = TZukanBase::mScrollValueCoe;
+		mControl->mScrollSpeed  = TZukanBase::mScrollSpeedCoe;
 	}
 }
 
@@ -4698,13 +4698,12 @@ void TZukanWindow::update()
 			                     y * sinf(mIconYHeightSin) + (mScrollPosition + mPaneIcon->getOffsetY()));
 		}
 	}
-	JGeometry::TVec3f pos1 = mPaneWinCap->getGlbVtx(0);
-	JGeometry::TVec3f pos2 = mPaneWinCap->getGlbVtx(3);
-	pos1.x += 10.0f;
-	pos1.y += 5.0f;
-	pos2.x -= 10.0f;
-	pos2.y -= 10.0f;
-	JGeometry::TBox2f box(pos1.x, pos1.y, pos2.x, pos2.y);
+
+	JGeometry::TBox2f box(mPaneWinCap->getGlbVtx(GLBVTX_TopRight), mPaneWinCap->getGlbVtx(GLBVTX_BtmLeft));
+	box.i.x += 10.0f;
+	box.i.y += 5.0f;
+	box.f.x -= 10.0f;
+	box.f.y -= 10.0f;
 	mScissor->mBounds = box;
 }
 
@@ -4797,23 +4796,25 @@ void TZukanWindow::onIcon(int id)
  */
 void TZukanWindow::moveIcon(f32 x)
 {
-	if (TZukanBase::mIconMove) {
-		if (FABS(x) < 0.1f) {
-			x = 0.0f;
-		}
-		if (FABS(mScrollPosition) < 1.0f) {
-			mScrollPosition = 0.0f;
-		}
-		if (mScrollPosition == 0.0f && x != 0.0f) {
-			mScaleMgr->up(0.05f, 1.0f, 0.2f, 0.0f);
-		}
-
-		f32 test = 0.1f;
-		if (x == 0.0f) {
-			test = 0.15f;
-		}
-		mScrollPosition += test * (x * 5.0f - mScrollPosition);
+	if (!TZukanBase::mIconMove) {
+		return;
 	}
+
+	if (FABS(x) < 0.1f) {
+		x = 0.0f;
+	}
+	if (FABS(mScrollPosition) < 1.0f) {
+		mScrollPosition = 0.0f;
+	}
+	if (mScrollPosition == 0.0f && x != 0.0f) {
+		mScaleMgr->up(0.05f, 1.0f, 0.2f, 0.0f);
+	}
+
+	f32 test = 0.1f;
+	if (x == 0.0f) {
+		test = 0.15f;
+	}
+	mScrollPosition += test * (x * 5.0f - mScrollPosition);
 }
 
 /**

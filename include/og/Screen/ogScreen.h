@@ -1,7 +1,7 @@
 #ifndef _OG_SCREEN_OGSCREEN_H
 #define _OG_SCREEN_OGSCREEN_H
 
-#include "JSystem/J2D/J2DPane.h"
+#include "JSystem/J2D/J2DPicture.h"
 #include "types.h"
 #include "Screen/Enums.h"
 #include "Vector2.h"
@@ -68,9 +68,12 @@ void setCallBack_CStickSmall(JKRArchive*, P2DScreen::Mgr*, u64);
 CallBack_CounterDay* setCallBack_CounterDay(P2DScreen::Mgr*, u64, u64, u64, u32*, u16, JKRArchive*);
 CallBack_CounterDay* setCallBack_CounterDay(char**, P2DScreen::Mgr*, u64, u64, u64, u32*, u16, JKRArchive*);
 void setCallBack_CounterMap(P2DScreen::Mgr*, u64, u64, u64, u32*, u16, u16, bool, JKRArchive*);
-CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr*, u64, u64, u64, u32*, u16, u16, bool, JKRArchive*);
-CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr*, u64, u32*, u16, bool, bool, JKRArchive*);
-CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr*, u64, u32, u16, bool, bool, JKRArchive*);
+CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr* mgr, u64 tag1, u64 tag2, u64 tag3, u32* countPtr, u16 maxDigits, u16 minDigits,
+                                          bool isPuyo, JKRArchive* arc);
+CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr* mgr, u64 tag, u32* countPtr, u16 maxDigits, bool isPuyo, bool hasMother,
+                                          JKRArchive* arc);
+CallBack_CounterRV* setCallBack_CounterRV(P2DScreen::Mgr* mgr, u64 tag, u32 value, u16 maxDigits, bool isPuyo, bool hasMother,
+                                          JKRArchive* arc);
 void setCallBack_CounterRV2(P2DScreen::Mgr*, u64, u32*, u16, bool, bool, JKRArchive*);
 CallBack_CounterSlot* setCallBack_CounterSlot(P2DScreen::Mgr*, u64, u32*, u16, bool, bool, JKRArchive*);
 CallBack_DrawAfter* setCallBack_DrawAfter(P2DScreen::Mgr*, u64);

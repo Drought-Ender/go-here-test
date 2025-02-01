@@ -119,20 +119,20 @@ ObjAnaDemo::ObjAnaDemo(const char* name)
 	mState      = ANADEMOSTATE_Disabled;
 	mAnaTypeSub = ANADEMOSUB_Normal;
 
-	mCurrMenuSel  = 0;
-	mScreen       = nullptr;
-	mMenuMgr      = nullptr;
-	mAnimGroup    = nullptr;
-	_54           = nullptr;
-	mMenuSelTitle = nullptr;
-	mMenuSelYes   = nullptr;
-	mMenuSelNo    = nullptr;
-	_68           = 0.0f;
-	_6C           = 0;
-	mPaneError    = nullptr;
-	_88           = 0;
-	_8C           = 0.0f;
-	mCloseTimer   = 0.0f;
+	mCurrMenuSel       = 0;
+	mScreen            = nullptr;
+	mMenuMgr           = nullptr;
+	mAnimGroup         = nullptr;
+	mUnusedObj         = nullptr;
+	mMenuSelTitle      = nullptr;
+	mMenuSelYes        = nullptr;
+	mMenuSelNo         = nullptr;
+	mUnused0           = 0.0f;
+	mUnused1           = 0;
+	mPaneError         = nullptr;
+	mUnused2           = 0;
+	mSwingMovePosition = 0.0f;
+	mCloseTimer        = 0.0f;
 
 	mTimer3 = 0.0f;
 	mAlpha  = 255;
@@ -200,7 +200,7 @@ void ObjAnaDemo::doCreate(JKRArchive* arc)
 		mDisp = new og::Screen::DispMemberAnaDemo;
 
 	} else {
-		JUT_PANICLINE(431, "ERR! in ObjAnaDemo CreateŽ¸”sI\n");
+		JUT_PANICLINE(431, "ERR! in ObjAnaDemo Createå¤±æ•—ï¼\n");
 	}
 
 	mScreen = new P2DScreen::Mgr_tuning;
@@ -343,7 +343,7 @@ void ObjAnaDemo::doCreate(JKRArchive* arc)
 
 	og::Screen::AnimText_Screen* anim = mMenuSelTitle;
 	if (anim) {
-		if (mDisp->_1C) {
+		if (mDisp->mNoOpenMenu) {
 			anim->stop();
 			mMenuSelYes->stop();
 			mMenuSelNo->stop();
@@ -478,7 +478,7 @@ bool ObjAnaDemo::doUpdate()
 		break;
 
 	case ANADEMOSTATE_IdleWait:
-		if (pad->mButton.mButtonDown & Controller::PRESS_UP) {
+		if (pad->isButtonDown(Controller::PRESS_UP)) {
 			if (mCurrMenuSel > 0) {
 				mCurrMenuSel--;
 				if (mMenuMgr) {
@@ -498,7 +498,7 @@ bool ObjAnaDemo::doUpdate()
 				}
 			}
 
-		} else if (pad->mButton.mButtonDown & Controller::PRESS_DOWN) {
+		} else if (pad->isButtonDown(Controller::PRESS_DOWN)) {
 			if (mCurrMenuSel < 1) {
 				mCurrMenuSel++;
 				if (mMenuMgr) {
@@ -517,7 +517,7 @@ bool ObjAnaDemo::doUpdate()
 					}
 				}
 			}
-		} else if (pad->mButton.mButtonDown & Controller::PRESS_A) {
+		} else if (pad->isButtonDown(Controller::PRESS_A)) {
 			if (mMenuMgr)
 				mMenuMgr->killCursor();
 			if (mCurrMenuSel == 0) {
@@ -534,7 +534,7 @@ bool ObjAnaDemo::doUpdate()
 					mState  = ANADEMOSTATE_ErrorTimed;
 					mTimer4 = 0.5f;
 					if (mMenuSelTitle)
-						mMenuSelTitle->_6C = 0.5f;
+						mMenuSelTitle->mMesgAlpha = 0.5f;
 					ogSound->setError();
 					mPaneError->setAlpha(0);
 				} else {
@@ -543,7 +543,7 @@ bool ObjAnaDemo::doUpdate()
 						mCloseTimer = 0.0f;
 						ogSound->setDecide();
 					} else {
-						_68 = 0.5f;
+						mUnused0 = 0.5f;
 						ogSound->setDecide();
 						mState      = ANADEMOSTATE_Exit;
 						mCloseTimer = 0.0f;
@@ -555,7 +555,7 @@ bool ObjAnaDemo::doUpdate()
 				mCloseTimer      = 0.0f;
 				ogSound->setDecide();
 			}
-		} else if (pad->mButton.mButtonDown & Controller::PRESS_B) {
+		} else if (pad->isButtonDown(Controller::PRESS_B)) {
 			if (mMenuMgr) {
 				mMenuMgr->killCursor();
 			}
@@ -568,7 +568,7 @@ bool ObjAnaDemo::doUpdate()
 
 	case ANADEMOSTATE_ErrorWait:
 		bool anyButtonDown = false;
-		u32 input          = pad->mButton.mButtonDown;
+		u32 input          = pad->mButton.mButtonDown; // getButtonDown doesnt cooperate here
 		if (input & Controller::PRESS_A || input & Controller::PRESS_B || input & Controller::PRESS_X || input & Controller::PRESS_Y
 		    || input & Controller::PRESS_START) {
 			anyButtonDown = true;
@@ -610,11 +610,11 @@ bool ObjAnaDemo::doUpdate()
 
 	case ANADEMOSTATE_Exit:
 		mCloseTimer += sys->mDeltaTime;
-		_8C = og::Screen::calcSmooth0to1(mCloseTimer, msVal._00) * -800.0f;
-		if (mCloseTimer >= msVal._00) {
-			ret        = true;
-			mDisp->_1F = false;
-			mState     = ANADEMOSTATE_Disabled;
+		mSwingMovePosition = og::Screen::calcSmooth0to1(mCloseTimer, msVal.mMoveFinishRatio) * -800.0f;
+		if (mCloseTimer >= msVal.mMoveFinishRatio) {
+			ret                = true;
+			mDisp->mExitStatus = og::Screen::MENUFINISH_CaveExit; // confirm menu
+			mState             = ANADEMOSTATE_Disabled;
 		}
 		break;
 	}
@@ -636,7 +636,7 @@ void ObjAnaDemo::commonUpdate()
 		mAnimGroup->update();
 	}
 
-	mScreen->setXY(_8C, 0.0f);
+	mScreen->setXY(mSwingMovePosition, 0.0f);
 	mScreen->update();
 }
 
@@ -664,8 +664,8 @@ void ObjAnaDemo::doDraw(Graphics& gfx)
  */
 bool ObjAnaDemo::doStart(::Screen::StartSceneArg const*)
 {
-	mCloseTimer = 0.0f;
-	_8C         = 800.0f;
+	mCloseTimer        = 0.0f;
+	mSwingMovePosition = 800.0f;
 	return true;
 }
 
@@ -698,7 +698,7 @@ void ObjAnaDemo::doUpdateFadeoutFinish()
 		scene->endScene(nullptr);
 	} else {
 		if (scene->setBackupScene() && !scene->startScene(nullptr)) {
-			JUT_PANICLINE(994, "‚¾‚ß‚Å‚·\n");
+			JUT_PANICLINE(994, "ã ã‚ã§ã™\n");
 		}
 	}
 }
@@ -713,9 +713,9 @@ bool ObjAnaDemo::doUpdateFadein()
 	commonUpdate();
 	mCloseTimer += sys->mDeltaTime;
 
-	_8C = 800.0f * (1.0f - og::Screen::calcSmooth0to1(mCloseTimer, msVal._00));
+	mSwingMovePosition = 800.0f * (1.0f - og::Screen::calcSmooth0to1(mCloseTimer, msVal.mMoveFinishRatio));
 
-	if (mCloseTimer >= msVal._00) {
+	if (mCloseTimer >= msVal.mMoveFinishRatio) {
 		ret = true;
 	}
 

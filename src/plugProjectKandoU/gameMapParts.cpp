@@ -11,6 +11,7 @@
 #include "JSystem/JUtility/JUTTexture.h"
 #include "Dolphin/rand.h"
 #include "Sys/TriangleTable.h"
+#include "Sys/RayIntersectInfo.h"
 #include "VsOtakaraName.h"
 #include "nans.h"
 
@@ -115,13 +116,13 @@ void Door::read(Stream& stream)
  */
 MapUnit::MapUnit()
 {
-	mModelData   = nullptr;
-	_04          = -1;
-	_A8          = 0;
-	mCellSize.y  = 0;
-	mCellSize.x  = 0;
-	mTexture     = nullptr;
-	mImgResource = nullptr;
+	mModelData    = nullptr;
+	mUnusedIdx    = -1;
+	mHasCollision = false;
+	mCellSize.y   = 0;
+	mCellSize.x   = 0;
+	mTexture      = nullptr;
+	mImgResource  = nullptr;
 }
 
 /**
@@ -210,7 +211,7 @@ MapUnit* MapUnitMgr::findMapUnit(char* unitName)
  */
 void MapUnitMgr::testConstruct()
 {
-	JUT_PANICLINE(500, "‚à‚¤Žg‚í‚È‚¢\n"); // 'don't use it anymore'
+	JUT_PANICLINE(500, "ã‚‚ã†ä½¿ã‚ãªã„\n"); // 'don't use it anymore'
 	JUT_PANICLINE(501, "%s : not found !\n", nullptr);
 	// UNUSED FUNCTION
 }
@@ -240,9 +241,8 @@ void MapUnitMgr::makeUnit(MapUnit* unit, char* folder)
 	void* viewModelData = archive->getResource("view.bmd");
 	P2ASSERTLINE(657, viewModelData);
 
-	unit->mModelData = J3DModelLoaderDataBase::load(viewModelData,
-	                                                0x20000000); // 0x20000000 is some flag
-	unit->mModelData->newSharedDisplayList(0x40000);
+	unit->mModelData = J3DModelLoaderDataBase::load(viewModelData, J3DMLF_Material_PE_FogOff);
+	unit->mModelData->newSharedDisplayList(J3DMLF_UseSingleSharedDL);
 	unit->mModelData->makeSharedDL();
 
 	void* textureData = archive->getResource("texture.bti");
@@ -313,9 +313,9 @@ void MapUnitMgr::makeUnit(MapUnit* unit, char* folder)
 		delete[] gridResource;
 
 		unit->mCollision.getBoundBox(unit->mBoundingBox);
-		unit->_A8 = 1;
+		unit->mHasCollision = true;
 	} else {
-		unit->_A8 = 0;
+		unit->mHasCollision = false;
 	}
 
 	// Load map code data
@@ -332,7 +332,7 @@ void MapUnitMgr::makeUnit(MapUnit* unit, char* folder)
 	void* waterBoxResource = archive->getResource("waterbox.txt");
 	if (waterBoxResource) {
 		RamStream stream(waterBoxResource, -1);
-		stream.resetPosition(true, 1);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 		unit->mSeaMgr.read(stream);
 	}
 
@@ -340,7 +340,7 @@ void MapUnitMgr::makeUnit(MapUnit* unit, char* folder)
 	void* routeResource = archive->getResource("route.txt");
 	if (routeResource) {
 		RamStream stream(routeResource, -1);
-		stream.resetPosition(true, 1);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 		unit->mRouteMgr.read(stream);
 	}
 
@@ -364,7 +364,7 @@ MapRoom::MapRoom()
 {
 	mModel = nullptr;
 	mUnit  = nullptr;
-	PSMTXIdentity(_0D8.mMatrix.mtxView);
+	PSMTXIdentity(mRoomSpaceMtx.mMatrix.mtxView);
 	mIndex     = -1;
 	mLink      = nullptr;
 	mWpIndices = nullptr;
@@ -413,7 +413,7 @@ void MapRoom::placeObjects(Cave::FloorInfo* floorInfo, bool isFinalFloor)
 					triInfo.mPosition = birthPos;
 					f32 minY          = 0.0f;
 					if (mapMgr) {
-						triInfo.mUpdateOnNewMaxY = 0;
+						triInfo.mGetTopPolygonInfo = 0;
 						mapMgr->getCurrTri(triInfo);
 						minY = triInfo.mMinY;
 					}
@@ -553,7 +553,7 @@ void MapRoom::placeObjects(Cave::FloorInfo* floorInfo, bool isFinalFloor)
 					}
 					RoomDoorInfo* doorinfo = &mDoorInfos[doorIdx];
 					Vector3f birthPos      = Vector3f(doorinfo->mWaypoint->mPosition);
-					f32 dir                = JMath::atanTable_.atan2_(doorinfo->mLookAtPos.x, doorinfo->mLookAtPos.z);
+					f32 dir                = JMAAtan2Radian(doorinfo->mLookAtPos.x, doorinfo->mLookAtPos.z);
 					ItemGateInitArg gateArg;
 					gateArg.mFaceDir = dir;
 
@@ -615,7 +615,7 @@ void MapRoom::doAnimation()
 		bool isVisible = false;
 		for (int i = 0; i < gfx->mActiveViewports; i++) {
 			Viewport* vp = gfx->getViewport(i);
-			if (vp->viewable() && vp->mCamera->isCylinderVisible(_160)) {
+			if (vp->viewable() && vp->mCamera->isCylinderVisible(mRoomVisibilityCylinder)) {
 				isVisible = true;
 				break;
 			}
@@ -635,11 +635,11 @@ void MapRoom::doAnimation()
 void MapRoom::doEntry()
 {
 	if (RoomMapMgr::mUseCylinderViewCulling) {
-		Graphics* gfx  = sys->mGfx;
+		Graphics* gfx  = sys->getGfx();
 		bool isVisible = false;
 		for (int i = 0; i < gfx->mActiveViewports; i++) {
 			Viewport* vp = gfx->getViewport(i);
-			if (vp->viewable() && vp->mCamera->isCylinderVisible(_160)) {
+			if (vp->viewable() && vp->mCamera->isCylinderVisible(mRoomVisibilityCylinder)) {
 				isVisible = true;
 				break;
 			}
@@ -649,15 +649,16 @@ void MapRoom::doEntry()
 		}
 	} else {
 		bool isVisible = false;
-		Graphics* gfx  = sys->mGfx;
+		Graphics* gfx  = sys->getGfx();
 
 		for (int i = 0; i < gfx->mActiveViewports; i++) {
 			Viewport* vp = gfx->getViewport(i);
-			if (vp->viewable() && vp->mCamera->isVisible(_150)) {
+			if (vp->viewable() && vp->mCamera->isVisible(mRoomVisibilitySphere)) {
 				isVisible = true;
 				break;
 			}
 		}
+
 		if (isVisible) {
 			if (!gameSystem->paused()) {
 				for (int i = 0; i < mAnimationCount; i++) {
@@ -670,6 +671,7 @@ void MapRoom::doEntry()
 			if (BaseHIOParms::sEntryOptMapRoom && !gameSystem->isMultiplayerMode()) {
 				return;
 			}
+
 			mModel->hide();
 		}
 
@@ -678,171 +680,6 @@ void MapRoom::doEntry()
 
 	mModel->mJ3dModel->calcMaterial();
 	mModel->mJ3dModel->diff();
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stmw     r27, 0xc(r1)
-	mr       r31, r3
-	lbz      r0, mUseCylinderViewCulling__Q24Game10RoomMapMgr@sda21(r13)
-	cmplwi   r0, 0
-	beq      lbl_801B785C
-	lwz      r3, sys@sda21(r13)
-	li       r28, 0
-	li       r27, 0
-	lwz      r29, 0x24(r3)
-	b        lbl_801B782C
-
-lbl_801B77F0:
-	mr       r3, r29
-	mr       r4, r27
-	bl       getViewport__8GraphicsFi
-	mr       r30, r3
-	bl       viewable__8ViewportFv
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801B7828
-	lwz      r3, 0x44(r30)
-	addi     r4, r31, 0x160
-	bl       isCylinderVisible__9CullPlaneFRQ23Sys8Cylinder
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801B7828
-	li       r28, 1
-	b        lbl_801B7838
-
-lbl_801B7828:
-	addi     r27, r27, 1
-
-lbl_801B782C:
-	lwz      r0, 0x264(r29)
-	cmpw     r27, r0
-	blt      lbl_801B77F0
-
-lbl_801B7838:
-	clrlwi.  r0, r28, 0x18
-	beq      lbl_801B7978
-	lwz      r3, 0x13c(r31)
-	lwz      r3, 8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0xc(r12)
-	mtctr    r12
-	bctrl
-	b        lbl_801B7978
-
-lbl_801B785C:
-	lwz      r3, sys@sda21(r13)
-	li       r27, 0
-	li       r28, 0
-	lwz      r29, 0x24(r3)
-	b        lbl_801B78AC
-
-lbl_801B7870:
-	mr       r3, r29
-	mr       r4, r28
-	bl       getViewport__8GraphicsFi
-	mr       r30, r3
-	bl       viewable__8ViewportFv
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801B78A8
-	lwz      r3, 0x44(r30)
-	addi     r4, r31, 0x150
-	bl       isVisible__9CullPlaneFRQ23Sys6Sphere
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801B78A8
-	li       r27, 1
-	b        lbl_801B78B8
-
-lbl_801B78A8:
-	addi     r28, r28, 1
-
-lbl_801B78AC:
-	lwz      r0, 0x264(r29)
-	cmpw     r28, r0
-	blt      lbl_801B7870
-
-lbl_801B78B8:
-	clrlwi.  r0, r27, 0x18
-	beq      lbl_801B7918
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	bl       paused__Q24Game10GameSystemFv
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801B7900
-	li       r27, 0
-	li       r29, 0
-	b        lbl_801B78F4
-
-lbl_801B78DC:
-	lwz      r0, 0xcc(r31)
-	lfs      f1, lbl_80519460@sda21(r2)
-	add      r3, r0, r29
-	bl       animate__Q23Sys15MatBaseAnimatorFf
-	addi     r29, r29, 0xc
-	addi     r27, r27, 1
-
-lbl_801B78F4:
-	lwz      r0, 0xc8(r31)
-	cmpw     r27, r0
-	blt      lbl_801B78DC
-
-lbl_801B7900:
-	lwz      r3, 0x13c(r31)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x1c(r12)
-	mtctr    r12
-	bctrl
-	b        lbl_801B7960
-
-lbl_801B7918:
-	lbz      r0, sEntryOptMapRoom__Q24Game12BaseHIOParms@sda21(r13)
-	cmplwi   r0, 0
-	beq      lbl_801B794C
-	lwz      r4, gameSystem__4Game@sda21(r13)
-	li       r3, 0
-	lwz      r0, 0x44(r4)
-	cmpwi    r0, 1
-	beq      lbl_801B7940
-	cmpwi    r0, 3
-	bne      lbl_801B7944
-
-lbl_801B7940:
-	li       r3, 1
-
-lbl_801B7944:
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801B799C
-
-lbl_801B794C:
-	lwz      r3, 0x13c(r31)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x18(r12)
-	mtctr    r12
-	bctrl
-
-lbl_801B7960:
-	lwz      r3, 0x13c(r31)
-	lwz      r3, 8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0xc(r12)
-	mtctr    r12
-	bctrl
-
-lbl_801B7978:
-	lwz      r3, 0x13c(r31)
-	lwz      r3, 8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	lwz      r3, 0x13c(r31)
-	lwz      r3, 8(r3)
-	bl       diff__8J3DModelFv
-
-lbl_801B799C:
-	lmw      r27, 0xc(r1)
-	lwz      r0, 0x24(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -863,13 +700,13 @@ void MapRoom::doSetView(int viewportNumber)
 		if (vp->viewable()) {
 			LookAtCamera* cam = vp->mCamera;
 			if (RoomMapMgr::mUseCylinderViewCulling) {
-				if (cam->isCylinderVisible(_160)) {
+				if (cam->isCylinderVisible(mRoomVisibilityCylinder)) {
 					isVisible = true;
 				}
 				break;
 			}
 
-			if (cam->isVisible(_150)) {
+			if (cam->isVisible(mRoomVisibilitySphere)) {
 				isVisible = true;
 			}
 		}
@@ -920,12 +757,10 @@ RoomMapMgr::RoomMapMgr(Cave::CaveInfo* info)
 	mBoundbox.mMin = Vector3f(SHORT_FLOAT_MAX);
 	mBoundbox.mMax = Vector3f(-SHORT_FLOAT_MAX);
 
-	mCaveInfo                  = info;
-	mFloorInfo                 = nullptr;
-	mSublevel                  = 0;
-	mTriangle.mTrianglePlane.a = 0.0f;
-	mTriangle.mTrianglePlane.b = 1.0f;
-	mTriangle.mTrianglePlane.c = 0.0f;
+	mCaveInfo                        = info;
+	mFloorInfo                       = nullptr;
+	mSublevel                        = 0;
+	mTriangle.mTrianglePlane.mNormal = Vector3f(0.0f, 1.0f, 0.0f);
 
 	mWraith = nullptr;
 }
@@ -967,8 +802,8 @@ void CaveVRBox::create(char* name)
 		if (vrBoxArc) {
 			void* res = vrBoxArc->getResource("model.bmd");
 			if (res) {
-				J3DModelData* model = J3DModelLoaderDataBase::load(res, 0x20000000);
-				model->newSharedDisplayList(0x40000);
+				J3DModelData* model = J3DModelLoaderDataBase::load(res, J3DMLF_Material_PE_FogOff);
+				model->newSharedDisplayList(J3DMLF_UseSingleSharedDL);
 				model->makeSharedDL();
 				mModel = new SysShape::Model(model, 0, 2);
 				Matrixf mtx;
@@ -1017,7 +852,7 @@ void RoomMapMgr::createRandomMap(int floorNum, Cave::EditMapUnit* edit)
 	JUT_ASSERTLINE(1609, unitFile, "%s not found !\n", unitFileName);
 
 	RamStream unitStream(unitFile, -1);
-	unitStream.resetPosition(true, 1);
+	unitStream.setMode(STREAM_MODE_TEXT, 1);
 
 	// set up map unit interfaces
 	int interfaceCount           = unitStream.readInt();
@@ -1036,9 +871,10 @@ void RoomMapMgr::createRandomMap(int floorNum, Cave::EditMapUnit* edit)
 	if (DVDConvertPathToEntrynum(lightingFileName) != -1) {
 		void* lightingFile = JKRDvdRipper::loadToMainRAM(lightingFileName, nullptr, Switch_0, 0, nullptr, JKRDvdRipper::ALLOC_DIR_BOTTOM, 0,
 		                                                 nullptr, nullptr);
+
 		if (lightingFile) {
 			RamStream lightingStream(lightingFile, -1);
-			lightingStream.resetPosition(true, 1);
+			lightingStream.setMode(STREAM_MODE_TEXT, 1);
 			gameSystem->getLightMgr()->loadParm(lightingStream);
 			delete[] lightingFile;
 		} else {
@@ -1057,7 +893,7 @@ void RoomMapMgr::createRandomMap(int floorNum, Cave::EditMapUnit* edit)
 		void* res = layoutArc->getResource("layout.txt");
 		if (res) {
 			RamStream layoutStream(res, -1);
-			layoutStream.resetPosition(true, 1);
+			layoutStream.setMode(STREAM_MODE_TEXT, 1);
 			interfaces[i].mBaseGen->read(layoutStream);
 		}
 
@@ -1068,7 +904,8 @@ void RoomMapMgr::createRandomMap(int floorNum, Cave::EditMapUnit* edit)
 
 	// make map.
 	sys->heapStatusStart("246-CreateRandomMap", nullptr);
-	nishimuraCreateRandomMap(interfaces, interfaceCount, floorInfo, floorNum == mCaveInfo->getFloorMax() - 1, edit);
+	bool isFinalFloor = mCaveInfo->isFinalFloor(floorNum);
+	nishimuraCreateRandomMap(interfaces, interfaceCount, floorInfo, isFinalFloor, edit);
 	sys->heapStatusEnd("246-CreateRandomMap");
 
 	delete[] unitFile;
@@ -1103,8 +940,7 @@ void RoomMapMgr::createRandomMap(int floorNum, Cave::EditMapUnit* edit)
 	CI_LOOP(iter)
 	{
 		if ((*iter)->mUnitKind == Cave::UNITKIND_Room) {
-			mRoomList[roomIdx] = *iter;
-			roomIdx++;
+			mRoomList[roomIdx++] = (*iter);
 		}
 	}
 
@@ -2355,19 +2191,25 @@ Sys::TriIndexList* RoomMapMgr::traceMove(MoveInfo& moveInfo, f32 rate)
 		list = traceMove_new(moveInfo, rate);
 	}
 
-	if (mFloorInfo->hasHiddenCollision() && !moveInfo.mBounceTriangle
+	if (mFloorInfo->hasHiddenCollision() && !moveInfo.mFloorTriangle
 	    && (moveInfo.mMoveSphere->mPosition.y - moveInfo.mMoveSphere->mRadius) < 0.0f) {
+
+		// pop to "floor" (center of move sphere at least one radius above 0)
 		moveInfo.mMoveSphere->mPosition.y = moveInfo.mMoveSphere->mRadius;
 		if (moveInfo.mVelocity->y < 0.0f) {
-			moveInfo.mVelocity->y = -moveInfo.mVelocity->y * (moveInfo.mTraceRadius - 1.0f);
+			// slow fall based on how elastic we are
+			// - perfectly elastic, stop falling
+			// - inelastic, reduce by some amount
+			// - perfectly inelastic, keep falling at same speed
+			moveInfo.mVelocity->y = -moveInfo.mVelocity->y * (moveInfo.mRestitution - 1.0f);
 		}
 
 		Vector3f bottomSpherePos = moveInfo.mMoveSphere->mPosition;
 		bottomSpherePos.y -= moveInfo.mMoveSphere->mRadius;
 
-		moveInfo.mBounceTriangle = &mTriangle;
-		moveInfo.mPosition       = Vector3f(0.0f, 1.0f, 0.0f);
-		moveInfo.mUpDirection    = Vector3f(0.0f, 1.0f, 0.0f);
+		moveInfo.mFloorTriangle = &mTriangle;
+		moveInfo.mFloorNormal   = Vector3f(0.0f, 1.0f, 0.0f);
+		moveInfo.mUnusedNormal  = Vector3f(0.0f, 1.0f, 0.0f);
 
 		moveInfo.mBaseSpherePos = bottomSpherePos;
 
@@ -2577,7 +2419,7 @@ s16 RoomMapMgr::findRoomIndex(Sys::Sphere& sphere)
 	{
 		MapRoom* room = static_cast<MapRoom*>(*iter);
 		Vector3f pos  = sphere.mPosition;
-		pos           = room->_108.mtxMult(pos);
+		pos           = room->mInvRoomSpaceMtx.mtxMult(pos);
 
 		Vector2f min(room->mUnit->mBoundingBox.mMin.x, room->mUnit->mBoundingBox.mMin.z);
 		min.x -= sphere.mRadius;
@@ -2615,7 +2457,7 @@ void RoomMapMgr::createGlobalCollision()
 		CI_LOOP(iter)
 		{
 			MapRoom* room    = *iter;
-			room->mCollision = room->mUnit->mCollision.clone(room->_0D8);
+			room->mCollision = room->mUnit->mCollision.clone(room->mRoomSpaceMtx);
 		}
 		P2DEBUG("After: %d", JKRGetCurrentHeap()->getTotalFreeSize());
 		return;
@@ -2648,8 +2490,56 @@ void RoomMapMgr::createGlobalCollision()
 		triTable->addOne(tri);
 	}
 
+	int count21 = 0;
+	int count20 = 0;
+
 	Iterator<MapRoom> iterCreate(&mRoomMgr);
-	CI_LOOP(iterCreate) { MapRoom* room = *iterCreate; }
+	CI_LOOP(iterCreate)
+	{
+		MapRoom* room            = *iterCreate;
+		Matrixf& mtx             = room->mRoomSpaceMtx;
+		Sys::VertexTable* verts  = room->mUnit->mCollision.mDivider->mVertexTable;   // r26
+		Sys::TriangleTable* tris = room->mUnit->mCollision.mDivider->mTriangleTable; // r19
+		for (int i = 0; i < verts->getNum(); i++) {
+			Vector3f preVert = *verts->getVertex(i);
+			Vector3f vert    = mtx.mtxMult(preVert);
+			vertTable->addOne(vert);
+			count21++;
+		}
+
+		for (int i = 0; i < tris->getNum(); i++) {
+			Sys::Triangle* preTri  = tris->getTriangle(i);
+			Sys::Triangle* postTri = triTable->getTriangle(i);
+			postTri->mVertices[0]  = preTri->mVertices[0] + count20;
+			postTri->mVertices[1]  = preTri->mVertices[1] + count20;
+			postTri->mVertices[2]  = preTri->mVertices[2] + count20;
+			postTri->mCode         = preTri->mCode;
+			postTri->makePlanes(*vertTable);
+			postTri->createSphere(*vertTable);
+			mRoomTriIndices[i] = room->mIndex;
+		}
+		count20 = count21;
+	}
+
+	box      = vertTable->mBoundBox;
+	box.mMin = box.mMin - Vector3f(10.0f);
+	box.mMax = box.mMax + Vector3f(10.0f);
+
+	mMapCollision           = new MapCollision;
+	mMapCollision->mDivider = new Sys::GridDivider;
+	int countX              = 48;
+	int countZ              = 48;
+
+	int altX = (f32)((int)absF(box.mMax.x - box.mMin.x)) / 64;
+	int altZ = (f32)((int)absF(box.mMax.z - box.mMin.z)) / 64;
+	if (altX < 48) {
+		countX = altX;
+	}
+
+	if (altZ < 48) {
+		countZ = altZ;
+	}
+	static_cast<Sys::GridDivider*>(mMapCollision->mDivider)->create(box, countX, countZ, vertTable, triTable);
 
 	P2DEBUG("After: %d", JKRGetCurrentHeap()->getTotalFreeSize());
 	/*
@@ -3378,8 +3268,58 @@ lbl_801BAB44:
  * @note Address: 0x801BAD60
  * @note Size: 0x328
  */
-Sys::TriIndexList* RoomMapMgr::traceMove_new(MoveInfo&, f32)
+Sys::TriIndexList* RoomMapMgr::traceMove_new(MoveInfo& info, f32 step)
 {
+	Vector3f* velocity         = info.mVelocity;   // r25
+	Sys::Sphere* moveSphere    = info.mMoveSphere; // r26
+	Vector3f startPos          = moveSphere->mPosition;
+	moveSphere->mPosition      = moveSphere->mPosition + *info.mVelocity * step;
+	moveSphere->mPosition      = moveSphere->mPosition;
+	Sys::TriIndexList* triList = mMapCollision->mDivider->findTriLists(*moveSphere);
+
+	Sys::Sphere sphere44; // r29
+	Sys::Sphere sphere34; // r28
+
+	Sys::VertexTable* vertTable = mMapCollision->mDivider->mVertexTable; // r23
+
+	for (triList; triList; triList = static_cast<Sys::TriIndexList*>(triList->mNext)) {
+		for (int i = 0; i < triList->getNum(); i++) {
+			int index          = triList->getIndex(i);
+			Sys::Triangle* tri = mMapCollision->mDivider->mTriangleTable->getTriangle(index);
+			Sys::Triangle::SphereSweep sweep;
+			sweep.mStartPos = startPos;
+			sweep.mSphere   = *moveSphere;
+			if (info.mDoHardIntersect) {
+				sweep.mSweepType = Sys::Triangle::SphereSweep::ST_SphereIntersectPlane;
+			}
+
+			if (tri->intersect(*vertTable, sweep)) {
+				info.mRoomIndex    = mRoomTriIndices[index];
+				sphere34.mPosition = sphere34.mPosition;
+				Vector3f old34     = sphere34.mPosition;
+				if (info.mIntersectCallback) {
+					info.mIntersectCallback->invoke(sphere44.mPosition, sphere34.mPosition);
+				}
+
+				if (sphere34.mPosition.y >= info.mFloorThreshold) {
+					info.mFloorTriangle = tri;
+					info.mFloorNormal   = sphere34.mPosition;
+				} else if (absF(sphere34.mPosition.y) <= info.mWallThreshold) {
+					info.mWallTriangle = tri;
+					info.mWallNormal   = sphere34.mPosition;
+				}
+
+				f32 impactAmt         = sphere34.mPosition.dot(*velocity);
+				impactAmt             = (1.0f + info.mRestitution) * impactAmt;
+				*velocity             = *velocity - sphere34.mPosition * impactAmt;
+				moveSphere->mPosition = moveSphere->mPosition + old34 * sphere34.mRadius;
+			}
+
+			Sys::Triangle::debug = false;
+		}
+	}
+
+	return nullptr;
 	/*
 	stwu     r1, -0xe0(r1)
 	mflr     r0
@@ -3609,8 +3549,99 @@ lbl_801BB038:
  * @note Address: 0x801BB088
  * @note Size: 0x740
  */
-void RoomMapMgr::traceMove_original(MoveInfo&, f32)
+Sys::TriIndexList* RoomMapMgr::traceMove_original(MoveInfo& info, f32 step)
 {
+	Iterator<MapRoom> iterRoom(&mRoomMgr);
+	int count               = 0;
+	Vector3f* velocity      = info.mVelocity;
+	Sys::Sphere* moveSphere = info.mMoveSphere; // r19
+	Vector3f startPos       = moveSphere->mPosition;
+	moveSphere->mPosition   = moveSphere->mPosition + *velocity * step;
+
+	Vector3f vecArray[8];       // 0x88, 0xFC, r22/r24/r27
+	Sys::Triangle* triArray[8]; // 0x68, 0xF8, r14/r25/r28
+	f32 floatArray[8];          // 0x48, 0x100, r21/r23/r26
+
+	CI_LOOP(iterRoom)
+	{
+		MapRoom* room = *iterRoom; // r31
+		if (sqrDistanceXZ(room->mBoundingSphere.mPosition, moveSphere->mPosition)
+		    > SQUARE(room->mBoundingSphere.mRadius + moveSphere->mRadius)) {
+			continue;
+		}
+		MapUnit* unit         = room->mUnit;
+		moveSphere->mPosition = room->mInvRoomSpaceMtx.mtxMult(moveSphere->mPosition);
+
+		Sys::TriIndexList* triList = unit->mCollision.mDivider->findTriLists(*moveSphere); // r18
+
+		for (triList; triList && count < 8; triList = static_cast<Sys::TriIndexList*>(triList->mNext)) {
+			Sys::VertexTable* vertTable = unit->mCollision.mDivider->mVertexTable;
+			for (int i = 0; i < triList->getNum(); i++) {
+				Sys::Triangle* tri = unit->mCollision.mDivider->mTriangleTable->getTriangle(triList->getIndex(i));
+
+				if ((info.mDoHardIntersect) ? tri->intersectHard(*vertTable, *moveSphere, info.mBaseSpherePos)
+				                            : tri->intersect(*vertTable, *moveSphere, info.mBaseSpherePos)) {
+					info.mBaseSpherePos = room->mRoomSpaceMtx.mtxMult(info.mBaseSpherePos);
+
+					Vector3f triNorm = tri->mTrianglePlane.mNormal;
+					triNorm          = room->mInvRoomSpaceMtx.multTranspose(triNorm);
+					if (info.mIntersectCallback) {
+						info.mIntersectCallback->invoke(info.mBaseSpherePos, triNorm);
+					}
+
+					if (count < 8) {
+						JUT_ASSERTLINE(2856, count < 8, "siboudesu !\n"); // 'it's dead!' lol
+						triArray[count] = tri;
+						vecArray[count] = triNorm;
+						floatArray[count]
+						    = moveSphere->mRadius - (moveSphere->mPosition.dot(tri->mTrianglePlane.mNormal) - tri->mTrianglePlane.mOffset);
+						info.mUnused3      = true;
+						info.mUnusedNormal = triNorm;
+						count++;
+					}
+				}
+				Sys::Triangle::debug = false;
+			}
+		}
+
+		moveSphere->mPosition = room->mRoomSpaceMtx.mtxMult(moveSphere->mPosition);
+	}
+
+	if (count == 0) {
+		return nullptr;
+	}
+
+	int count2      = 0;
+	f32 floatSum    = 0.0f;
+	Vector3f sumVec = Vector3f(0.0f);
+	for (int i = 0; i < count; i++) {
+		if (floatArray[i] < 0.0f) {
+			continue;
+		}
+		count2++;
+		floatSum += floatArray[i];
+		Vector3f currVec = vecArray[i];
+		sumVec += currVec;
+		if (currVec.y > 0.6f) {
+			info.mFloorTriangle = triArray[i];
+			info.mFloorNormal   = currVec;
+		}
+	}
+
+	if (count2 == 0) {
+		return nullptr;
+	}
+
+	f32 norm              = 1.0f / (f32)count2;
+	Vector3f lineOfImpact = sumVec * norm;
+	lineOfImpact.normalise();
+
+	floatSum /= (f32)count2;
+
+	f32 impactAmt         = lineOfImpact.dot(*velocity);
+	f32 elasticFactor     = 1.0f + info.mRestitution;
+	*velocity             = *velocity - lineOfImpact * (elasticFactor * impactAmt);
+	moveSphere->mPosition = moveSphere->mPosition + (lineOfImpact * floatSum);
 	/*
 	stwu     r1, -0x150(r1)
 	mflr     r0
@@ -4140,361 +4171,80 @@ lbl_801BB7B4:
 }
 
 /**
+ * Finds the intersection of a ray with the map rooms.
+ *
+ * @param info The ray intersection information.
+ * @return True if an intersection is found, false otherwise.
+ *
  * @note Address: 0x801BB7C8
  * @note Size: 0x4F0
  */
-bool RoomMapMgr::findRayIntersection(Sys::RayIntersectInfo&)
+bool RoomMapMgr::findRayIntersection(Sys::RayIntersectInfo& info)
 {
-	/*
-	stwu     r1, -0x160(r1)
-	mflr     r0
-	stw      r0, 0x164(r1)
-	stfd     f31, 0x150(r1)
-	psq_st   f31, 344(r1), 0, qr0
-	stfd     f30, 0x140(r1)
-	psq_st   f30, 328(r1), 0, qr0
-	stfd     f29, 0x130(r1)
-	psq_st   f29, 312(r1), 0, qr0
-	stfd     f28, 0x120(r1)
-	psq_st   f28, 296(r1), 0, qr0
-	stfd     f27, 0x110(r1)
-	psq_st   f27, 280(r1), 0, qr0
-	stfd     f26, 0x100(r1)
-	psq_st   f26, 264(r1), 0, qr0
-	stfd     f25, 0xf0(r1)
-	psq_st   f25, 248(r1), 0, qr0
-	stfd     f24, 0xe0(r1)
-	psq_st   f24, 232(r1), 0, qr0
-	stfd     f23, 0xd0(r1)
-	psq_st   f23, 216(r1), 0, qr0
-	stfd     f22, 0xc0(r1)
-	psq_st   f22, 200(r1), 0, qr0
-	stfd     f21, 0xb0(r1)
-	psq_st   f21, 184(r1), 0, qr0
-	stmw     r24, 0x90(r1)
-	lis      r6, "__vt__25Iterator<Q24Game7MapRoom>"@ha
-	li       r5, 0
-	addi     r6, r6, "__vt__25Iterator<Q24Game7MapRoom>"@l
-	addi     r0, r3, 0xac
-	stw      r6, 0x60(r1)
-	mr       r30, r4
-	lfs      f4, lbl_8051945C@sda21(r2)
-	stw      r5, 0x6c(r1)
-	lfs      f0, lbl_80519440@sda21(r2)
-	stw      r5, 0x64(r1)
-	stw      r0, 0x68(r1)
-	lfs      f2, 0(r4)
-	stfs     f2, 0x54(r1)
-	lfs      f1, 4(r4)
-	stfs     f1, 0x58(r1)
-	lfs      f3, 8(r4)
-	stfs     f3, 0x5c(r1)
-	lfs      f1, 0xc(r4)
-	stfs     f1, 0x48(r1)
-	fadds    f1, f2, f1
-	lfs      f2, 0x10(r4)
-	fmuls    f30, f1, f4
-	stfs     f2, 0x4c(r1)
-	lfs      f1, 0x14(r4)
-	stfs     f1, 0x50(r1)
-	fadds    f3, f3, f1
-	lfs      f2, 4(r4)
-	lfs      f1, 0x10(r4)
-	fmuls    f29, f3, f4
-	lfs      f4, 0(r4)
-	fsubs    f5, f2, f1
-	lfs      f3, 0xc(r4)
-	lfs      f2, 8(r4)
-	lfs      f1, 0x14(r4)
-	fsubs    f3, f4, f3
-	fmuls    f4, f5, f5
-	fsubs    f2, f2, f1
-	fmadds   f1, f3, f3, f4
-	fmuls    f2, f2, f2
-	fadds    f31, f2, f1
-	fcmpo    cr0, f31, f0
-	ble      lbl_801BB8E8
-	ble      lbl_801BB8EC
-	frsqrte  f0, f31
-	fmuls    f31, f0, f31
-	b        lbl_801BB8EC
+	Iterator<MapRoom> iterRoom(&mRoomMgr);
+	Vector3f intersectPos;
+	Vector3f startPos = info.mIntersectEdge.mStartPos;
+	Vector3f endPos   = info.mIntersectEdge.mEndPos;
+	Vector3f midPos   = Vector3f((startPos.x + endPos.x) / 2, 0.0f, (startPos.z + endPos.z) / 2);
 
-lbl_801BB8E8:
-	fmr      f31, f0
+	f32 rayLen  = info.mIntersectEdge.mStartPos.distance(info.mIntersectEdge.mEndPos);
+	bool result = false; // r31
+	f32 minDist = 12800000.0f;
 
-lbl_801BB8EC:
-	lwz      r0, 0x6c(r1)
-	li       r31, 0
-	lfs      f22, lbl_80519484@sda21(r2)
-	cmplwi   r0, 0
-	bne      lbl_801BB91C
-	lwz      r3, 0x68(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x18(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
-	b        lbl_801BBC1C
+	CI_LOOP(iterRoom)
+	{
+		MapRoom* room               = *iterRoom;
+		Vector3f distanceFromCenter = midPos - room->mBoundingSphere.mPosition;
+		f32 radius                  = room->mBoundingSphere.mRadius + rayLen;
 
-lbl_801BB91C:
-	lwz      r3, 0x68(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x18(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
-	b        lbl_801BB98C
+		// Check if the ray is outside the room's bounding sphere
+		if (distanceFromCenter.x * distanceFromCenter.x + distanceFromCenter.z * distanceFromCenter.z > SQUARE(radius)) {
+			continue;
+		}
 
-lbl_801BB938:
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0x6c(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801BBC1C
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
+		MapUnit* unit = room->mUnit;
 
-lbl_801BB98C:
-	lwz      r12, 0x60(r1)
-	addi     r3, r1, 0x60
-	lwz      r12, 0x10(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BB938
-	b        lbl_801BBC1C
+		// Convert it to room space
+		Vector3f transformedStartPos = room->mInvRoomSpaceMtx.mtxMult(startPos);
+		Vector3f transformedEndPos   = room->mInvRoomSpaceMtx.mtxMult(endPos);
 
-lbl_801BB9AC:
-	lwz      r3, 0x68(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r29, r3
-	lfs      f0, 0x148(r3)
-	lfs      f1, 0x140(r3)
-	fsubs    f3, f29, f0
-	lfs      f0, 0x14c(r3)
-	fsubs    f2, f30, f1
-	fadds    f0, f0, f31
-	fmuls    f1, f3, f3
-	fmuls    f0, f0, f0
-	fmadds   f1, f2, f2, f1
-	fcmpo    cr0, f1, f0
-	bgt      lbl_801BBB60
-	lwz      r26, 0x138(r29)
-	addi     r3, r29, 0x108
-	addi     r4, r1, 0x54
-	addi     r5, r1, 0x20
-	bl       PSMTXMultVec
-	lfs      f28, 0x20(r1)
-	addi     r3, r29, 0x108
-	lfs      f27, 0x24(r1)
-	addi     r4, r1, 0x48
-	lfs      f26, 0x28(r1)
-	addi     r5, r1, 0x14
-	bl       PSMTXMultVec
-	lfs      f5, 0x18(r1)
-	addi     r4, r1, 0x38
-	lfs      f6, 0x1c(r1)
-	lfs      f4, 0x14(r1)
-	fadds    f1, f27, f5
-	lfs      f2, lbl_8051945C@sda21(r2)
-	fadds    f0, f26, f6
-	fadds    f3, f28, f4
-	stfs     f28, 0x70(r1)
-	fmuls    f1, f1, f2
-	fmuls    f0, f0, f2
-	stfs     f27, 0x74(r1)
-	fmuls    f2, f3, f2
-	stfs     f26, 0x78(r1)
-	stfs     f4, 0x7c(r1)
-	stfs     f5, 0x80(r1)
-	stfs     f6, 0x84(r1)
-	stfs     f2, 0x38(r1)
-	stfs     f1, 0x3c(r1)
-	stfs     f0, 0x40(r1)
-	stfs     f31, 0x44(r1)
-	lwz      r3, 0x28(r26)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	mr       r25, r3
-	b        lbl_801BBB58
+		// Create a new ray
+		Sys::Edge newRay;
+		newRay.mStartPos = transformedStartPos;
+		newRay.mEndPos   = transformedEndPos;
 
-lbl_801BBA90:
-	li       r24, 0
-	li       r27, 0
-	b        lbl_801BBB48
+		Vector3f transformedMidPos
+		    = Vector3f((transformedStartPos.x + transformedEndPos.x) / 2, (transformedStartPos.y + transformedEndPos.y) / 2,
+		               (transformedStartPos.z + transformedEndPos.z) / 2);
 
-lbl_801BBA9C:
-	lwz      r4, 0x24(r25)
-	mr       r3, r30
-	lwz      r5, 0x28(r26)
-	lwzx     r0, r4, r27
-	lwz      r4, 0x1c(r5)
-	mulli    r0, r0, 0x60
-	lwz      r4, 0x24(r4)
-	add      r28, r4, r0
-	mr       r4, r28
-	bl       condition__Q23Sys16RayIntersectInfoFRQ23Sys8Triangle
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BBB40
-	lfs      f1, 0x18(r30)
-	mr       r3, r28
-	addi     r4, r1, 0x70
-	addi     r5, r1, 0x2c
-	bl       "intersect__Q23Sys8TriangleFRQ23Sys4EdgefR10Vector3<f>"
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BBB40
-	lfs      f1, 0x30(r1)
-	li       r31, 1
-	lfs      f0, 0x2c(r1)
-	fsubs    f3, f1, f27
-	lfs      f1, 0x34(r1)
-	fsubs    f2, f0, f28
-	fsubs    f1, f1, f26
-	fmuls    f0, f3, f3
-	fmadds   f0, f2, f2, f0
-	fmadds   f21, f1, f1, f0
-	fcmpo    cr0, f21, f22
-	bge      lbl_801BBB40
-	addi     r3, r29, 0xd8
-	addi     r4, r1, 0x2c
-	addi     r5, r1, 8
-	bl       PSMTXMultVec
-	lfs      f25, 8(r1)
-	fmr      f22, f21
-	lfs      f24, 0xc(r1)
-	lfs      f23, 0x10(r1)
-	lfs      f0, 0x10(r28)
-	stfs     f0, 0x48(r30)
+		Sys::Sphere boundSphere;
+		boundSphere.mPosition = transformedMidPos;
+		boundSphere.mRadius   = rayLen;
 
-lbl_801BBB40:
-	addi     r27, r27, 4
-	addi     r24, r24, 1
+		Sys::TriIndexList* triList = unit->mCollision.mDivider->findTriLists(boundSphere);
 
-lbl_801BBB48:
-	lwz      r0, 0x1c(r25)
-	cmpw     r24, r0
-	blt      lbl_801BBA9C
-	lwz      r25, 4(r25)
+		for (triList; triList; triList = static_cast<Sys::TriIndexList*>(triList->mNext)) {
+			for (int i = 0; i < triList->getNum(); i++) {
+				Sys::Triangle* tri = unit->mCollision.mDivider->mTriangleTable->getTriangle(triList->getIndex(i));
+				if (info.condition(*tri)) {
+					Vector3f intersectionPoint;
+					if (tri->intersect(newRay, info.mRadius, intersectionPoint)) {
+						result                   = true;
+						Vector3f directionVector = intersectionPoint - transformedStartPos;
+						f32 dist                 = directionVector.sqrMagnitude();
+						if (dist < minDist) {
+							intersectPos  = room->mRoomSpaceMtx.mtxMult(intersectionPoint);
+							minDist       = dist;
+							info.mNormalY = tri->mTrianglePlane.mNormal.y;
+						}
+					}
+				}
+			}
+		}
+	}
 
-lbl_801BBB58:
-	cmplwi   r25, 0
-	bne      lbl_801BBA90
-
-lbl_801BBB60:
-	lwz      r0, 0x6c(r1)
-	cmplwi   r0, 0
-	bne      lbl_801BBB8C
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
-	b        lbl_801BBC1C
-
-lbl_801BBB8C:
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
-	b        lbl_801BBC00
-
-lbl_801BBBAC:
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0x6c(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801BBC1C
-	lwz      r3, 0x68(r1)
-	lwz      r4, 0x64(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x64(r1)
-
-lbl_801BBC00:
-	lwz      r12, 0x60(r1)
-	addi     r3, r1, 0x60
-	lwz      r12, 0x10(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BBBAC
-
-lbl_801BBC1C:
-	lwz      r3, 0x68(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x1c(r12)
-	mtctr    r12
-	bctrl
-	lwz      r4, 0x64(r1)
-	cmplw    r4, r3
-	bne      lbl_801BB9AC
-	stfs     f25, 0x34(r30)
-	mr       r3, r31
-	stfs     f24, 0x38(r30)
-	stfs     f23, 0x3c(r30)
-	psq_l    f31, 344(r1), 0, qr0
-	lfd      f31, 0x150(r1)
-	psq_l    f30, 328(r1), 0, qr0
-	lfd      f30, 0x140(r1)
-	psq_l    f29, 312(r1), 0, qr0
-	lfd      f29, 0x130(r1)
-	psq_l    f28, 296(r1), 0, qr0
-	lfd      f28, 0x120(r1)
-	psq_l    f27, 280(r1), 0, qr0
-	lfd      f27, 0x110(r1)
-	psq_l    f26, 264(r1), 0, qr0
-	lfd      f26, 0x100(r1)
-	psq_l    f25, 248(r1), 0, qr0
-	lfd      f25, 0xf0(r1)
-	psq_l    f24, 232(r1), 0, qr0
-	lfd      f24, 0xe0(r1)
-	psq_l    f23, 216(r1), 0, qr0
-	lfd      f23, 0xd0(r1)
-	psq_l    f22, 200(r1), 0, qr0
-	lfd      f22, 0xc0(r1)
-	psq_l    f21, 184(r1), 0, qr0
-	lfd      f21, 0xb0(r1)
-	lmw      r24, 0x90(r1)
-	lwz      r0, 0x164(r1)
-	mtlr     r0
-	addi     r1, r1, 0x160
-	blr
-	*/
+	info.mIntersectPosition = intersectPos;
+	return result;
 }
 
 /**
@@ -4504,8 +4254,8 @@ lbl_801BBC1C:
 f32 RoomMapMgr::getMinY(Vector3f& pos)
 {
 	CurrTriInfo info;
-	info.mPosition        = pos;
-	info.mUpdateOnNewMaxY = 0;
+	info.mPosition          = pos;
+	info.mGetTopPolygonInfo = 0;
 	getCurrTri(info);
 	return info.mMinY;
 }
@@ -4514,11 +4264,80 @@ f32 RoomMapMgr::getMinY(Vector3f& pos)
  * @note Address: 0x801BBD44
  * @note Size: 0x770
  */
-void RoomMapMgr::createTriangles(Sys::CreateTriangleArg&)
+void RoomMapMgr::createTriangles(Sys::CreateTriangleArg& createArg)
 {
-	Vector3f vecs[768];
+	f32 rad = createArg.mBoundingSphere.mRadius;
+	Vector3f vecs[768];           // 0x864
+	Sys::Triangle* triArray[256]; // 0x464
+	MapRoom* roomArray[256];      // 0x64
 	Iterator<MapRoom> iter(&mRoomMgr);
-	CI_LOOP(iter) { }
+	int count = 0;
+	CI_LOOP(iter)
+	{
+		MapRoom* room = *iter;
+		Vector3f sep2 = room->_190.mPosition - createArg.mBoundingSphere.mPosition;
+		f32 radius    = room->_190.mRadius + rad;
+		if (sep2.x * sep2.x + sep2.z * sep2.z > SQUARE(radius)) {
+			continue;
+		}
+		MapUnit* unit = room->mUnit;
+		Sys::Sphere boundSphere;
+		boundSphere.mPosition      = room->mInvRoomSpaceMtx.mtxMult(createArg.mBoundingSphere.mPosition);
+		boundSphere.mRadius        = rad;
+		Sys::TriIndexList* triList = unit->mCollision.mDivider->findTriLists(boundSphere);
+
+		for (triList; triList; triList = static_cast<Sys::TriIndexList*>(triList->mNext)) {
+			for (int i = 0; i < triList->getNum(); i++) {
+				Sys::Triangle* tri          = unit->mCollision.mDivider->mTriangleTable->getTriangle(triList->getIndex(i));
+				Sys::VertexTable* vertTable = unit->mCollision.mDivider->mVertexTable;
+				if (!tri->intersect(*vertTable, boundSphere)) {
+					continue;
+				}
+				Vector3f vertices[3]; // 0x40
+				for (int j = 0; j < 3; j++) {
+					vertices[j] = *vertTable->getVertex(tri->mVertices[j]);
+					vertices[j] = room->mRoomSpaceMtx.mtxMult(vertices[j]);
+				}
+
+				bool isAlreadySet = false;
+				for (int j = 0; j < count; j++) {
+					if (tri == triArray[j] && room == roomArray[j]) {
+						isAlreadySet = true;
+					}
+				}
+
+				if (isAlreadySet) {
+					continue;
+				}
+
+				if (count >= 256) {
+					break;
+				}
+
+				Vector3f transRoomVec = room->mRoomSpaceMtx.multTranspose(tri->mTrianglePlane.mNormal);
+				if (transRoomVec.y > createArg.mScaleLimit) {
+					Vector3f addVec  = transRoomVec * createArg.mScale;
+					triArray[count]  = tri;
+					roomArray[count] = room;
+					for (int k = 0; k < 3; k++) {
+						vertices[k] += addVec;
+						vecs[3 * count + k] = addVec;
+					}
+					count++;
+				}
+			}
+		}
+	}
+
+	if (count > 0) {
+		createArg.mVertices = new Vector3f[count * 3];
+
+		for (int i = 0; i < count * 3; i++) {
+			createArg.mVertices[i] = vecs[i];
+		}
+	}
+
+	createArg.mCount = count;
 	/*
 	stwu     r1, -0x2cd0(r1)
 	mflr     r0
@@ -5051,324 +4870,62 @@ lbl_801BC490:
  * @note Address: 0x801BC4B4
  * @note Size: 0x460
  */
-void RoomMapMgr::getCurrTri(CurrTriInfo&)
+void RoomMapMgr::getCurrTri(CurrTriInfo& info)
 {
-	/*
-	stwu     r1, -0x60(r1)
-	mflr     r0
-	lfs      f0, lbl_80519488@sda21(r2)
-	stw      r0, 0x64(r1)
-	li       r0, 0
-	cmplwi   r0, 0
-	stmw     r24, 0x40(r1)
-	mr       r25, r3
-	lis      r3, "__vt__25Iterator<Q24Game7MapRoom>"@ha
-	mr       r26, r4
-	stfs     f0, 0x18(r4)
-	addi     r4, r3, "__vt__25Iterator<Q24Game7MapRoom>"@l
-	addi     r3, r25, 0xac
-	stw      r4, 0x30(r1)
-	stw      r0, 0x3c(r1)
-	stw      r0, 0x34(r1)
-	stw      r3, 0x38(r1)
-	bne      lbl_801BC514
-	lwz      r12, 0(r3)
-	lwz      r12, 0x18(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
-	b        lbl_801BC894
+	info.mMaxY = 328000.0f;
+	Iterator<MapRoom> iterRoom(&mRoomMgr);
+	CI_LOOP(iterRoom)
+	{
+		MapRoom* room = *iterRoom;
+		f32 rad       = room->_190.mRadius;
+		Vector3f sep  = room->_190.mPosition - info.mPosition;
+		if (sep.x * sep.x + sep.z * sep.z > rad * rad) {
+			continue;
+		}
+		MapUnit* unit = room->mUnit;
+		Vector3f pos  = room->mInvRoomSpaceMtx.mtxMult(info.mPosition);
+		Sys::Sphere boundSphere(pos, 0.0f);
+		Sys::TriIndexList* triList = unit->mCollision.mDivider->findTriLists(boundSphere);
+		for (triList; triList; triList = static_cast<Sys::TriIndexList*>(triList->mNext)) {
+			for (int i = 0; i < triList->getNum(); i++) {
+				Sys::Triangle* tri = unit->mCollision.mDivider->mTriangleTable->getTriangle(triList->getIndex(i));
+				if (!tri->insideXZ(pos)) {
+					continue;
+				}
 
-lbl_801BC514:
-	lwz      r12, 0(r3)
-	lwz      r12, 0x18(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
-	b        lbl_801BC580
+				f32 height = pos.y;
+				if (info.mMaxY > height) {
+					info.mMaxY = height;
+					if (info.mGetTopPolygonInfo) {
+						info.mTriangle  = tri;
+						info.mNormalVec = tri->mTrianglePlane.mNormal;
+						info.mNormalVec = room->mInvRoomSpaceMtx.multTranspose(info.mNormalVec);
+					}
+				}
 
-lbl_801BC52C:
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0x3c(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801BC894
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
+				if (info.mMinY < height) {
+					info.mMinY = height;
+					if (!info.mGetTopPolygonInfo) {
+						info.mTriangle  = tri;
+						info.mNormalVec = tri->mTrianglePlane.mNormal;
+						info.mNormalVec = room->mInvRoomSpaceMtx.multTranspose(info.mNormalVec);
+					}
+				}
+			}
+		}
+	}
 
-lbl_801BC580:
-	lwz      r12, 0x30(r1)
-	addi     r3, r1, 0x30
-	lwz      r12, 0x10(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BC52C
-	b        lbl_801BC894
+	if (mFloorInfo->hasHiddenCollision() && info.mMinY < 0.0f) {
+		info.mMinY     = 0.0f;
+		info.mMaxY     = 0.0f;
+		info.mTriangle = &mTriangle;
+		return;
+	}
 
-lbl_801BC5A0:
-	lwz      r3, 0x38(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r31, r3
-	lfs      f0, 8(r26)
-	lfs      f1, 0x198(r3)
-	lfs      f4, 0x19c(r3)
-	fsubs    f3, f1, f0
-	lfs      f2, 0x190(r3)
-	lfs      f1, 0(r26)
-	fmuls    f0, f4, f4
-	fsubs    f2, f2, f1
-	fmuls    f1, f3, f3
-	fmadds   f1, f2, f2, f1
-	fcmpo    cr0, f1, f0
-	bgt      lbl_801BC7D8
-	lwz      r29, 0x138(r31)
-	mr       r4, r26
-	addi     r3, r31, 0x108
-	addi     r5, r1, 8
-	bl       PSMTXMultVec
-	lfs      f3, 8(r1)
-	addi     r4, r1, 0x14
-	lfs      f2, 0xc(r1)
-	lfs      f1, 0x10(r1)
-	lfs      f0, lbl_80519440@sda21(r2)
-	stfs     f3, 0x24(r1)
-	stfs     f2, 0x28(r1)
-	stfs     f1, 0x2c(r1)
-	stfs     f3, 0x14(r1)
-	stfs     f2, 0x18(r1)
-	stfs     f1, 0x1c(r1)
-	stfs     f0, 0x20(r1)
-	lwz      r3, 0x28(r29)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	mr       r28, r3
-	b        lbl_801BC7D0
-
-lbl_801BC648:
-	li       r27, 0
-	li       r30, 0
-	b        lbl_801BC7C0
-
-lbl_801BC654:
-	lwz      r3, 0x24(r28)
-	addi     r4, r1, 0x24
-	lwz      r5, 0x28(r29)
-	lwzx     r0, r3, r30
-	lwz      r3, 0x1c(r5)
-	mulli    r0, r0, 0x60
-	lwz      r3, 0x24(r3)
-	add      r24, r3, r0
-	mr       r3, r24
-	bl       "insideXZ__Q23Sys8TriangleFR10Vector3<f>"
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BC7B8
-	lfs      f10, 0x28(r1)
-	lfs      f0, 0x18(r26)
-	fcmpo    cr0, f0, f10
-	ble      lbl_801BC720
-	stfs     f10, 0x18(r26)
-	lbz      r0, 0xc(r26)
-	cmplwi   r0, 0
-	beq      lbl_801BC720
-	stw      r24, 0x14(r26)
-	lfs      f0, 0xc(r24)
-	stfs     f0, 0x20(r26)
-	lfs      f0, 0x10(r24)
-	stfs     f0, 0x24(r26)
-	lfs      f0, 0x14(r24)
-	stfs     f0, 0x28(r26)
-	lfs      f7, 0x24(r26)
-	lfs      f1, 0x118(r31)
-	lfs      f0, 0x11c(r31)
-	fmuls    f1, f7, f1
-	lfs      f8, 0x20(r26)
-	lfs      f4, 0x108(r31)
-	fmuls    f2, f7, f0
-	lfs      f0, 0x120(r31)
-	lfs      f3, 0x10c(r31)
-	fmadds   f5, f8, f4, f1
-	lfs      f9, 0x28(r26)
-	lfs      f6, 0x128(r31)
-	fmuls    f0, f7, f0
-	lfs      f1, 0x110(r31)
-	fmadds   f3, f8, f3, f2
-	lfs      f4, 0x12c(r31)
-	fmadds   f5, f9, f6, f5
-	lfs      f2, 0x130(r31)
-	fmadds   f0, f8, f1, f0
-	fmadds   f1, f9, f4, f3
-	stfs     f5, 0x20(r26)
-	fmadds   f0, f9, f2, f0
-	stfs     f1, 0x24(r26)
-	stfs     f0, 0x28(r26)
-
-lbl_801BC720:
-	lfs      f0, 0x1c(r26)
-	fcmpo    cr0, f0, f10
-	bge      lbl_801BC7B8
-	stfs     f10, 0x1c(r26)
-	lbz      r0, 0xc(r26)
-	cmplwi   r0, 0
-	bne      lbl_801BC7B8
-	stw      r24, 0x14(r26)
-	lfs      f0, 0xc(r24)
-	stfs     f0, 0x20(r26)
-	lfs      f0, 0x10(r24)
-	stfs     f0, 0x24(r26)
-	lfs      f0, 0x14(r24)
-	stfs     f0, 0x28(r26)
-	lfs      f7, 0x24(r26)
-	lfs      f1, 0x118(r31)
-	lfs      f0, 0x11c(r31)
-	fmuls    f1, f7, f1
-	lfs      f8, 0x20(r26)
-	lfs      f4, 0x108(r31)
-	fmuls    f2, f7, f0
-	lfs      f0, 0x120(r31)
-	lfs      f3, 0x10c(r31)
-	fmadds   f5, f8, f4, f1
-	lfs      f9, 0x28(r26)
-	lfs      f6, 0x128(r31)
-	fmuls    f0, f7, f0
-	lfs      f1, 0x110(r31)
-	fmadds   f3, f8, f3, f2
-	lfs      f4, 0x12c(r31)
-	fmadds   f5, f9, f6, f5
-	lfs      f2, 0x130(r31)
-	fmadds   f0, f8, f1, f0
-	fmadds   f1, f9, f4, f3
-	stfs     f5, 0x20(r26)
-	fmadds   f0, f9, f2, f0
-	stfs     f1, 0x24(r26)
-	stfs     f0, 0x28(r26)
-
-lbl_801BC7B8:
-	addi     r30, r30, 4
-	addi     r27, r27, 1
-
-lbl_801BC7C0:
-	lwz      r0, 0x1c(r28)
-	cmpw     r27, r0
-	blt      lbl_801BC654
-	lwz      r28, 4(r28)
-
-lbl_801BC7D0:
-	cmplwi   r28, 0
-	bne      lbl_801BC648
-
-lbl_801BC7D8:
-	lwz      r0, 0x3c(r1)
-	cmplwi   r0, 0
-	bne      lbl_801BC804
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
-	b        lbl_801BC894
-
-lbl_801BC804:
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
-	b        lbl_801BC878
-
-lbl_801BC824:
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x20(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0x3c(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801BC894
-	lwz      r3, 0x38(r1)
-	lwz      r4, 0x34(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	stw      r3, 0x34(r1)
-
-lbl_801BC878:
-	lwz      r12, 0x30(r1)
-	addi     r3, r1, 0x30
-	lwz      r12, 0x10(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BC824
-
-lbl_801BC894:
-	lwz      r3, 0x38(r1)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x1c(r12)
-	mtctr    r12
-	bctrl
-	lwz      r4, 0x34(r1)
-	cmplw    r4, r3
-	bne      lbl_801BC5A0
-	lwz      r3, 0x2c(r25)
-	bl       hasHiddenCollision__Q34Game4Cave9FloorInfoFv
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801BC8E8
-	lfs      f1, 0x1c(r26)
-	lfs      f0, lbl_80519440@sda21(r2)
-	fcmpo    cr0, f1, f0
-	bge      lbl_801BC8E8
-	stfs     f0, 0x1c(r26)
-	addi     r0, r25, 0x40
-	stfs     f0, 0x18(r26)
-	stw      r0, 0x14(r26)
-	b        lbl_801BC900
-
-lbl_801BC8E8:
-	lwz      r0, 0x14(r26)
-	cmplwi   r0, 0
-	bne      lbl_801BC900
-	lfs      f0, lbl_80519440@sda21(r2)
-	stfs     f0, 0x18(r26)
-	stfs     f0, 0x1c(r26)
-
-lbl_801BC900:
-	lmw      r24, 0x40(r1)
-	lwz      r0, 0x64(r1)
-	mtlr     r0
-	addi     r1, r1, 0x60
-	blr
-	*/
+	if (!info.mTriangle) {
+		info.mMaxY = 0.0f;
+		info.mMinY = 0.0f;
+	}
 }
 
 /**
@@ -5431,13 +4988,13 @@ void RoomMapMgr::makeOneRoom(f32 centreX, f32 centreY, f32 direction, char* unit
 	MapUnit* unit = mMapUnitMgr->findMapUnit(unitName); // r22
 
 	room->mUnit = unit;
-	PSMTXCopy(mtx1.mMatrix.mtxView, room->_0D8.mMatrix.mtxView);
-	PSMTXInverse(mtx1.mMatrix.mtxView, room->_108.mMatrix.mtxView);
-	room->mModel = new SysShape::Model(unit->mModelData, 0x20000, 2);
-	room->mModel->mJ3dModel->newDifferedTexMtx(TexDiff_0);
+	PSMTXCopy(mtx1.mMatrix.mtxView, room->mRoomSpaceMtx.mMatrix.mtxView);
+	PSMTXInverse(mtx1.mMatrix.mtxView, room->mInvRoomSpaceMtx.mMatrix.mtxView);
+	room->mModel = new SysShape::Model(unit->mModelData, J3DMODEL_CreateNewDL, 2);
+	room->mModel->mJ3dModel->newDifferedTexMtx(TEXDIFF_Material);
 	room->mModel->mJ3dModel->newDifferedDisplayList(0x200);
 
-	PSMTXCopy(room->_0D8.mMatrix.mtxView, room->mModel->mJ3dModel->mPosMtx);
+	PSMTXCopy(room->mRoomSpaceMtx.mMatrix.mtxView, room->mModel->mJ3dModel->mPosMtx);
 	room->mModel->mJ3dModel->calc();
 	room->mModel->mJ3dModel->calcMaterial();
 	room->mModel->mJ3dModel->makeDL();
@@ -5479,14 +5036,14 @@ void RoomMapMgr::makeOneRoom(f32 centreX, f32 centreY, f32 direction, char* unit
 		val += 30.0f;
 	}
 
-	room->_150.mPosition = modelCenter + translation;
-	room->_150.mRadius   = val;
+	room->mRoomVisibilitySphere.mPosition = modelCenter + translation;
+	room->mRoomVisibilitySphere.mRadius   = val;
 
 	Vector3f startCyl = Vector3f(room->mBoundingSphere.mPosition);
 	Vector3f endCyl   = Vector3f(room->mBoundingSphere.mPosition);
 	endCyl.y -= 100.0f;
 
-	room->_160.set(startCyl, endCyl, room->mBoundingSphere.mRadius);
+	room->mRoomVisibilityCylinder.set(startCyl, endCyl, room->mBoundingSphere.mRadius);
 
 	mSeaMgr->addSeaMgr(&unit->mSeaMgr, mtx1);
 	MapUnitInterface* mui = getMUI(unit); // r27
@@ -5497,14 +5054,14 @@ void RoomMapMgr::makeOneRoom(f32 centreX, f32 centreY, f32 direction, char* unit
 
 	room->mDoorInfos = new RoomDoorInfo[room->mDoorNum];
 
-	room->mFlags = mui->_6E;
+	room->mFlags = mui->mFlags;
 
 	for (int i = 0; i < mui->mDoorCount; i++) {
 		Door* door   = mui->getDoor(i);
 		WayPoint* wp = unit->mRouteMgr.getWayPoint(door->mWpIndex);
 
 		wp->mDoFloorSnap = 1;
-		wp->_76          = i;
+		wp->mDoorIndex   = i;
 	}
 
 	int counter = 0;
@@ -5526,7 +5083,7 @@ void RoomMapMgr::makeOneRoom(f32 centreX, f32 centreY, f32 direction, char* unit
 			RoomLink* targetLink = nullptr; // r23
 			FOREACH_NODE(RoomLink, link->mChild, linkNode)
 			{
-				if (linkNode->mLinkIndex == wp->_76) {
+				if (linkNode->mLinkIndex == wp->mDoorIndex) {
 					targetLink = linkNode;
 					break;
 				}
@@ -5535,10 +5092,10 @@ void RoomMapMgr::makeOneRoom(f32 centreX, f32 centreY, f32 direction, char* unit
 			P2ASSERTLINE(3459, targetLink);
 			MapRoom* aliveRoom = getMapRoom(targetLink->mAliveMapIndex); // r21
 
-			Door* door = mui->getDoor(wp->_76); // r22
+			Door* door = mui->getDoor(wp->mDoorIndex); // r22
 
-			Vector3f doorDirs[4] = { (Vector3f) { 1.0f, 0.0f, 0.0f }, (Vector3f) { 0.0f, 0.0f, 1.0f }, (Vector3f) { 0.0f, 0.0f, 0.0f },
-				                     (Vector3f) { 0.0f, 1.0f, 0.0f } }; // 0x1B4
+			Vector3f doorDirs[4] = { (Vector3f) { 0.0f, 0.0f, 1.0f }, (Vector3f) { 1.0f, 0.0f, 0.0f }, (Vector3f) { 0.0f, 0.0f, -1.0f },
+				                     (Vector3f) { -1.0f, 0.0f, 0.0f } }; // 0x1B4
 
 			if (!aliveRoom) {
 				P2ASSERTBOOLLINE(3480, wp->mIndex >= 0 && wp->mIndex < counter);
@@ -7391,14 +6948,14 @@ void RoomMapMgr::doEntry()
 			mSeaMgr->doEntry();
 		}
 
-		section->setDrawBuffer(2);
+		section->setDrawBuffer(DB_MapLayer);
 		mRoomMgr.doEntry();
 		if (mVRBox.mModel) {
-			section->setDrawBuffer(6);
+			section->setDrawBuffer(DB_FirstLayer);
 			mVRBox.mModel->mJ3dModel->entry();
 		}
 
-		section->setDrawBuffer(0);
+		section->setDrawBuffer(DB_NormalLayer);
 	}
 
 	sys->mTimers->_stop("ENT-MAP");

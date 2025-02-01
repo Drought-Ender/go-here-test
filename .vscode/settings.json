@@ -1,10 +1,10 @@
 {
     "[c]": {
-        "files.encoding": "shiftjis",
+        "files.encoding": "utf8",
         "editor.defaultFormatter": "ms-vscode.cpptools"
     },
     "[cpp]": {
-        "files.encoding": "shiftjis",
+        "files.encoding": "utf8",
         "editor.defaultFormatter": "ms-vscode.cpptools"
     },
     "editor.tabSize": 4,
@@ -54,7 +54,12 @@
         "gxdata.h": "c",
         "gxtypes.h": "c",
         "gxtexture.h": "c",
-        "math.h": "c",
-        "arith.h": "c"
+        "arith.h": "c",
+        "file_pos.h": "c",
+        "ctype.h": "c",
+        "mem_funcs.h": "c",
+        "card.h": "c",
+        "FILE_POS.c": "cpp",
+        "ctype_api.h": "c"
     }
 }

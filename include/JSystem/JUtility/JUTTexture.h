@@ -4,7 +4,7 @@
 #include "Dolphin/gx.h"
 #include "types.h"
 #include "JSystem/ResTIMG.h"
-#include "JSystem/J2D/J2DPane.h"
+#include "JSystem/J2D/J2DScreen.h"
 
 struct JUTPalette;
 struct ResTIMG;
@@ -73,6 +73,7 @@ struct JUTTexture : public GXTexObj {
 	u8 getTlutName() const { return mTlut; }
 
 	int getTransparency() { return mTexInfo->mTransparency; }
+	u8 getFormat() const { return mTexInfo->mTextureFormat; }
 
 	void setTlutName(u8 tlut) { mTlut = tlut; }
 
@@ -99,7 +100,5 @@ struct JUTTexture : public GXTexObj {
 	u8 mFlags;                  // _3B
 	ResTIMG* mImage;            // _3C
 };
-
-inline ResTIMG* J2DPicture::getTIMG(u8 i) { return getTexture(i)->mTexInfo; }
 
 #endif

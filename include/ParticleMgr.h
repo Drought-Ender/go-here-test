@@ -31,7 +31,7 @@ struct ParticleMgr : public CNode {
 
 	static void globalInstance();
 	static void deleteInstance();
-	static void Instance_TPkEffectMgr();
+	void Instance_TPkEffectMgr();
 	void deleteInstance_TPkEffectMgr();
 
 	void createHeap(u32);
@@ -64,6 +64,7 @@ struct ParticleMgr : public CNode {
 	void testCreateModelEffect(int, int, Vector3f&);
 
 	inline JPAEmitterManager* getManager() const { return mEmitterManager; }
+	inline Game::GameLightMgr* getLightMgr() const { return mLightMgr; }
 
 	Game::GameLightMgr* mLightMgr;              // _18
 	NodeObjectMgr<ModelEffect> mModelEffectMgr; // _1C
@@ -76,9 +77,9 @@ struct ParticleMgr : public CNode {
 	JPAResourceManager* mResourceManager;       // _9C
 	JKRHeap* mHeap;                             // _A0
 	JKRHeap* mModelEffectHeap;                  // _A4
-	int _A8;                                    // _A8
+	int mUnusedVal;                             // _A8
 
-	static bool disableCulling;
+	static volatile bool disableCulling;
 	static f32 mClipRadiusS; // = 10.0f;
 	static f32 mClipRadiusM; // = 30.0f;
 	static f32 mClipRadiusL; // = 100.0f;

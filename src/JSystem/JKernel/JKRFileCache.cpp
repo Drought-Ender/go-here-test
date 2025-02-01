@@ -172,12 +172,12 @@ void* JKRFileCache::getRelResource(const char* path)
  */
 void* JKRFileCache::getResource(u32 type, const char* fileName)
 {
-	char directoryPath[256];
+	char directoryPath[PATH_MAX];
 	size_t len = strlen(mRootPath);
-	char* v1   = directoryPath + len;
+	char* path = directoryPath + len;
 	strcpy(directoryPath, mRootPath);
 	if (findFile(directoryPath, fileName)) {
-		return getResource(v1);
+		return getResource(path);
 	}
 	return nullptr;
 }
@@ -226,12 +226,12 @@ size_t JKRFileCache::readRelResource(void* p1, u32 p2, const char* p3)
  */
 size_t JKRFileCache::readResource(void* resourceBuffer, u32 bufferSize, u32 type, const char* fileName)
 {
-	char directoryPath[256];
+	char directoryPath[PATH_MAX];
 	size_t len = strlen(mRootPath);
-	char* v1   = directoryPath + len;
+	char* path = directoryPath + len;
 	strcpy(directoryPath, mRootPath);
 	if (findFile(directoryPath, fileName)) {
-		return readResource(resourceBuffer, bufferSize, v1);
+		return readResource(resourceBuffer, bufferSize, path);
 	}
 	return nullptr;
 }

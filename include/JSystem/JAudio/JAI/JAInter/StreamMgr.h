@@ -35,11 +35,11 @@ struct StreamUpdateData {
 	u8 _00;               // _00
 	u8 _01;               // _01
 	u8 mPrepareFlag;      // _02
-	f32 _04;              // _04
-	f32 _08;              // _08
-	f32 _0C;              // _0C
-	f32 _10;              // _10
-	f32 _14;              // _14
+	f32 _04;              // _04, volume
+	f32 _08;              // _08, pitch
+	f32 _0C;              // _0C, pan
+	f32 _10;              // _10, fxmix
+	f32 _14;              // _14, dolby
 	u32 mActiveTrackFlag; // _18, see JAISoundTrackActiveFlags enum
 	JAIStream* mStream;   // _1C
 };
@@ -50,7 +50,7 @@ typedef void (*ExternalAramBufferCallback)(JASHeap*);
 typedef void (*MgrCallback)();
 
 void init();
-void storeStreamBuffer(JAIStream**, JAInter::Actor*, u32, u32, u8, JAInter::SoundInfo*);
+void storeStreamBuffer(JAIStream** soundHandlePtr, JAInter::Actor* actor, u32 soundID, u32 fadeTime, u8 camId, JAInter::SoundInfo* info);
 void releaseStreamBuffer(JAIStream* stream, u32 fadeTime);
 void checkSystem();
 void PlayingStream();
@@ -79,14 +79,15 @@ void setChannelMax(u32);
 void setExternalAramBuffer(ExternalAramBufferCallback);
 
 extern struct Flags {
-	u16 _0 : 1;
-	u16 _1 : 1;
-	u16 _2 : 1;
-	u16 _3 : 1;
-	u16 _4 : 1;
-	u16 _5 : 1;
-	u16 _6 : 1;
+	u16 _00 : 1;
+	u16 _01 : 1;
+	u16 _02 : 1;
+	u16 _03 : 1;
+	u16 _04 : 1;
+	u16 _05 : 1;
+	u16 _06 : 1;
 } flags;
+
 extern u8 prepareSw;
 extern u8 prepareFlag;
 extern u8 externalAram;

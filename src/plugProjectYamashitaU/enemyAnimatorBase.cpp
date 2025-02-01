@@ -20,21 +20,21 @@ EnemyAnimatorBase::EnemyAnimatorBase()
  */
 void EnemyAnimatorBase::animate(f32 speed)
 {
-	if (!(mFlags.isSet(EANIM_FLAG_STOPPED))) {
-		if (mFlags.isSet(EANIM_FLAG_FINISHED)) {
+	if (!(mFlags.isSet(SysShape::Animator::AnimCompleted))) {
+		if (mFlags.isSet(SysShape::Animator::AnimFinishMotion)) {
 			mNormalizedTime *= 0.9f;
 			if (mNormalizedTime < 0.1f) {
 				mNormalizedTime = 0.0f;
 
-				mFlags.unset(EANIM_FLAG_PLAYING);
-				mFlags.set(EANIM_FLAG_STOPPED);
+				mFlags.unset(SysShape::Animator::AnimInProgress);
+				mFlags.set(SysShape::Animator::AnimCompleted);
 			}
-		} else if (mFlags.isSet(EANIM_FLAG_PLAYING)) {
+		} else if (mFlags.isSet(SysShape::Animator::AnimInProgress)) {
 			mNormalizedTime *= 1.1f;
 			if (mNormalizedTime > 1.0f) {
 				mNormalizedTime = 1.0f;
 
-				mFlags.unset(EANIM_FLAG_FINISHED | EANIM_FLAG_STOPPED);
+				mFlags.unset(SysShape::Animator::AnimFinishMotion | SysShape::Animator::AnimCompleted);
 				mNormalizedTime = 1.0f;
 			}
 		}
@@ -51,21 +51,21 @@ void EnemyAnimatorBase::animate(f32 speed)
  */
 void EnemyAnimatorBase::animate(int animatorNum, f32 speed)
 {
-	if (!(mFlags.isSet(EANIM_FLAG_STOPPED))) {
-		if (mFlags.isSet(EANIM_FLAG_FINISHED)) {
+	if (!(mFlags.isSet(SysShape::Animator::AnimCompleted))) {
+		if (mFlags.isSet(SysShape::Animator::AnimFinishMotion)) {
 			mNormalizedTime *= 0.9f;
 			if (mNormalizedTime < 0.1f) {
 				mNormalizedTime = 0.0f;
 
-				mFlags.unset(EANIM_FLAG_PLAYING);
-				mFlags.set(EANIM_FLAG_STOPPED);
+				mFlags.unset(SysShape::Animator::AnimInProgress);
+				mFlags.set(SysShape::Animator::AnimCompleted);
 			}
-		} else if (mFlags.isSet(EANIM_FLAG_PLAYING)) {
+		} else if (mFlags.isSet(SysShape::Animator::AnimInProgress)) {
 			mNormalizedTime *= 1.1f;
 			if (mNormalizedTime > 1.0f) {
 				mNormalizedTime = 1.0f;
 
-				mFlags.unset(EANIM_FLAG_FINISHED | EANIM_FLAG_STOPPED);
+				mFlags.unset(SysShape::Animator::AnimFinishMotion | SysShape::Animator::AnimCompleted);
 				mNormalizedTime = 1.0f;
 			}
 		}

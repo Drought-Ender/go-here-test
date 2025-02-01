@@ -2,14 +2,57 @@
 #define _JSYSTEM_JAS_JASTRACK_H
 
 #include "JSystem/JAudio/JAS/JASBank.h"
-#include "JSystem/JAudio/JAS/JASOscillator.h"
-#include "types.h"
 #include "JSystem/JSupport/JSUList.h"
 #include "JSystem/JAudio/JAS/JASSeqCtrl.h"
 #include "JSystem/JAudio/JAS/JASChannel.h"
 #include "JSystem/JAudio/JAS/JASRegisterParam.h"
+#include "JSystem/JAudio/JAS/JASPlayer.h"
+
+#define TRACKPORT_MAX (16)
 
 struct JASTrack;
+
+enum JASOuterParamFlag {
+	OUTERPARAM_Volume     = 0x1,
+	OUTERPARAM_Pitch      = 0x2,
+	OUTERPARAM_Fxmix      = 0x4,
+	OUTERPARAM_Pan        = 0x8,
+	OUTERPARAM_Dolby      = 0x10,
+	OUTERPARAM_Unk6       = 0x20,
+	OUTERPARAM_Tempo      = 0x40,
+	OUTERPARAM_FIR8Filter = 0x80,
+	OUTERPARAM_IIR0       = 0x1000,
+	OUTERPARAM_IIR1       = 0x2000,
+	OUTERPARAM_IIR2       = 0x4000,
+	OUTERPARAM_IIR3       = 0x8000,
+	OUTERPARAM_Unk18      = 0x20000,
+
+	OUTERPARAM_IIRFilter = OUTERPARAM_IIR0 | OUTERPARAM_IIR1 | OUTERPARAM_IIR2 | OUTERPARAM_IIR3,
+};
+
+enum JASRegisters {
+	JASREG_Unk0 = 0,
+	JASREG_Unk1 = 1,
+	JASREG_Unk2 = 2,
+
+	JASREG_Unk4 = 4,
+	JASREG_Unk5 = 5,
+
+	JASREG_BankNumber    = 0x20,
+	JASREG_ProgramNumber = 0x21,
+	JASREG_Unk34         = 0x22,
+	JASREG_Unk35         = 0x23,
+
+	JASREG_Unk40 = 0x28,
+	JASREG_Unk41 = 0x29,
+	JASREG_Unk42 = 0x2A,
+	JASREG_Unk43 = 0x2B,
+
+	JASREG_Unk44 = 0x2C, // related to children?
+	JASREG_Unk45 = 0x2D, // related to channels?
+
+	JASREG_SeqLoopTimer = 0x30,
+};
 
 /**
  * @size = 0xC
@@ -37,13 +80,13 @@ struct JASIntrMgr {
 	void* checkIntr();
 	void timerProcess();
 
-	u8 _00;       // _00
-	u8 _01;       // _01
-	u8 _02;       // _02
-	u8 _03;       // _03
-	u32 _04;      // _04
-	u32 _08;      // _08
-	void* _0C[8]; // _0C
+	bool mIsActive;  // _00, if true, checks requests + returns data
+	u8 mRequestFlag; // _01
+	u8 mIntrFlag;    // _02
+	u8 mTimerCount;  // _03, counts down mTimer from mMaxTime to 0, mTimerCount amount of times
+	u32 mTimer;      // _04
+	u32 mMaxTime;    // _08
+	void* mData[8];  // _0C, might just be addresses?
 };
 
 /**
@@ -51,20 +94,21 @@ struct JASIntrMgr {
  */
 struct JASTrackPort {
 	void init();
-	u16 readImport(int);
-	u16 readExport(int);
-	void writeImport(int, u16);
-	void writeExport(int, u16);
+	u16 readImport(int portNo);
+	u16 readExport(int portNo);
+	void writeImport(int portNo, u16 value);
+	void writeExport(int portNo, u16 value);
 
-	u8 _00[0x10];  // _00
-	u8 _10[0x10];  // _10
-	u16 _20[0x10]; // _20
+	u8 mImportFlag[TRACKPORT_MAX]; // _00
+	u8 mExportFlag[TRACKPORT_MAX]; // _10
+	u16 mValue[TRACKPORT_MAX];     // _20
 };
 
 /**
  * @size = 0x2C
  */
 struct JASOuterParam {
+
 	JASOuterParam();
 
 	void initExtBuffer();
@@ -85,11 +129,11 @@ struct JASOuterParam {
 
 	u16 mOuterSwitch;  // _00 - outerSwitch?
 	u16 mOuterUpdate;  // _02 - outerUpdate?
-	f32 _04;           // _04
-	f32 _08;           // _08
-	f32 _0C;           // _0C
-	f32 _10;           // _10
-	f32 _14;           // _14
+	f32 mVolume;       // _04
+	f32 mPitch;        // _08
+	f32 mFxmix;        // _0C
+	f32 mDolby;        // _10
+	f32 mPan;          // _14
 	f32 mTempo;        // _18
 	s16 mFirFilter[8]; // _1C - firFilter?
 };
@@ -97,67 +141,102 @@ struct JASOuterParam {
 /**
  * @size = 0x358
  */
-struct JASTrack : JSUList<JASChannel> {
+struct JASTrack : public JSUList<JASChannel> {
 	typedef JASChannel* (*NoteOnCallback)(JASTrack*, u8, u8, u8, u8, u16);
 	typedef u16 (*SeqCallback)(JASTrack*, u16);
 
+	enum TimedParamType {
+		TIMED_Volume      = 0,
+		TIMED_Pitch       = 1,
+		TIMED_Fxmix       = 2,
+		TIMED_Pan         = 3,
+		TIMED_Dolby       = 4,
+		TIMED_Unk5        = 5,
+		TIMED_Osc0_Width  = 6,
+		TIMED_Osc0_Rate   = 7,
+		TIMED_Osc0_Vertex = 8,
+		TIMED_Osc1_Width  = 9,
+		TIMED_Osc1_Rate   = 10,
+		TIMED_Osc1_Vertex = 11,
+		TIMED_IIR_Unk0    = 12,
+		TIMED_IIR_Unk1    = 13,
+		TIMED_IIR_Unk2    = 14,
+		TIMED_IIR_Unk3    = 15,
+		TIMED_Unk16       = 16,
+		TIMED_Unk17       = 17,
+		TIMED_Count, // 18
+	};
+
 	struct MoveParam_ {
 		MoveParam_()
-		    : _00(0.0f)
-		    , _04(0.0f)
-		    , _08(0.0f)
-		    , _0C(0.0f)
+		    : mCurrentValue(0.0f)
+		    , mTargetValue(0.0f)
+		    , mMoveTime(0.0f)
+		    , mMoveAmount(0.0f)
 		{
 		}
 
-		f32 _00; // _00
-		f32 _04; // _04
-		f32 _08; // _08
-		f32 _0C; // _0C
+		inline void set(f32 value)
+		{
+			mCurrentValue = value;
+			mTargetValue  = value;
+		}
+
+		f32 mCurrentValue; // _00
+		f32 mTargetValue;  // _04
+		f32 mMoveTime;     // _08
+		f32 mMoveAmount;   // _0C
 	};
 
 	struct AInnerParam_ {
 		AInnerParam_()
-		    : _00()
-		    , _10()
-		    , _20()
-		    , _30()
-		    , _40()
+		    : mVolume()
+		    , mPitch()
+		    , mFxmix()
+		    , mPan()
+		    , mDolby()
 		    , _50()
-		    , _60()
-		    , _70()
-		    , _80()
-		    , _90()
-		    , _A0()
-		    , _B0()
-		    , _C0()
+		    , mOsc0Width()
+		    , mOsc0Rate()
+		    , mOsc0Vertex()
+		    , mOsc1Width()
+		    , mOsc1Rate()
+		    , mOsc1Vertex()
+		    , mIIRs()
 		    , _100()
 		    , _110()
 		{
 		}
 
-		MoveParam_ _00;
-		MoveParam_ _10;
-		MoveParam_ _20;
-		MoveParam_ _30;
-		MoveParam_ _40;
-		MoveParam_ _50;
-		MoveParam_ _60;
-		MoveParam_ _70;
-		MoveParam_ _80;
-		MoveParam_ _90;
-		MoveParam_ _A0;
-		MoveParam_ _B0;
-		MoveParam_ _C0[4];
-		MoveParam_ _100;
-		MoveParam_ _110;
+		MoveParam_ mVolume;     // _00
+		MoveParam_ mPitch;      // _10
+		MoveParam_ mFxmix;      // _20
+		MoveParam_ mPan;        // _30
+		MoveParam_ mDolby;      // _40
+		MoveParam_ _50;         // _50
+		MoveParam_ mOsc0Width;  // _60
+		MoveParam_ mOsc0Rate;   // _70
+		MoveParam_ mOsc0Vertex; // _80
+		MoveParam_ mOsc1Width;  // _90
+		MoveParam_ mOsc1Rate;   // _A0
+		MoveParam_ mOsc1Vertex; // _B0
+		MoveParam_ mIIRs[4];    // _C0
+		MoveParam_ _100;        // _100
+		MoveParam_ _110;        // _110
 	};
 
 	union TimedParam_ {
 		TimedParam_() { }
 
-		AInnerParam_ mInnerParam;
-		MoveParam_ mMoveParams[0x12];
+		AInnerParam_ mInnerParam;            // get individual params by member name
+		MoveParam_ mMoveParams[TIMED_Count]; // get individual params by index
+	};
+
+	enum ParamType {
+		JASParam_Volume = 0,
+		JASParam_Pitch  = 1,
+		JASParam_Null   = 2,
+		JASParam_Pan    = 3,
 	};
 
 	JASTrack();
@@ -173,7 +252,7 @@ struct JASTrack : JSUList<JASChannel> {
 	void overwriteOsc(JASChannel*);
 	bool noteOff(u8, u16);
 	int gateOn(u8, s32, s32, s32);
-	BOOL checkNoteStop(s32);
+	bool checkNoteStop(s32);
 	void oscSetupFull(u8, u32, u32);
 	void oscSetupSimpleEnv(u8, u32);
 	void oscSetupSimple(u8);
@@ -183,7 +262,7 @@ struct JASTrack : JSUList<JASChannel> {
 	void updateTempo();
 	void updateSeq(u32, bool);
 	s32 seqTimeToDspTime(s32, u8);
-	void setParam(int, f32, int);
+	void setParam(int type, f32 value, int);
 	bool setSeqData(u8*, s32);
 	bool startSeq();
 	bool stopSeq();
@@ -193,20 +272,20 @@ struct JASTrack : JSUList<JASChannel> {
 	JASTrack* openChild(u8, u8);
 	u32 exchangeRegisterValue(u8);
 	u32 readReg32(u8);
-	u32 readReg16(u8);
+	u16 readReg16(u8);
 	void writeRegDirect(u8, u16);
 	void writeRegParam(u8);
-	u16 readSelfPort(int portNumber);
-	void writeSelfPort(int portNumber, u16 value);
-	bool writePortAppDirect(u32, u16);
-	bool readPortAppDirect(u32, u16*);
-	void writePortApp(u32, u16);
-	void readPortApp(u32, u16*);
+	u16 readSelfPort(int portNo);
+	void writeSelfPort(int portNo, u16 value);
+	bool writePortAppDirect(u32 portNo, u16 value);
+	bool readPortAppDirect(u32 portNo, u16* outValue);
+	bool writePortApp(u32, u16 value);
+	bool readPortApp(u32, u16* outValue);
 	void pause(bool, bool);
 	int getTranspose() const;
 	void setTempo(u16);
 	void setTimebase(u16);
-	f32 panCalc(f32, f32, f32, u8);
+	f32 panCalc(f32 valA, f32 valB, f32 weight, u8 calcType);
 	void setNoteMask(u8);
 	void muteTrack(bool);
 
@@ -232,7 +311,7 @@ struct JASTrack : JSUList<JASChannel> {
 	void updateOscParam(int, f32);
 	void muteChildTracks(u16);
 	void loadTbl(u32, u32, u32);
-	void routeTrack(u32);
+	JASTrack* routeTrack(u32 count);
 	void routeTrack(u32) const;
 	void checkExportApp(u32) const;
 	void checkImportApp(u32) const;
@@ -240,26 +319,43 @@ struct JASTrack : JSUList<JASChannel> {
 	int getChannelCount() const;
 	int getReleaseChannelCount() const;
 
-	inline JASSeqCtrl* getCtrl() { return &mSeqCtrl; }
+	inline JASSeqCtrl* getSeq() { return &mSeqCtrl; }
+	inline JASOuterParam* getExtBuffer() const { return mExtBuffer; }
 
-	// JSUPtrList _00;        // _00
+	inline void initOscillators()
+	{
+		for (int i = 0; i < 2; i++) {
+			mOscRoute[i] = 0xF;
+			mOscData[i]  = JASPlayer::sEnvelopeDef;
+		}
+	}
+
+	static struct JASSeqParser sParser;
+
+	// these might be JSUList<JASChannel>, for whatever difference that may or may not make
+	static JASTrack* sFreeList;
+	static JASTrack* sFreeListEnd;
+
+	static SeqCallback sCallBackFunc;
+
+	// _00-_0C = JSUList
 	JASSeqCtrl mSeqCtrl;               // _0C
 	JASTrackPort mTrackPort;           // _54
 	JASIntrMgr mIntrMgr;               // _94
 	JASChannel* mChannels[8];          // _C0
 	u32 _E0;                           // _E0
 	u8 _E4;                            // _E4
-	u8 _E5;                            // _E5
+	u8 _E5;                            // _E5, last note?
 	u8 _E6;                            // _E6
 	u8 _E7;                            // _E7 - might be padding
 	JASVibrate mVibrate;               // _E8
 	JASChannelUpdater mChannelUpdater; // _F4
-	NoteOnCallback _144;               // _144
+	NoteOnCallback mNoteOnCallback;    // _144
 	TimedParam_ mTimedParam;           // _148
 	JASRegisterParam mRegisterParam;   // _268
-	u8 _298[0x10];                     // _298 - unknown
+	u8 _298[0x10];                     // _298, unknown
 	JASOscillator::Data mOscData[2];   // _2A8
-	u32 _2D8[2];                       // _2D8
+	u32 mOscRoute[2];                  // _2D8
 	s16 _2E0[12];                      // _2E0
 	JASTrack* mParentTrack;            // _2F8
 	JASTrack* mChildList[16];          // _2FC
@@ -267,7 +363,7 @@ struct JASTrack : JSUList<JASChannel> {
 	f32 _340;                          // _340
 	f32 mCurrentTempo;                 // _344, actual calculated tempo for playback
 	u32 _348;                          // _348
-	u32 _34C;                          // _34C - unknown
+	u32 mUpdateFlags;                  // _34C
 	u16 _350;                          // _350
 	u16 mTempo;                        // _352, direct value read from bms
 	u16 mTimeBase;                     // _354
@@ -277,25 +373,17 @@ struct JASTrack : JSUList<JASChannel> {
 	u8 mVolumeMode;                    // _359
 	u8 mNoteMask;                      // _35A
 	u8 _35B;                           // _35B
-	u8 _35C;                           // _35C
-	u8 _35D;                           // _35D
-	u8 _35E;                           // _35E
-	u8 _35F;                           // _35F
-	u8 _360;                           // _360
-	u8 _361;                           // _361
+	u8 mPanCalcType;                   // _35C
+	u8 mFxmixCalcType;                 // _35D
+	u8 mDolbyCalcType;                 // _35E
+	u8 mParentPanCalcType;             // _35F
+	u8 mParentFxmixCalcType;           // _360
+	u8 mParentDolbyCalcType;           // _361
 	bool mIsPaused;                    // _362
 	bool mIsMuted;                     // _363
 	u8 mTimeRelate;                    // _364
 	u8 _365;                           // _365
 	u8 _366;                           // _366
-
-	static struct JASSeqParser* sParser;
-
-	// these might be JSUList<JASChannel>, for whatever difference that may or may not make
-	static JASTrack* sFreeList;
-	static JASTrack* sFreeListEnd;
-
-	static SeqCallback sCallBackFunc;
 };
 
 #endif

@@ -319,6 +319,8 @@ typedef enum _GXCullMode {
 	GX_CULL_FRONT = 1,
 	GX_CULL_BACK  = 2,
 	GX_CULL_ALL   = 3,
+
+	GX_CULL_INVALID = 0xFF,
 } GXCullMode;
 
 // Clipping modes.
@@ -532,6 +534,8 @@ typedef enum _GXTexMtx {
 	GX_TEXMTX9 = 30 + 9 * 3, // 57, Mtx9
 
 	GX_IDENTITY = 60, // 60, Identity mtx
+
+	GX_TEXMTX_NULL = 0, // 0, no matrix selected
 } GXTexMtx;
 
 // Texture matrix type.

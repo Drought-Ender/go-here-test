@@ -16,7 +16,7 @@ const char filename[] = "246-KabutoMgr";
 Mgr::Mgr(int p1, u8 p2)
     : EnemyMgrBase(p1, p2)
 {
-	mName = "カブトマネージャ"; // beetle manager
+	mName = "繧ｫ繝悶ヨ繝槭ロ繝ｼ繧ｸ繝｣"; // beetle manager
 }
 
 /**
@@ -74,13 +74,13 @@ void Mgr::loadAnimData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 	P2ASSERTLINE(147, model != nullptr);
 
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "mat_babykabuto_body") || !strcmp(name, "mat_babykabuto_eye") || !strcmp(name, "mat_babykabuto_head")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x04020000);
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(J3DMDF_TexCoord1 | J3DMDF_DiffTexCoordScale);
 		}
 	}
 

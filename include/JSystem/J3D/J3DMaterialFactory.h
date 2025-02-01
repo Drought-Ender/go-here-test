@@ -13,75 +13,34 @@
 #include "JSystem/J3D/J3DTypes.h"
 #include "types.h"
 
-struct J3DColorChanInfo {
-	bool mlightingEnabled; // _00
-	u8 mMaterialColorSrc;  // _01
-	u8 mAmbientColorSrc;   // _02
-	u8 mLitmask;           // _03
-	u8 mDiffuseFn;         // _04
-	u8 mAttnFn;            // _05
-	u8 _06;                // _06 - unknown/padding
-	u8 _07;                // _07 - unknown/padding
-};
-
 struct J3DDisplayListInit {
-	u32 _00; // _00
-	u32 _04; // _04
+	u32 mOffset; // _00
+	u32 mSize;   // _04
 };
 
 struct J3DIndInitData {
-	u8 _00;             // _00
-	u8 mIndTexStageNum; // _01
-	u32 : 0;
-	J3DIndTexOrder mIndTexOrders[4];           // _04
-	J3DIndTexMtx mIndTexMatrices[3];           // _14
-	J3DIndTexCoordScale mIndTexCoordScales[1]; // _68 - unknown length
-	u8 _6C[0xCC];                              // _6C - tbd
+	bool mEnabled;                                    // _00
+	u8 mIndTexStageNum;                               // _01
+	u8 _02[2];                                        // _02, padding?
+	J3DIndTexOrderInfo mIndTexOrderInfo[3];           // _04
+	u8 _10[4];                                        // _10, padding?
+	J3DIndTexMtxInfo mIndTexMtxInfo[3];               // _14
+	J3DIndTexCoordScaleInfo mIndTexCoordScaleInfo[3]; // _68
+	u8 _74[4];                                        // _74, padding?
+	J3DIndTevStageInfo mIndTevStageInfo[16];          // _78
 };
 
 struct J3DLightInfo {
 };
 
 struct J3DPatchingInfo {
-	u16 _00;   // _00
-	u16 _02;   // _02
-	u16 _04;   // _04
-	u16 _06;   // _06
-	u16 _08;   // _08
-	u16 _0A;   // _0A
-	u8 _0C[4]; // _0C
-};
-
-struct J3DTevStageInfo {
-	u8 mTevStageMode; // _00
-	u8 mColorInA;     // _01
-	u8 mColorInB;     // _02
-	u8 mColorInC;     // _03
-	u8 mColorInD;     // _04
-	u8 mColorOp;      // _05
-	u8 mColorBias;    // _06
-	u8 mColorScale;   // _07
-	bool mColorClamp; // _08
-	u8 mColorRegID;   // _09
-	u8 mAlphaInA;     // _0A
-	u8 mAlphaInB;     // _0B
-	u8 mAlphaInC;     // _0C
-	u8 mAlphaInD;     // _0D
-	u8 mAlphaOp;      // _0E
-	u8 mAlphaBias;    // _0F
-	u8 mAlphaScale;   // _10
-	bool mAlphaClamp; // _11
-	u8 mAlphaRegID;   // _12
-	u8 _13;           // _13 - unknown
-};
-
-extern const J3DTevSwapModeInfo j3dDefaultTevSwapMode;
-
-struct J3DTevSwapModeTableInfo {
-	u8 mR; // _00
-	u8 mG; // _01
-	u8 mB; // _02
-	u8 mA; // _03
+	u16 mMatColorOffset;  // _00
+	u16 mColorChanOffset; // _02
+	u16 mTexMtxOffset;    // _04
+	u16 mTexNoOffset;     // _06
+	u16 mTevRegOffset;    // _08
+	u16 mFogOffset;       // _0A
+	u8 _0C[4];            // _0C
 };
 
 struct J3DTexCoord2Info {
@@ -123,7 +82,11 @@ struct J3DMaterialInitData {
 };
 
 struct J3DMaterialFactory {
-	enum MaterialType { NORMAL = 0, LOCKED, PATCHED };
+	enum MaterialType {
+		NORMAL  = 0,
+		LOCKED  = 1,
+		PATCHED = 2,
+	};
 
 	J3DMaterialFactory(const J3DMaterialBlock& block);
 	J3DMaterialFactory(const J3DMaterialDLBlock& block);
@@ -159,34 +122,35 @@ struct J3DMaterialFactory {
 	u8 newTevStageNum(int) const;
 	J3DTevSwapModeTable newTevSwapModeTable(int, int) const;
 	J3DTexCoord newTexCoord(int, int) const;
-	u8 newTexGenNum(int) const;
-	J3DTexMtx newTexMtx(int, int) const;
+	u32 newTexGenNum(int) const;
+	J3DTexMtx* newTexMtx(int, int) const;
 	u16 newTexNo(int, int) const;
 	u8 newZCompLoc(int) const;
 	J3DZMode newZMode(int) const;
 	void modifyPatchedCurrentMtx(J3DMaterial*, int) const;
 
 	/** @fabricated */
-	// inline s32 getMaterialInitDataIndex(s32 initDataIndexIndex) const { return _08[initDataIndexIndex]; }
+	u16 getMaterialID(int idx) const { return mMatRemapTable[idx]; }
 	inline J3DMaterialInitData& getMaterialInitData(s32 index) const { return mInitData[mMatRemapTable[index]]; }
+	u8 getMaterialMode(int idx) const { return getMaterialInitData(idx).mPixelEngineMode; }
 
 	/** @fabricated */
 	inline J3DIndInitData& getIndInitData(s32 index) const { return mIndInitData[index]; }
 
 	// unused/inlined:
-	// inline J3DMaterialInitData& getMaterialInitData(u16 initDataIndexIndex) const { return _04[_08[initDataIndexIndex]]; }
-	// J3DMaterialInitData& getMaterialInitData(u16 initDataIndexIndex) const;
+	u32 countTexGens(int matID) const;
+	u32 countStages(int matID) const;
 
 	u16 mMaterialNum;                               // _00
 	J3DMaterialInitData* mInitData;                 // _04
 	u16* mMatRemapTable;                            // _08
 	J3DIndInitData* mIndInitData;                   // _0C
-	GXColor* mColorData;                            // _10
+	GXColor* mMaterialColors;                       // _10
 	u8* mNumColorChans;                             // _14
 	J3DColorChanInfo* mColorChanInfo;               // _18
 	GXColor* mAmbientColors;                        // _1C
 	J3DLightInfo* mLightInfo;                       // _20
-	u8* mNumTexCoords;                              // _24
+	u8* mTexGenNums;                                // _24
 	J3DTexCoordInfo* mTexCoordInfo;                 // _28
 	J3DTexCoord2Info* mTexCoord2Info;               // _2C
 	J3DTexMtxInfo* mTexMtxInfo;                     // _30
@@ -196,7 +160,7 @@ struct J3DMaterialFactory {
 	J3DTevOrderInfo* mTevOrderInfo;                 // _40
 	GXColorS10* mTevColors;                         // _44
 	GXColor* mTevKColors;                           // _48
-	u8* mNumTevStages;                              // _4C
+	u8* mTevStageNums;                              // _4C
 	J3DTevStageInfo* mTevStageInfo;                 // _50
 	J3DTevSwapModeInfo* mTevSwapModeInfo;           // _54
 	J3DTevSwapModeTableInfo* mTevSwapModeTableInfo; // _58
@@ -248,13 +212,14 @@ struct J3DMaterialInitData_v21 {
 
 struct J3DMaterialFactory_v21 {
 	J3DMaterialFactory_v21(const J3DMaterialBlock_v21&);
+
 	u16 countUniqueMaterials();
 	J3DMaterial* create(J3DMaterial*, int, u32) const;
 	J3DGXColor newMatColor(int, int) const;
 	u8 newColorChanNum(int) const;
 	J3DColorChan newColorChan(int, int) const;
 	u8 newTexGenNum(int) const;
-	J3DTexMtx newTexMtx(int, int) const;
+	J3DTexMtx* newTexMtx(int, int) const;
 	u16 newTexNo(int, int) const;
 	u8 newZCompLoc(int) const;
 	J3DZMode newZMode(int) const;
@@ -274,7 +239,7 @@ struct J3DMaterialFactory_v21 {
 	J3DNBTScale newNBTScale(int) const;
 
 	/** @fabricated */
-	// inline s32 getMaterialInitDataIndex(s32 initDataIndexIndex) const { return _08[initDataIndexIndex]; }
+	u16 getMaterialID(int idx) const { return mMatRemapTable[idx]; }
 	inline J3DMaterialInitData_v21& getMaterialInitData(s32 index) const { return mInitData[mMatRemapTable[index]]; }
 
 	u16 mMaterialNum;                               // _00
@@ -283,7 +248,7 @@ struct J3DMaterialFactory_v21 {
 	GXColor* mColorData;                            // _0C
 	u8* mNumColorChans;                             // _10
 	J3DColorChanInfo* mColorChanInfo;               // _14
-	u8* mNumTexCoords;                              // _18
+	u8* mTexGenNums;                                // _18
 	J3DTexCoordInfo* mTexCoordInfo;                 // _1C
 	J3DTexCoord2Info* mTexCoord2Info;               // _20
 	J3DTexMtxInfo* mTexMtxInfo;                     // _24
@@ -293,7 +258,7 @@ struct J3DMaterialFactory_v21 {
 	J3DTevOrderInfo* mTevOrderInfo;                 // _34
 	GXColorS10* mTevColors;                         // _38
 	GXColor* mTevKColors;                           // _3C
-	u8* mNumTevStages;                              // _40
+	u8* mTevStageNums;                              // _40
 	J3DTevStageInfo* mTevStageInfo;                 // _44
 	J3DTevSwapModeInfo* mTevSwapModeInfo;           // _48
 	J3DTevSwapModeTableInfo* mTevSwapModeTableInfo; // _4C
@@ -304,13 +269,6 @@ struct J3DMaterialFactory_v21 {
 	u8* mZCompareInfo;                              // _60
 	u8* mDitherInfo;                                // _64
 	J3DNBTScaleInfo* mNBTScaleInfo;                 // _68
-	void* _6C;                                      // _6C
-	void* _70;                                      // _70
-	void* _74;                                      // _74
-	void* _78;                                      // _78
-	void* _7C;                                      // _7C
-	void* _80;                                      // _80
-	void* _84;                                      // _84
 };
 
 #endif

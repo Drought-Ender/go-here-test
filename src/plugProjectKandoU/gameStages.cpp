@@ -9,6 +9,7 @@ const char gameStages[] = "gameStages";
 
 namespace Game {
 Stages* stageList;
+f32 gMapRotation = 0.0f;
 
 /**
  * @note Address: N/A
@@ -247,7 +248,8 @@ void CourseInfo::read(Stream& stream)
 	}
 
 	if (strcmp(currentBytes, "startangle") == 0) {
-		mStartAngle = stream.readFloat();
+		mStartAngle  = stream.readFloat();
+		gMapRotation = roundAng(TORADIANS(mStartAngle));
 		stream.readString(nullptr, 0);
 
 		// Convert angle to radians
@@ -309,15 +311,15 @@ char* CourseInfo::getCaveinfoFilename_FromID(ID32& id)
  * @note Address: 0x801ADC3C
  * @note Size: 0x3C
  */
-ID32* CourseInfo::getCaveID_FromIndex(int childIdx)
+u32 CourseInfo::getCaveID_FromIndex(int childIdx)
 {
 	CaveOtakara* node = (CaveOtakara*)mCaveOtakaraInfo.mOwner.getChildAt(childIdx);
 
 	if (node) {
-		return (ID32*)node->mId.getID();
+		return node->mId.getID();
 	}
 
-	return (ID32*)'none';
+	return 'none';
 }
 
 /**
@@ -338,7 +340,7 @@ Stages::Stages()
 	_104 = 0;
 	_10A = 0;
 
-	loadAndRead(this, "user/Abe/stages.txt", nullptr, false);
+	loadFromFile(this, "user/Abe/stages.txt", nullptr, false);
 }
 
 /**
@@ -363,7 +365,7 @@ inline void Stages::update()
 CourseInfo* Stages::getCourseInfo(char* name)
 {
 	for (CNode* node = mCourseInfo.mChild; node; node = node->mNext) {
-		if (!strncmp(name, node->mName, strlen(name))) {
+		if (IS_SAME_STRING_N(name, node->mName, strlen(name))) {
 			return (CourseInfo*)node;
 		}
 	}
@@ -399,32 +401,32 @@ inline void Stages::draw2d()
  */
 void Stages::createMapMgr(Game::CourseInfo* info, Game::RouteMgr* routeMgr)
 {
-	char modelPathTxt[0x100];
+	char modelPathTxt[PATH_MAX];
 	if (info->mModelPath) {
 		sprintf(modelPathTxt, "%s/%s", info->mFolder, info->mModelPath);
 	}
 
-	char collPathTxt[0x100];
+	char collPathTxt[PATH_MAX];
 	if (info->mCollisionPath) {
 		sprintf(collPathTxt, "%s/%s", info->mFolder, info->mCollisionPath);
 	}
 
-	char wboxPathTxt[0x100];
+	char wboxPathTxt[PATH_MAX];
 	if (info->mWaterboxPath) {
 		sprintf(wboxPathTxt, "%s/%s", info->mFolder, info->mWaterboxPath);
 	}
 
-	char codePathTxt[0x100];
+	char codePathTxt[PATH_MAX];
 	if (info->mMapcodePath) {
 		sprintf(codePathTxt, "%s/%s", info->mFolder, info->mMapcodePath);
 	}
 
-	char farmPathTxt[0x100];
+	char farmPathTxt[PATH_MAX];
 	if (info->mFarmPath) {
 		sprintf(farmPathTxt, "%s/%s", info->mFolder, info->mFarmPath);
 	}
 
-	char routePathTxt[0x100];
+	char routePathTxt[PATH_MAX];
 	if (info->mRoutePath) {
 		sprintf(routePathTxt, "%s/%s", info->mAbeFolder, info->mRoutePath);
 	}

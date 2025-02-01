@@ -46,9 +46,9 @@ struct InteractAbsorb : public Interaction {
 };
 
 struct InteractAstonish : public Interaction {
-	inline InteractAstonish(Creature* creature, f32 p1)
+	inline InteractAstonish(Creature* creature, f32 time)
 	    : Interaction(creature)
-	    , _08(p1)
+	    , mMaxTime(time)
 	{
 	}
 
@@ -56,7 +56,7 @@ struct InteractAstonish : public Interaction {
 
 	// _00 = VTBL
 	// _04 = Creature*
-	f32 _08; // _08
+	f32 mMaxTime; // _08, doesnt get used?
 };
 
 struct InteractBattle : public Interaction {
@@ -189,7 +189,7 @@ struct InteractFallMeck : public Interaction {
 struct InteractFarmHaero : public Interaction {
 	inline InteractFarmHaero(Creature* parent, int p1)
 	    : Interaction(parent)
-	    , _08(p1)
+	    , mPower(p1)
 	{
 	}
 
@@ -198,13 +198,13 @@ struct InteractFarmHaero : public Interaction {
 
 	// _00 = VTBL
 	// _04 = Creature*
-	int _08; // _08
+	int mPower; // _08
 };
 
 struct InteractFarmKarero : public Interaction {
-	inline InteractFarmKarero(Creature* parent, int p1)
+	inline InteractFarmKarero(Creature* parent, int power)
 	    : Interaction(parent)
-	    , _08(p1)
+	    , mPower(power)
 	{
 	}
 
@@ -213,7 +213,7 @@ struct InteractFarmKarero : public Interaction {
 
 	// _00 = VTBL
 	// _04 = Creature*
-	int _08; // _08
+	int mPower; // _08
 };
 
 struct InteractFire : public Interaction {
@@ -271,9 +271,9 @@ struct InteractFlockAttack : public Interaction {
 };
 
 struct InteractFlyCollision : public Interaction {
-	inline InteractFlyCollision(Creature* parent, f32 p1, CollPart* collpart)
+	inline InteractFlyCollision(Creature* parent, f32 damage, CollPart* collpart)
 	    : Interaction(parent)
-	    , _08(p1)
+	    , mDamage(damage)
 	    , mCollPart(collpart)
 	{
 	}
@@ -282,16 +282,16 @@ struct InteractFlyCollision : public Interaction {
 
 	// _00 = VTBL
 	// _04 = Creature*
-	f32 _08;             // _08
+	f32 mDamage;         // _08
 	CollPart* mCollPart; // _0C
 };
 
 // Whistle
 struct InteractFue : public Interaction {
-	inline InteractFue(Creature* parent, u8 a, u8 b)
+	inline InteractFue(Creature* parent, bool doCombineParties, bool isNewToParty)
 	    : Interaction(parent)
-	    , _08(a)
-	    , _09(b)
+	    , mDoCombineParties(doCombineParties)
+	    , mIsNewToParty(isNewToParty)
 	{
 	}
 
@@ -301,8 +301,8 @@ struct InteractFue : public Interaction {
 
 	// _00 = VTBL
 	// _04 = Creature*
-	bool _08; // _08
-	bool _09; // _09
+	bool mDoCombineParties; // _08, always false unless whistling another captain that has pikmin
+	bool mIsNewToParty;     // _09, always true unless we're swapping between captains in a two-captain party
 };
 
 struct InteractFueFuki : public Interaction {
@@ -467,23 +467,23 @@ struct InteractSuckFinish : public Interaction {
 };
 
 struct InteractSuikomi_Test : public Interaction {
-	inline InteractSuikomi_Test(Creature* parent, Vector3f* vec, CollPart* p1, CollPart* collpart) // probably
+	inline InteractSuikomi_Test(Creature* parent, Vector3f* direction, CollPart* collpart, CollPart* stomachCollpart)
 	    : Interaction(parent)
 	{
-		_08.x     = vec->x;
-		_08.y     = vec->y;
-		_08.z     = vec->z;
-		_14       = p1;
-		mCollPart = collpart;
+		mUnused08.x      = direction->x;
+		mUnused08.y      = direction->y;
+		mUnused08.z      = direction->z;
+		mCollpart        = collpart;
+		mStomachCollpart = stomachCollpart;
 	}
 
 	virtual bool actPiki(Piki*); // _0C
 
 	// _00 = VTBL
 	// _04 = Creature* (EnemyBase*)
-	Vector3f _08;        // _08
-	CollPart* _14;       // _14, unknown
-	CollPart* mCollPart; // _18
+	Vector3f mUnused08;         // _08, direction
+	CollPart* mCollpart;        // _14
+	CollPart* mStomachCollpart; // _18
 };
 
 ///////////////////////////////////////
@@ -522,7 +522,7 @@ struct InteractHipdrop : public InteractAttack {
 struct InteractSwallow : public InteractAttack {
 	inline InteractSwallow(Creature* parent, f32 damage, CollPart* collpart)
 	    : InteractAttack(parent, damage, collpart)
-	    , _10(0)
+	    , mIsStabbed(FALSE)
 	{
 	}
 
@@ -531,7 +531,7 @@ struct InteractSwallow : public InteractAttack {
 
 	// _00     = VTBL
 	// _00-_10 = InteractAttack
-	int _10; // _10
+	int mIsStabbed; // _10, used for burrownit, plays extra stab sound/anim
 };
 
 struct InteractSarai : public InteractSwallow {
@@ -553,10 +553,8 @@ struct InteractWind : public Interaction {
 	inline InteractWind(Creature* parent, f32 force, Vector3f* direction)
 	    : Interaction(parent)
 	{
-		mDamage      = force;
-		mDirection.x = direction->x;
-		mDirection.y = direction->y;
-		mDirection.z = direction->z;
+		mDamage    = force;
+		mDirection = *direction;
 	}
 
 	virtual bool actPiki(Piki*); // _0C

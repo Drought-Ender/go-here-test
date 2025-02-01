@@ -30,7 +30,7 @@ void J3DGDLoadTlut(void*, u32, GXTlutSize);
 void J3DGDLoadTexMtxImm(Mtx, u32, GXTexMtxType);
 void J3DGDLoadPostTexMtxImm(Mtx, u32);
 
-void J3DGDSetIndTexMtx(GXIndTexMtxID, Mtx33, char);
+void J3DGDSetIndTexMtx(GXIndTexMtxID, Mtx33, s8);
 void J3DFifoLoadTexCached(GXTexMapID, u32, GXTexCacheSize, u32, GXTexCacheSize);
 void J3DFifoLoadPosMtxImm(Mtx, u32);
 void J3DFifoLoadNrmMtxImm(Mtx, u32);
@@ -137,6 +137,45 @@ inline void J3DGDSetTevKonstantSel_SwapModeTable(GXTevStageID stage, GXTevKColor
 {
 	J3DGDWriteBPCmd((stage / 2 + 0xf6) << 24
 	                | (chan1 | chan2 << 2 | colorSel1 << 4 | alphaSel1 << 9 | colorSel2 << 14 | alphaSel2 << 19) & 0x00FFFFFF);
+}
+
+inline void J3DGDLoadTexMtxImm(Mtx mtx, u32 mtxNo, GXTexMtxType mtxType)
+{
+	u16 mtxReg = mtxNo << 2;
+	u8 len     = mtxType == GX_MTX2x4 ? 8 : 12;
+	J3DGDWriteXFCmdHdr(mtxReg, len);
+	J3DGDWrite_f32(mtx[0][0]);
+	J3DGDWrite_f32(mtx[0][1]);
+	J3DGDWrite_f32(mtx[0][2]);
+	J3DGDWrite_f32(mtx[0][3]);
+	J3DGDWrite_f32(mtx[1][0]);
+	J3DGDWrite_f32(mtx[1][1]);
+	J3DGDWrite_f32(mtx[1][2]);
+	J3DGDWrite_f32(mtx[1][3]);
+	if (mtxType == GX_MTX3x4) {
+		J3DGDWrite_f32(mtx[2][0]);
+		J3DGDWrite_f32(mtx[2][1]);
+		J3DGDWrite_f32(mtx[2][2]);
+		J3DGDWrite_f32(mtx[2][3]);
+	}
+}
+
+inline void J3DGDLoadPostTexMtxImm(f32 (*mtx)[4], u32 mtxNo)
+{
+	u16 addr = (mtxNo - 0x40) * 4 + 0x500;
+	J3DGDWriteXFCmdHdr(addr, 12);
+	J3DGDWrite_f32(mtx[0][0]);
+	J3DGDWrite_f32(mtx[0][1]);
+	J3DGDWrite_f32(mtx[0][2]);
+	J3DGDWrite_f32(mtx[0][3]);
+	J3DGDWrite_f32(mtx[1][0]);
+	J3DGDWrite_f32(mtx[1][1]);
+	J3DGDWrite_f32(mtx[1][2]);
+	J3DGDWrite_f32(mtx[1][3]);
+	J3DGDWrite_f32(mtx[2][0]);
+	J3DGDWrite_f32(mtx[2][1]);
+	J3DGDWrite_f32(mtx[2][2]);
+	J3DGDWrite_f32(mtx[2][3]);
 }
 
 #endif

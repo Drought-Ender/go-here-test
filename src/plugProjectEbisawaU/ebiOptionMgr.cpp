@@ -13,7 +13,7 @@
  * @note Address: N/A
  * @note Size: 0xE4
  */
-void _Print(char* name, ...) { OSReport("ebiOptionMgr"); }
+static void _Print(char* name, ...) { OSReport("ebiOptionMgr"); }
 
 namespace ebi {
 namespace Option {
@@ -145,9 +145,9 @@ void FSMState_ScreenClose::do_exec(TMgr* obj)
  */
 void FSMState_WaitCloseForNoCard::do_init(TMgr* obj, Game::StateArg* arg)
 {
-	u32 v1 = 1.0f / sys->mDeltaTime;
-	_10    = v1;
-	_14    = v1;
+	u32 inverseDeltaTime = 1.0f / sys->mDeltaTime;
+	mWaitTimer           = inverseDeltaTime;
+	mWaitTimerMax        = inverseDeltaTime;
 }
 
 /**
@@ -156,10 +156,10 @@ void FSMState_WaitCloseForNoCard::do_init(TMgr* obj, Game::StateArg* arg)
  */
 void FSMState_WaitCloseForNoCard::do_exec(TMgr* obj)
 {
-	if (_10) {
-		_10--;
+	if (mWaitTimer) {
+		mWaitTimer--;
 	}
-	if (_10 == 0) {
+	if (mWaitTimer == 0) {
 		PSSystem::spSysIF->playSystemSe(PSSE_SY_MEMORYCARD_OK, 0);
 		transit(obj, ScreenClose, nullptr);
 	}
@@ -185,10 +185,10 @@ void FSMState_WorldMapInfoWindow::do_init(TMgr* obj, Game::StateArg* arg)
 void FSMState_WorldMapInfoWindow::do_exec(TMgr* obj)
 {
 	switch (::Screen::gGame2DMgr->check_WorldMapInfoWin0()) {
-	case 0:
+	case ::Screen::Game2DMgr::CHECK2D_WorldMapInfoWin0_Cancel:
 		transit(obj, ScreenWait, nullptr);
 		break;
-	case 1:
+	case ::Screen::Game2DMgr::CHECK2D_WorldMapInfoWin0_Confirm:
 		obj->mOptionScreen.mOptionParamB.saveRam();
 		transit(obj, ScreenClose, nullptr);
 		break;
@@ -248,17 +248,17 @@ void FSMState_SaveMgr::do_init(TMgr* obj, Game::StateArg* arg)
 void FSMState_SaveMgr::do_exec(TMgr* obj)
 {
 	if (obj->mSaveMgr->isFinish()) {
-		switch (obj->mSaveMgr->mCurrStateID) {
-		case 0:
+		switch (obj->mSaveMgr->mEndState) {
+		case Save::TMgr::End_SaveDone:
 			transit(obj, ScreenClose, nullptr);
 			break;
-		case 1:
+		case Save::TMgr::End_Cancel:
 			transit(obj, ScreenWait, nullptr);
 			break;
-		case 2:
+		case Save::TMgr::End_SelectNoSave:
 			transit(obj, ScreenClose, nullptr);
 			break;
-		case 4:
+		case Save::TMgr::End_Error:
 			transit(obj, ScreenWait, nullptr);
 			break;
 		}
@@ -280,7 +280,7 @@ TMgr::TMgr()
 	mSaveMgr->mIsStoryGameSave = true;
 	mSaveMgr->mSaveType        = 1;
 	mSaveMgr->mIsAutosaveOn    = true;
-	mSaveMgr->_47A             = 0;
+	mSaveMgr->mDoRetryOnError  = 0;
 }
 
 /**

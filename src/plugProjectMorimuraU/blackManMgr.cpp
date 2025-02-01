@@ -15,7 +15,7 @@ static const char blackManMgrName[] = "blackManMgr";
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "黒い人マネージャ"; // black man manager
+	mName = "鮟偵＞莠ｺ繝槭ロ繝ｼ繧ｸ繝｣"; // black man manager
 }
 
 /**
@@ -68,7 +68,11 @@ void Mgr::loadTexData()
  * @note Address: 0x803A5A24
  * @note Size: 0x2C
  */
-J3DModelData* Mgr::doLoadBmd(void* filename) { return J3DModelLoaderDataBase::load(filename, 0x21300030); }
+J3DModelData* Mgr::doLoadBmd(void* filename)
+{
+	return J3DModelLoaderDataBase::load(filename, J3DMLF_Material_PE_FogOff | J3DMLF_Material_UseIndirect | J3DMLF_UseUniqueMaterials
+	                                                  | J3DMLF_21 | J3DMLF_UsePostTexMtx | J3DMLF_UseImmediateMtx);
+}
 
 /**
  * @note Address: 0x803A5A50
@@ -76,13 +80,15 @@ J3DModelData* Mgr::doLoadBmd(void* filename) { return J3DModelLoaderDataBase::lo
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 	P2ASSERTLINE(128, model != nullptr);
 
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "kage_mat")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x05021200);
+
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(
+			    J3DMDF_TexCoord1 | J3DMDF_DiffColorReg | J3DMDF_DiffTexCoordScale | J3DMDF_DiffTexGen | CREATE_DIFF_FLAG(0, 2, 0, 0));
 		}
 	}
 

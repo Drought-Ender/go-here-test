@@ -28,6 +28,13 @@ struct DemoInitiator {
 };
 
 struct DemoArg {
+	DemoArg(char* name)
+	    : mCameraName(nullptr)
+	    , mName(name)
+	// , mBgmID(id)
+	{
+	}
+
 	char* mCameraName; // _00
 	char* mName;       // _04
 	u32 mBgmID;        // _08

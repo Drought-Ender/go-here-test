@@ -22,7 +22,7 @@
 JAISound::JAISound()
     : JSULink<JAISound>(this)
     , mState(SOUNDSTATE_Inactive)
-    , _16(10)
+    , mFinishWaitTimer(10)
     , mCreatureObj(nullptr)
 {
 	// UNUSED FUNCTION
@@ -93,7 +93,7 @@ void JAISound::initMultiMoveParameter(JAInter::MoveParaSet*, u8, u32, f32, f32, 
  * @note Address: 0x800B3B24
  * @note Size: 0x24
  */
-u32 JAISe::getSeCategoryNumber() { return JAInter::SeMgr::changeIDToCategory(mSoundID); }
+u8 JAISe::getSeCategoryNumber() { return JAInter::SeMgr::changeIDToCategory(mSoundID); }
 
 /**
  * @note Address: 0x800B3B48
@@ -194,8 +194,8 @@ void JAISound::checkReady()
 f32 JAISound::setDistanceVolumeCommon(f32 p1, u8 p2)
 {
 	f32 dist;
-	if (_18 != 4) {
-		dist = mSoundObj[_18].mDistance;
+	if (mCameraIndex != 4) {
+		dist = mSoundObj[mCameraIndex].mDistance;
 	} else { // _18 == 4
 		dist = mSoundObj[0].mDistance;
 		for (u8 i = 1; i < JAIGlobalParameter::audioCameraMax; i++) {
@@ -264,8 +264,8 @@ f32 JAISound::setDistancePanCommon()
 	}
 
 	// audioCameraMax != 1
-	if (_18 != 4) {
-		return _18 & 1;
+	if (mCameraIndex != 4) {
+		return mCameraIndex & 1;
 	}
 	return 0.5f;
 	/*
@@ -383,8 +383,34 @@ lbl_800B4030:
  * @note Address: 0x800B4038
  * @note Size: 0x270
  */
-f32 JAISound::setPositionDopplarCommon(u32)
+f32 JAISound::setPositionDopplarCommon(u32 p1)
 {
+	JAISound_0x34* soundObj = getSoundObj();
+	f32 soundX              = soundObj->mPosition.x;
+	f32 soundY              = soundObj->mPosition.y;
+	f32 soundZ              = soundObj->mPosition.z;
+	f32 x                   = soundX - soundObj->_0C.x;
+	f32 y                   = soundY - soundObj->_0C.y;
+	f32 z                   = soundZ - soundObj->_0C.z;
+	f32 dist1               = dolsqrtfull(SQUARE(soundX) + SQUARE(soundY) + SQUARE(soundZ));
+	f32 x2                  = soundX + x;
+	f32 y2                  = soundY + y;
+	f32 z2                  = soundZ + z;
+
+	f32 dist2 = dolsqrtfull(SQUARE(x2) + SQUARE(y2) + SQUARE(z2));
+
+	f32 sqVal = SQUARE(p1 >> 8);
+
+	dist1 -= dist2;
+	f32 posDopplar = 1.0f / (1.0f - (dist1 / (JAIGlobalParameter::dopplarParameter / sqVal)));
+
+	if (posDopplar < 0.1f) {
+		posDopplar = 0.1f;
+	} else if (posDopplar > 2.0f) {
+		posDopplar = 2.0f;
+	}
+
+	return posDopplar;
 	/*
 	stwu     r1, -0x20(r1)
 	lfs      f0, lbl_80516FE4@sda21(r2)
@@ -594,7 +620,7 @@ lbl_800B42A0:
 f32 JAISound::setDistanceDolbyCommon()
 {
 	JAISound_0x34* obj = mSoundObj;
-	if (_3C == 0 || obj->mPosition.z < JAIGlobalParameter::seDolbyFrontDistanceMax) {
+	if (!mPosition || obj->mPosition.z < JAIGlobalParameter::seDolbyFrontDistanceMax) {
 		return 0.0f;
 	}
 	if (obj->mPosition.z < 0.0f) {
@@ -841,7 +867,7 @@ void JAISequence::setTrackPortData(u8 p1, u8 p2, u16 p3)
 		mSeqParameter.mTrack.writePortApp(getTrackPortRoute(p1, p2), p3);
 	} else {
 		mSeqParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_TrackPortData;
-		mSeqParameter._2B0 |= 1 << p1;
+		mSeqParameter.mTrackPortDataFlag |= 1 << p1;
 		mSeqParameter._2B4[p1] |= 1 << p2;
 	}
 	mSeqParameter._274[p1][p2] = p3;
@@ -863,7 +889,17 @@ void JAISe::setSeInterRandomPara(f32*, u32, f32, f32)
 void JAISe::setSeInterVolume(u8 type, f32 value, u32 moveTime, u8 p4)
 {
 	if (p4) {
-		value = JAInter::Const::random.nextFloat(value, p4);
+		// these need tweaking a bit
+		f32 val  = (u32)(4.2949673E9f * JAInter::Const::random.nextFloat_0_1()) + value;
+		f32 val2 = (1.0f + val) / 1000.0f;
+
+		if (val + val2 > 1.0f) {
+			value = 1.0f;
+		} else if (value < (0.0f - val2)) {
+			value = 0.0f;
+		} else {
+			value += val2;
+		}
 	}
 	mSeParam.mVolumes[type].set(value, moveTime);
 	/*
@@ -969,7 +1005,17 @@ lbl_800B4774:
 void JAISe::setSeInterPan(u8 type, f32 value, u32 moveTime, u8 p4)
 {
 	if (p4) {
-		value = JAInter::Const::random.nextFloat(value, p4);
+		// these need tweaking a bit
+		f32 val  = (u32)(4.2949673E9f * JAInter::Const::random.nextFloat_0_1()) + value;
+		f32 val2 = (1.0f + val) / 1000.0f;
+
+		if (val + val2 > 1.0f) {
+			value = 1.0f;
+		} else if (value < (0.0f - val2)) {
+			value = 0.0f;
+		} else {
+			value += val2;
+		}
 	}
 	mSeParam.mPans[type].set(value, moveTime);
 	/*
@@ -1102,7 +1148,17 @@ void JAISe::setSeInterFir(u8, u8, u32, u8)
 void JAISe::setSeInterDolby(u8 type, f32 value, u32 moveTime, u8 p4)
 {
 	if (p4) {
-		value = JAInter::Const::random.nextFloat(value, p4);
+		// these need tweaking a bit
+		f32 val  = (u32)(4.2949673E9f * JAInter::Const::random.nextFloat_0_1()) + value;
+		f32 val2 = (1.0f + val) / 1000.0f;
+
+		if (val + val2 > 1.0f) {
+			value = 1.0f;
+		} else if (value < (0.0f - val2)) {
+			value = 0.0f;
+		} else {
+			value += val2;
+		}
 	}
 	mSeParam.mDolbys[type].set(value, moveTime);
 	/*
@@ -1236,7 +1292,7 @@ void JAISe::setSeDistanceParameters()
 	setSeDistanceFxmix(moveTime);
 	setSeDistanceFir(moveTime);
 	if (checkSwBit(0x400) == 0) {
-		setFxmix(JAIBasic::msBasic->getMapInfoFxParameter(_30), 0, SOUNDPARAM_Unk3);
+		setFxmix(JAIBasic::msBasic->getMapInfoFxParameter(mMapInfoIndex), 0, SOUNDPARAM_Unk3);
 	}
 	setSeDistanceDolby(moveTime);
 }
@@ -1258,7 +1314,7 @@ void JAISe::setSeDistanceVolume(u8 moveTime)
 void JAISe::setSeDistancePan(u8 moveTime)
 {
 	f32 pan = 0.5f;
-	if (!_1A) {
+	if (!mIsPlayingWithActor) {
 		pan = setDistancePanCommon();
 	} else if (mCreatureObj) {
 		pan = static_cast<JAInter::Object*>(mCreatureObj)->mPan;
@@ -1291,7 +1347,7 @@ void JAISe::setSeDistancePitch(u8 moveTime)
 		}
 	}
 	if (checkSwBit(0x40 | 0x80) != 0) {
-		pitch += _17 / 192.0f;
+		pitch += mRandPitchModifier / 192.0f;
 	}
 	mSeParam.mPitches[SOUNDPARAM_Distance].set(pitch, moveTime);
 	/*
@@ -1431,8 +1487,8 @@ void JAISe::setSeDistanceFir(u8) { }
  */
 void JAISe::setSeDistanceDolby(u8 moveTime)
 {
-	f32 dolby = 0.5f;
-	if (!_1A) {
+	f32 dolby = 0.0f;
+	if (!mIsPlayingWithActor) {
 		dolby = setDistanceDolbyCommon();
 	} else if (mCreatureObj) {
 		dolby = static_cast<JAInter::Object*>(mCreatureObj)->mDolby;
@@ -1524,7 +1580,7 @@ void JAIStream::setChannelVolume(u8 type, f32 value, u32 moveTime)
 		mStreamParameter.mChannelVolumeFlags |= 1 << type;
 	}
 	if (result != JAInter::MOVEPARA_AlreadySet) {
-		mStreamParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_ChannelVolume;
+		mStreamParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_TrackVolume;
 	}
 }
 
@@ -1540,7 +1596,7 @@ void JAIStream::setChannelPan(u8 type, f32 value, u32 moveTime)
 		mStreamParameter.mChannelPanFlags |= 1 << type;
 	}
 	if (result != JAInter::MOVEPARA_AlreadySet) {
-		mStreamParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_ChannelPan;
+		mStreamParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_TrackPan;
 	}
 }
 
@@ -2014,33 +2070,11 @@ void JAISound::getActorGroundNumber()
  */
 u32 JAISound::getTrackPortRoute(u8 p1, u8 p2)
 {
-	if ((mSoundID & 0x800) != 0) {
-		return (p1 >> 4) + 0x20000000 + p2 * 0x10000 + (p1 & 0xF) * 0x10;
+	if (IsJAISoundIDInUse(mSoundID) == 0) {
+		return (p1 >> 4) + (2 << 28) + ((p1 & 0xF) << 4) + (p2 << 16);
 	} else {
-		return (p1 & 0xF) + 0x10000000 + p2 * 0x10000;
+		return (p1 & 0xF) + (1 << 28) + (p2 << 16);
 	}
-	// return ((mSoundID & 0x800) != 0) ? (p1 >> 4) + 0x20000000 + p2 * 0x10000 + (p1 & 0xF) * 0x10 : (p1 & 0xF) + 0x10000000 + p2 *
-	// 0x10000;
-
-	/*
-	lwz      r0, 0x20(r3)
-	rlwinm.  r0, r0, 0, 0x14, 0x14
-	beq      lbl_800B54FC
-	rlwinm   r3, r4, 0x1c, 0x1c, 0x1f
-	rlwinm   r0, r4, 4, 0x18, 0x1b
-	rlwinm   r5, r5, 0x10, 8, 0xf
-	addis    r4, r3, 0x2000
-	add      r3, r0, r5
-	add      r3, r4, r3
-	blr
-
-lbl_800B54FC:
-	clrlwi   r3, r4, 0x1c
-	rlwinm   r0, r5, 0x10, 8, 0xf
-	addis    r3, r3, 0x1000
-	add      r3, r3, r0
-	blr
-	*/
 }
 
 /**
@@ -2106,34 +2140,34 @@ u32 JAIStream::getFadeCounter()
  * @note Address: 0x800B5614
  * @note Size: 0xE8
  */
-void JAISound::initParameter(void* handlePtr, JAInter::Actor* actor, u32 soundID, u32 fadeTime, u8 p5, JAInter::SoundInfo* info)
+void JAISound::initParameter(void* handlePtr, JAInter::Actor* actor, u32 soundID, u32 fadeTime, u8 camId, JAInter::SoundInfo* info)
 {
 	mSoundID = soundID;
 	if (actor) {
 		mCreatureObj = actor->mObj;
 		if (actor->mObj) {
-			_3C = actor->mVec2;
-			_30 = actor->mUnk;
+			mPosition     = actor->mVec2;
+			mMapInfoIndex = actor->mInfoIndex;
 		} else {
-			_3C = nullptr;
-			_30 = actor->mUnk;
+			mPosition     = nullptr;
+			mMapInfoIndex = actor->mInfoIndex;
 		}
-		_1A = actor->mFlag.boolView[0];
+		mIsPlayingWithActor = actor->mFlag.boolView[0];
 	} else {
-		mCreatureObj = nullptr;
-		_3C          = nullptr;
-		_1A          = 0;
-		_30          = 0;
+		mCreatureObj        = nullptr;
+		mPosition           = nullptr;
+		mIsPlayingWithActor = false;
+		mMapInfoIndex       = 0;
 	}
 	mMainSoundPPointer         = (void**)handlePtr;
 	mFadeCounter               = fadeTime;
-	_18                        = p5;
+	mCameraIndex               = camId;
 	mSoundInfo                 = info;
-	_16                        = 10;
+	mFinishWaitTimer           = 10;
 	mDistanceParameterMoveTime = JAIGlobalParameter::getParamDistanceParameterMoveTime();
 	mAdjustPriority            = 0;
-	_2C                        = 0;
-	if (_3C) {
+	mActiveTimer               = 0;
+	if (mPosition) {
 		mSoundObj->mDistance = JAIGlobalParameter::getParamDistanceMax() * 10.0f;
 	} else {
 		mSoundObj->mDistance = 0.0f;
@@ -2263,98 +2297,29 @@ BOOL JAInter::MoveParaSet::move()
  * @note Size: 0x130
  * setPortData__5JAISeFUcUs
  */
-void JAISe::setPortData(u8, u16)
+void JAISe::setPortData(u8 p1, u16 p2)
 {
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	stw      r29, 0x14(r1)
-	mr       r29, r5
-	stw      r28, 0x10(r1)
-	mr       r28, r4
-	lbz      r0, 0x15(r3)
-	cmplwi   r0, 1
-	bne      lbl_800B68BC
-	rlwinm   r0, r28, 1, 0x17, 0x1e
-	clrlwi   r5, r28, 0x18
-	add      r4, r3, r0
-	sth      r29, 0x48(r4)
-	li       r0, 1
-	slw      r0, r0, r5
-	lhz      r4, 0x68(r3)
-	or       r0, r4, r0
-	sth      r0, 0x68(r3)
-	b        lbl_800B6974
+	if (mState == SOUNDSTATE_Stored) {
+		mSeParam._00[p1] = p2;
+		mSeParam._20 |= (1 << p1);
+		return;
+	}
 
-lbl_800B68BC:
-	lwz      r30, seHandle__Q27JAInter5SeMgr@sda21(r13)
-	lbz      r31, 0x14(r3)
-	lwz      r7, 0x308(r30)
-	cmplwi   r7, 0
-	beq      lbl_800B6974
-	lbz      r0, 0x15(r30)
-	cmplwi   r0, 4
-	blt      lbl_800B6924
-	lwz      r0, 0x20(r30)
-	addi     r3, r30, 0x30c
-	rlwinm.  r0, r0, 0, 0x14, 0x14
-	beq      lbl_800B6908
-	rlwinm   r4, r31, 0x1c, 0x1c, 0x1f
-	rlwinm   r6, r28, 0x10, 8, 0xf
-	rlwinm   r0, r31, 4, 0x18, 0x1b
-	addis    r5, r4, 0x2000
-	add      r4, r0, r6
-	add      r4, r5, r4
-	b        lbl_800B6918
+	JAISequence* seq             = JAInter::SeMgr::seHandle;
+	u8 trackNo                   = getTrackNumber();
+	JAInter::SeqUpdateData* data = seq->mSeqParameter.mUpdateData;
+	if (!data) {
+		return;
+	}
+	if (seq->mState >= SOUNDSTATE_Playing) {
+		seq->mSeqParameter.getTrack()->writePortApp(seq->getTrackPortRoute(trackNo, p1), p2);
+	} else {
+		data->mActiveTrackFlag |= JAInter::SOUNDACTIVE_TrackPortData;
+		seq->mSeqParameter.mTrackPortDataFlag |= (1 << trackNo);
+		seq->mSeqParameter._2B4[trackNo] |= (1 << p1);
+	}
 
-lbl_800B6908:
-	clrlwi   r4, r31, 0x1c
-	rlwinm   r0, r28, 0x10, 8, 0xf
-	addis    r4, r4, 0x1000
-	add      r4, r4, r0
-
-lbl_800B6918:
-	mr       r5, r29
-	bl       writePortApp__8JASTrackFUlUs
-	b        lbl_800B6960
-
-lbl_800B6924:
-	lwz      r3, 8(r7)
-	li       r5, 1
-	clrlwi   r0, r28, 0x18
-	rlwinm   r4, r31, 2, 0x16, 0x1d
-	ori      r6, r3, 0x1000
-	slw      r3, r5, r31
-	stw      r6, 8(r7)
-	slw      r0, r5, r0
-	lwz      r5, 0x2f8(r30)
-	or       r3, r5, r3
-	stw      r3, 0x2f8(r30)
-	lwz      r5, 0x2fc(r30)
-	lwzx     r3, r5, r4
-	or       r0, r3, r0
-	stwx     r0, r5, r4
-
-lbl_800B6960:
-	lwz      r4, 0x2bc(r30)
-	rlwinm   r3, r31, 2, 0x16, 0x1d
-	rlwinm   r0, r28, 1, 0x17, 0x1e
-	lwzx     r3, r4, r3
-	sthx     r29, r3, r0
-
-lbl_800B6974:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	lwz      r28, 0x10(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
+	seq->mSeqParameter._274[trackNo][p1] = p2;
 }
 
 /**
@@ -2364,79 +2329,18 @@ lbl_800B6974:
  */
 u16 JAISe::getPortData(u8 p1)
 {
+	JAISequence* seq;
 	if ((mSoundID & JAISoundID_TypeMask) == JAISoundID_Type_Se) {
 		u8 v1            = _14;
+		seq              = JAInter::SeMgr::seHandle;
 		static u16 _port = -1;
-		if (JAInter::SeMgr::seHandle->mState >= SOUNDSTATE_Playing) {
-			u32 v2;
-			if ((JAInter::SeMgr::seHandle->mSoundID & 0x800) != 0) {
-				v2 = (v1 >> 4) + 0x20000000 + (v1 & 0xF) * 0x10 + p1 * 0x10000;
-			} else {
-				v2 = (v1 & 0xF) + 0x10000000 + p1 * 0x10000;
-			}
-			JAInter::SeMgr::seHandle->mSeqParameter.mTrack.readPortApp(v2, &_port);
+		if (seq->mState >= SOUNDSTATE_Playing) {
+			seq->mSeqParameter.getTrack()->readPortApp(seq->getTrackPortRoute(v1, p1), &_port);
 		}
 		return _port;
 	}
 
 	return 0;
-	/*
-	stwu     r1, -0x10(r1)
-	mflr     r0
-	stw      r0, 0x14(r1)
-	lwz      r0, 0x20(r3)
-	rlwinm.  r0, r0, 0, 0, 1
-	bne      lbl_800B6A2C
-	lbz      r0, init$2292@sda21(r13)
-	lbz      r6, 0x14(r3)
-	extsb.   r0, r0
-	lwz      r5, seHandle__Q27JAInter5SeMgr@sda21(r13)
-	bne      lbl_800B69D4
-	lis      r3, 0x0000FFFF@ha
-	li       r0, 1
-	addi     r3, r3, 0x0000FFFF@l
-	stb      r0, init$2292@sda21(r13)
-	sth      r3, _port$2291@sda21(r13)
-
-lbl_800B69D4:
-	lbz      r0, 0x15(r5)
-	cmplwi   r0, 4
-	blt      lbl_800B6A24
-	lwz      r0, 0x20(r5)
-	addi     r3, r5, 0x30c
-	rlwinm.  r0, r0, 0, 0x14, 0x14
-	beq      lbl_800B6A0C
-	rlwinm   r5, r6, 0x1c, 0x1c, 0x1f
-	rlwinm   r4, r4, 0x10, 8, 0xf
-	rlwinm   r0, r6, 4, 0x18, 0x1b
-	addis    r5, r5, 0x2000
-	add      r4, r0, r4
-	add      r4, r5, r4
-	b        lbl_800B6A1C
-
-lbl_800B6A0C:
-	clrlwi   r5, r6, 0x1c
-	rlwinm   r0, r4, 0x10, 8, 0xf
-	addis    r4, r5, 0x1000
-	add      r4, r4, r0
-
-lbl_800B6A1C:
-	addi     r5, r13, _port$2291@sda21
-	bl       readPortApp__8JASTrackFUlPUs
-
-lbl_800B6A24:
-	lhz      r3, _port$2291@sda21(r13)
-	b        lbl_800B6A30
-
-lbl_800B6A2C:
-	li       r3, 0
-
-lbl_800B6A30:
-	lwz      r0, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x10
-	blr
-	*/
 }
 
 /**
@@ -2444,115 +2348,20 @@ lbl_800B6A30:
  * @note Size: 0x17C
  * setPortData__11JAISequenceFUcUs
  */
-void JAISequence::setPortData(u8, u16)
+void JAISequence::setPortData(u8 p1, u16 p2)
 {
-	/*
-	stwu     r1, -0x40(r1)
-	mflr     r0
-	lfs      f1, lbl_80516FE4@sda21(r2)
-	stw      r0, 0x44(r1)
-	stmw     r27, 0x2c(r1)
-	mr       r30, r3
-	rlwinm   r28, r4, 4, 0x14, 0x1b
-	mr       r31, r4
-	add      r29, r30, r28
-	mr       r27, r5
-	lfs      f0, 0x5c(r29)
-	fcmpu    cr0, f1, f0
-	bne      lbl_800B7310
-	lbz      r0, 0x15(r30)
-	cmplwi   r0, 3
-	blt      lbl_800B7310
-	addi     r3, r30, 0x30c
-	rlwinm   r4, r31, 0x10, 8, 0xf
-	addi     r5, r1, 8
-	bl       readPortApp__8JASTrackFUlPUs
-	lhz      r3, 8(r1)
-	lis      r0, 0x4330
-	stw      r0, 0x10(r1)
-	lfd      f1, lbl_80517018@sda21(r2)
-	stw      r3, 0x14(r1)
-	lfd      f0, 0x10(r1)
-	fsubs    f0, f0, f1
-	stfs     f0, 0x5c(r29)
+	if (mSeqParameter._10[p1].mCurrentValue == 0.0f && mState >= SOUNDSTATE_Ready) {
+		u16 portVal;
+		mSeqParameter.mTrack.readPortApp(p1 << 16, &portVal);
+		mSeqParameter._10[p1].mCurrentValue = portVal;
+	}
 
-lbl_800B7310:
-	add      r3, r30, r28
-	lwz      r4, 0x64(r3)
-	cmplwi   r4, 0
-	bne      lbl_800B7350
-	clrlwi   r3, r27, 0x10
-	lis      r0, 0x4330
-	stw      r3, 0x14(r1)
-	lfd      f1, lbl_80517018@sda21(r2)
-	stw      r0, 0x10(r1)
-	lfs      f2, 0x5c(r29)
-	lfd      f0, 0x10(r1)
-	fsubs    f0, f0, f1
-	fcmpu    cr0, f2, f0
-	bne      lbl_800B7350
-	li       r5, 2
-	b        lbl_800B73C8
+	int setResult = mSeqParameter._10[p1].set((f32)p2, 0);
+	if (setResult == JAInter::MOVEPARA_SetTarget) {
+		mSeqParameter._280 |= (1 << p1);
+	}
 
-lbl_800B7350:
-	cmplwi   r4, 0
-	beq      lbl_800B738C
-	clrlwi   r3, r27, 0x10
-	lis      r0, 0x4330
-	stw      r3, 0x14(r1)
-	add      r3, r30, r28
-	lfd      f1, lbl_80517018@sda21(r2)
-	stw      r0, 0x10(r1)
-	lfs      f2, 0x58(r3)
-	lfd      f0, 0x10(r1)
-	fsubs    f0, f0, f1
-	fcmpu    cr0, f2, f0
-	bne      lbl_800B738C
-	li       r5, 2
-	b        lbl_800B73C8
-
-lbl_800B738C:
-	clrlwi   r4, r27, 0x10
-	lis      r0, 0x4330
-	stw      r4, 0x14(r1)
-	add      r3, r30, r28
-	lfd      f2, lbl_80517018@sda21(r2)
-	li       r5, 0
-	stw      r0, 0x10(r1)
-	lfd      f0, 0x10(r1)
-	stw      r4, 0x1c(r1)
-	fsubs    f1, f0, f2
-	stw      r0, 0x18(r1)
-	lfd      f0, 0x18(r1)
-	stfs     f1, 0x58(r3)
-	fsubs    f0, f0, f2
-	stfs     f0, 0x5c(r29)
-
-lbl_800B73C8:
-	cmpwi    r5, 1
-	bne      lbl_800B73E8
-	clrlwi   r0, r31, 0x18
-	li       r3, 1
-	lwz      r4, 0x2c8(r30)
-	slw      r0, r3, r0
-	or       r0, r4, r0
-	stw      r0, 0x2c8(r30)
-
-lbl_800B73E8:
-	lwz      r3, 0x308(r30)
-	cmplwi   r3, 0
-	beq      lbl_800B7408
-	cmpwi    r5, 2
-	beq      lbl_800B7408
-	lwz      r0, 8(r3)
-	ori      r0, r0, 0x10
-	stw      r0, 8(r3)
-
-lbl_800B7408:
-	lmw      r27, 0x2c(r1)
-	lwz      r0, 0x44(r1)
-	mtlr     r0
-	addi     r1, r1, 0x40
-	blr
-	*/
+	if (mSeqParameter.mUpdateData && setResult != JAInter::MOVEPARA_AlreadySet) {
+		mSeqParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_Unk5;
+	}
 }

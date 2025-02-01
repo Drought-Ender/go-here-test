@@ -3,6 +3,7 @@
 #include "og/Screen/ogScreen.h"
 #include "og/Screen/MenuMgr.h"
 #include "og/Screen/callbackNodes.h"
+#include "Screen/Game2DMgr.h"
 #include "og/Sound.h"
 #include "System.h"
 #include "Controller.h"
@@ -122,7 +123,7 @@ bool ObjFinalMsg::menu()
 	Controller* pad = getGamePad();
 	mMenuMgr->update();
 
-	u32 input = pad->mButton.mButtonDown;
+	u32 input = pad->getButtonDown();
 
 	if (input & Controller::PRESS_UP) {
 		if (mCurrSel > 0) {
@@ -139,16 +140,16 @@ bool ObjFinalMsg::menu()
 	} else if (input & Controller::PRESS_A) {
 		if (mCurrSel == 0) {
 			ret                = true;
-			mDisp->mFinalState = 1;
+			mDisp->mFinalState = ::Screen::Game2DMgr::CHECK2D_FinalMessage_Continue;
 			ogSound->setDecide();
 		} else if (mCurrSel == 1) {
 			ret                = true;
-			mDisp->mFinalState = 2;
+			mDisp->mFinalState = ::Screen::Game2DMgr::CHECK2D_FinalMessage_ConfirmQuit;
 			ogSound->setDecide();
 		}
 	} else if (input & Controller::PRESS_B) {
 		ret                = true;
-		mDisp->mFinalState = 2;
+		mDisp->mFinalState = ::Screen::Game2DMgr::CHECK2D_FinalMessage_ConfirmQuit;
 		ogSound->setClose();
 	}
 	return ret;
@@ -195,10 +196,10 @@ bool ObjFinalMsg::doUpdateFadein()
 	bool check = false;
 	commonUpdate();
 	mFadeLevel += sys->mDeltaTime;
-	if (mFadeLevel > ObjSMenuBase::msBaseVal._08) {
+	if (mFadeLevel > ObjSMenuBase::msBaseVal.mFadeInOutTime) {
 		check = true;
 	}
-	mMovePos = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, ObjSMenuBase::msBaseVal._08)) * 800.0f;
+	mMovePos = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, ObjSMenuBase::msBaseVal.mFadeInOutTime)) * 800.0f;
 	return check;
 }
 
@@ -231,10 +232,10 @@ bool ObjFinalMsg::doUpdateFadeout()
 	bool check = false;
 	commonUpdate();
 	mFadeLevel += sys->mDeltaTime;
-	if (mFadeLevel > ObjSMenuBase::msBaseVal._08) {
+	if (mFadeLevel > ObjSMenuBase::msBaseVal.mFadeInOutTime) {
 		check = true;
 	}
-	mMovePos = og::Screen::calcSmooth0to1(mFadeLevel, ObjSMenuBase::msBaseVal._08) * -800.0f;
+	mMovePos = og::Screen::calcSmooth0to1(mFadeLevel, ObjSMenuBase::msBaseVal.mFadeInOutTime) * -800.0f;
 	return check;
 }
 

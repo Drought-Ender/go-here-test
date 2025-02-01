@@ -2,13 +2,21 @@
 #define _SYS_MATBASEANIMATOR_H
 
 #include "types.h"
+#include "Sys/MatBaseAnimation.h"
+
 namespace Sys {
-struct MatBaseAnimation;
 
 /**
  * @size{0xC}
  */
 struct MatBaseAnimator {
+	enum State {
+		Playing     = 0,
+		AtStart     = 1,
+		AtEnd       = 2,
+		NoAnimation = 0x8000,
+	};
+
 	MatBaseAnimator();
 
 	virtual void start(MatBaseAnimation* animation); // _08
@@ -20,7 +28,29 @@ struct MatBaseAnimator {
 
 	// unused/inlined:
 	void removeMotion();
-	f32 forward(f32);
+	int forward(f32);
+
+	// by all means this should not exist, its just forward with - instead of +
+	// but alas, the subtract is needed and idk how else to make it work
+	int backward(f32 rate)
+	{
+		int state;
+		if (!mAnimation) {
+			state = NoAnimation;
+		} else {
+			state = Playing;
+			mCurrFrame -= rate;
+			if (mCurrFrame < 0.0f) {
+				mCurrFrame = 0.0f;
+				state      = AtStart;
+			} else if (mCurrFrame >= mAnimation->getFrameMax()) {
+				mCurrFrame = mAnimation->getFrameMax();
+				state      = AtEnd;
+			}
+			mAnimation->getAnmBase()->setFrame(mCurrFrame);
+		}
+		return state;
+	}
 
 	// VTBL _00
 	MatBaseAnimation* mAnimation; // _04
@@ -43,7 +73,7 @@ struct MatRepeatAnimator : public MatBaseAnimator {
 	virtual void onStart();       // _0C
 	virtual void do_animate(f32); // _10
 
-	u8 _0C; // _0C
+	u8 mStarted; // _0C
 };
 
 } // namespace Sys

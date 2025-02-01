@@ -39,7 +39,7 @@ struct AutoBgm : public PSSystem::DirectedBgm {
 	virtual void startSeq();                                                                              // _14
 	virtual void pauseOn(PSSystem::SeqBase::PauseMode);                                                   // _1C
 	virtual void pauseOff();                                                                              // _20
-	virtual u8 getCastType() { return 3; }                                                                // _24 (weak)
+	virtual u8 getCastType() { return TYPE_AutoBgm; }                                                     // _24 (weak)
 	virtual PSSystem::SeqTrackRoot* newSeqTrackRoot() { return new AutoBgmSeqTrackRoot(&mConductorMgr); } // _44 (weak)
 
 	void loadConductor(PSSystem::TaskChecker*);
@@ -47,23 +47,23 @@ struct AutoBgm : public PSSystem::DirectedBgm {
 
 	void setPikiMaskNum(u8* cond)
 	{
-		u8 num = 0;
+		u16 num = 0;
 		for (u8 i = 0; i < 16; i++) {
 			if (cond[i]) {
-				num++;
+				num |= cond[i] << i;
 			}
 		}
-		mMeloArr._10 = num;
+		mMeloArr.mTrackMaskIds = num;
 	}
 
 	// _00-_10  = JSULink<SeqBase>
 	// _10      = VTABLE
 	// _14-_B8  = DirectedBgm
-	ConductorMgr mConductorMgr;  // _B8
-	char* mConductorFilePath;    // _330 (.cnd)
-	PSSystem::TaskChecker* _334; // _334
-	JKRHeap* mHeap;              // _338
-	MeloArrMgr mMeloArr;         // _33C
+	ConductorMgr mConductorMgr;          // _B8
+	char* mConductorFilePath;            // _330 (.cnd)
+	PSSystem::TaskChecker* mTaskChecker; // _334
+	JKRHeap* mHeap;                      // _338
+	MeloArrMgr mMeloArr;                 // _33C
 };
 
 /**
@@ -74,7 +74,7 @@ struct ConductorArcMgr {
 	{
 		mArchive = nullptr;
 		mArchive = JKRMountArchive("/AudioRes/Conductor.arc", JKRArchive::EMM_Dvd, JKRGetCurrentHeap(), JKRArchive::EMD_Head);
-		P2ASSERTLINE(746, mArchive); // this file needs to be PSAutoBgm.h
+		P2ASSERTLINE(746, mArchive);
 	}
 
 	static void createInstance()

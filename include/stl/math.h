@@ -1,37 +1,42 @@
 #ifndef _MATH_H
 #define _MATH_H
 
-#include "types.h"
 #include "PowerPC_EABI_Support/MSL_C/MSL_Common/math_api.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif // ifdef __cplusplus
 
-#define SQUARE(v)                      ((v) * (v))
-#define IS_WITHIN_CIRCLE(x, z, radius) ((SQUARE(x) + SQUARE(z)) < SQUARE(radius))
-#define VECTOR_SQUARE_MAG(v)           (SQUARE(v.x) + SQUARE(v.y) + SQUARE(v.z))
+#define SQUARE(v)                       ((v) * (v))
+#define IS_WITHIN_CIRCLE(x, z, radius)  ((SQUARE(x) + SQUARE(z)) < SQUARE(radius))
+#define IS_OUTSIDE_CIRCLE(x, z, radius) ((SQUARE(x) + SQUARE(z)) > SQUARE(radius))
+#define IS_WITHIN_SPHERE(x, y, z, r)    ((SQUARE(x) + SQUARE(y) + SQUARE(z)) < SQUARE(r))
+#define VECTOR_SQUARE_MAG(v)            (SQUARE(v.x) + SQUARE(v.y) + SQUARE(v.z))
 
-#define signbit(x)    ((int)(__HI(x) & 0x80000000))
-#define ispositive(x) ((((u8*)&x)[0] & 0x80) != 0)
+#define SIGNBIT(x)     ((int)(__HI(x) & 0x80000000))
+#define IS_POSITIVE(x) ((((u8*)&x)[0] & 0x80) != 0)
 
 #define INFINITY (*(f32*)__float_huge)
 #define NAN      (*(f32*)__float_nan)
 #define HUGE_VAL (*(f64*)__double_huge)
 
-#define LONG_TAU   6.2831854820251465
-#define TAU        6.2831855f
-#define PI         3.1415927f
-#define HALF_PI    1.5707964f
-#define THIRD_PI   1.0471976f
-#define QUARTER_PI 0.7853982f
+#define LONG_TAU    6.2831854820251465
+#define TAU         6.2831855f
+#define PI          3.1415927f
+#define HALF_PI     1.5707964f
+#define HALF_PI_F64 1.5707963267948966
+#define THIRD_PI    1.0471976f
+#define QUARTER_PI  0.7853982f
 
 #define SIN_2_5 0.43633234f
 #define M_SQRT3 1.73205f
 
 #define DEG2RAD            (1.0f / 180.0f)
-#define RAD2DEG            (57.295776f)
+#define RAD2DEG            (180.0f / PI)
+#define RAD2DEG_F64        (57.29577951308232)
 #define TORADIANS(degrees) (PI * (DEG2RAD * degrees))
+#define TODEGREES(radians) (RAD2DEG * radians)
 
 extern int __float_nan[];
 extern int __float_huge[];
@@ -139,6 +144,30 @@ static inline f32 dolsqrtf(f32 x)
 	return x;
 }
 
+static inline f64 sqrt_step(f64 tmpd, f32 mag) { return tmpd * 0.5 * (3.0 - mag * (tmpd * tmpd)); }
+
+static inline f32 dolsqrtfull(f32 mag)
+{
+	if (mag > 0.0f) {
+		f64 tmpd = __frsqrte(mag);
+		tmpd     = sqrt_step(tmpd, mag);
+		tmpd     = sqrt_step(tmpd, mag);
+		tmpd     = sqrt_step(tmpd, mag);
+		return mag * tmpd;
+	} else if (mag < 0.0) {
+		return NAN;
+	} else if (fpclassify(mag) == 1) {
+		return NAN;
+	} else {
+		return mag;
+	}
+}
+
 static inline f32 scaleValue(f32 scale, f32 value) { return scale * value; }
+
+static inline f32 dolsinf(f32 val) { return (f32)sin((f32)val); }
+static inline f32 dolcosf(f32 val) { return (f32)cos((f32)val); }
+static inline f32 doltanf(f32 val) { return (f32)tan((f32)val); }
+static inline f32 dolatan2f(f32 val1, f32 val2) { return (f32)atan2((f32)val1, (f32)val2); }
 
 #endif

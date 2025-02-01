@@ -20,9 +20,9 @@ struct JASGenericMemPool {
 	// unused/inlined:
 	~JASGenericMemPool();
 
-	void** _00;        // _00
-	void** _04;        // _04
-	int mFreeMemCount; // _08
+	void** mNextFreeBlock;  // _00
+	void** mFirstFreeBlock; // _04
+	int mFreeMemCount;      // _08
 };
 
 namespace JASCreationPolicy {

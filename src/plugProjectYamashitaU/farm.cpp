@@ -20,7 +20,7 @@ namespace Farm {
 Plant::Plant(Creature* creature)
     : CNode("")
     , mCreature(creature)
-    , _1C()
+    , mCurrentPower()
 {
 }
 
@@ -30,12 +30,12 @@ Plant::Plant(Creature* creature)
  */
 void Plant::sendInteraction()
 {
-	if (_1C > 0) {
-		InteractFarmHaero haero(mCreature, _1C);
+	if (mCurrentPower > 0) {
+		InteractFarmHaero haero(mCreature, mCurrentPower);
 		mCreature->stimulate(haero);
 
-	} else if (_1C < 0) {
-		InteractFarmKarero karero(mCreature, -_1C);
+	} else if (mCurrentPower < 0) {
+		InteractFarmKarero karero(mCreature, -mCurrentPower);
 		mCreature->stimulate(karero);
 	}
 }
@@ -93,7 +93,7 @@ void Obstacle::doDebugDraw(Graphics& gfx)
  * @note Size: 0xBC
  */
 Farm::Farm()
-    : CNode("”_k")
+    : CNode("è¾²è€•")
     , mModelData(nullptr)
     , mModel(nullptr)
     , mObstacleRootNode("ObstacleNode")
@@ -111,7 +111,7 @@ void Farm::loadResource(u32 modelType, void* mdlData)
 {
 	sys->heapStatusStart("Farm resource", nullptr);
 	sys->heapStatusStart("mdlData", nullptr);
-	mModelData = J3DModelLoaderDataBase::load(mdlData, 0x20000000);
+	mModelData = J3DModelLoaderDataBase::load(mdlData, J3DMLF_Material_PE_FogOff);
 	sys->heapStatusEnd("mdlData");
 	mPosition = Vector3f(0.0f);
 
@@ -240,7 +240,7 @@ void Farm::updateObjectRelation(bool doInteract)
 			}
 		}
 
-		plantNode->_1C = counter;
+		plantNode->mCurrentPower = counter;
 
 		if (doInteract) {
 			plantNode->sendInteraction();

@@ -46,6 +46,7 @@ bool MovieConfig::isSkippable()
 	if (mFlags & 2) {
 		return false;
 	}
+
 	return mFlags & 1;
 }
 
@@ -59,7 +60,7 @@ bool MovieConfig::isNeverSkippable() { return mFlags >> 1 & 1; }
  * @note Address: 0x804318CC
  * @note Size: 0x54
  */
-bool MovieConfig::is(char* name) { return strncmp(mMovieNameBuffer2, name, strlen(name)) == 0; }
+bool MovieConfig::is(char* name) { return IS_SAME_STRING_N(mMovieNameBuffer2, name, strlen(name)); }
 
 /**
  * @note Address: 0x80431920
@@ -130,23 +131,10 @@ void MovieList::construct() { movieList = new MovieList; }
  */
 MovieList::MovieList()
 {
-	mName           = "MovieList";
-	mConfig.mChild  = nullptr;
-	mConfig.mParent = nullptr;
-	mConfig.mPrev   = nullptr;
-	mConfig.mNext   = nullptr;
+	mName = "MovieList";
+	mConfig.clearRelations();
 
-	void* file = JKRDvdRipper::loadToMainRAM("user/Mukki/movie/demos.txt", nullptr, Switch_0, 0, nullptr, JKRDvdRipper::ALLOC_DIR_BOTTOM, 0,
-	                                         nullptr, nullptr);
-	if (file) {
-		RamStream stream(file, -1);
-		stream.mMode = STREAM_MODE_TEXT;
-		if (stream.mMode == STREAM_MODE_TEXT) {
-			stream.mTabCount = 0;
-		}
-		read(stream);
-		delete[] file;
-	}
+	loadFromFile(this, "user/Mukki/movie/demos.txt");
 }
 
 /**
@@ -155,20 +143,23 @@ MovieList::MovieList()
  */
 MovieConfig* MovieList::findConfig(char* movieName, char* mapName)
 {
-	int movielen = strlen(movieName);
-	int maplen   = 0;
+	int nameLength = strlen(movieName);
+	int mapLength  = 0;
 	if (mapName) {
-		maplen = strlen(mapName);
+		mapLength = strlen(mapName);
 	}
 
 	FOREACH_NODE(MovieConfig, mConfig.mChild, cNode)
 	{
-		if (!strncmp(movieName, cNode->mMovieNameBuffer2, movielen)) {
-			if (mapName == nullptr || !strncmp(mapName, cNode->mMapName, maplen)) {
+		// If the movie name matches
+		if (IS_SAME_STRING_N(movieName, cNode->mMovieNameBuffer2, nameLength)) {
+			// If the map name matches or there is no map name
+			if (mapName == nullptr || IS_SAME_STRING_N(mapName, cNode->mMapName, mapLength)) {
 				return cNode;
 			}
 		}
 	}
+
 	return nullptr;
 }
 
@@ -187,10 +178,7 @@ void MovieList::read(Stream& data)
 {
 	int nodes = data.readInt();
 
-	mConfig.mChild  = nullptr;
-	mConfig.mParent = nullptr;
-	mConfig.mPrev   = nullptr;
-	mConfig.mNext   = nullptr;
+	mConfig.clearRelations();
 
 	for (int i = 0; i < nodes; i++) {
 		MovieConfig* config = new MovieConfig;

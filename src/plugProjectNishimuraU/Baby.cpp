@@ -242,7 +242,7 @@ void Obj::moveNoTarget()
 	if (gameSystem && gameSystem->isZukanMode()) {
 		if (sqrDistanceXZ(mPosition, mTargetPos) < 500.0f) {
 			f32 randomAngle = randWeightFloat(100.0f) + 50.0f;
-			f32 angleToHome = JMath::atanTable_.atan2_(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
+			f32 angleToHome = JMAAtan2Radian(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
 			angleToHome     = randWeightFloat(PI) + angleToHome + HALF_PI;
 
 			mTargetPos.x = randomAngle * sinf(angleToHome) + mHomePosition.x;
@@ -265,9 +265,9 @@ void Obj::createHoney()
 {
 	Parms* parms = C_PARMS;
 	if (randWeightFloat(1.0f) < parms->mProperParms.mNectarChance.mValue) {
-		ItemHoney::InitArg arg(false, false);
+		ItemHoney::InitArg arg(HONEY_Y, false);
 
-		ItemHoney::Item* item = static_cast<ItemHoney::Item*>(ItemHoney::mgr->birth());
+		ItemHoney::Item* item = ItemHoney::mgr->birth();
 		if (item) {
 			item->init(&arg);
 			item->setPosition(mPosition, false);

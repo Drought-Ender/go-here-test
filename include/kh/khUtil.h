@@ -49,7 +49,7 @@ struct khUtilFadePane : public P2DScreen::CallBackNode {
 	void fadeout();
 	void set_init_alpha(u8);
 
-	static khUtilFadePane* create(P2DScreen::Mgr*, u64, u8);
+	static khUtilFadePane* create(P2DScreen::Mgr* screen, u64 tag, u8 changeSpeed);
 
 	inline void createNode(J2DPane* pane)
 	{
@@ -68,7 +68,7 @@ struct khUtilFadePane : public P2DScreen::CallBackNode {
 	khPaneNode mPaneNode; // _1C
 	int mState;           // _28
 	u8 mCurrentAlpha;     // _2C
-	u8 mChangeAlpha;      // _2D
+	u8 mChangeSpeed;      // _2D
 };
 
 struct khUtilFadePaneWM : public khUtilFadePane {
@@ -81,8 +81,8 @@ struct khUtilFadePaneWM : public khUtilFadePane {
 	virtual ~khUtilFadePaneWM() { } // _08 (weak)
 	virtual void fadeout_finish();  // _20
 
-	void create(P2DScreen::Mgr*, u64, u8);      // UNUSED
-	void create(P2DScreen::Mgr*, J2DPane*, u8); // UNUSED
+	static khUtilFadePaneWM* create(P2DScreen::Mgr*, u64, u8);      // UNUSED
+	static khUtilFadePaneWM* create(P2DScreen::Mgr*, J2DPane*, u8); // UNUSED
 
 	// _00     = VTBL
 	// _00-_30 = khUtilFadePane
@@ -91,7 +91,7 @@ struct khUtilFadePaneWM : public khUtilFadePane {
 };
 
 struct khUtilColorAnm : public P2DScreen::CallBackNode {
-	khUtilColorAnm(P2DScreen::Mgr* screen, u64 tag, int panes, int length);
+	khUtilColorAnm(P2DScreen::Mgr* screen, u64 tag, int colors, int length);
 
 	virtual ~khUtilColorAnm() { } // _08 (weak)
 	virtual void update();        // _10 (weak)
@@ -100,13 +100,20 @@ struct khUtilColorAnm : public P2DScreen::CallBackNode {
 	inline JUtility::TColor& getColor(int id) const { return mColorList[id]; }
 
 	inline void setColor(JUtility::TColor color, int id) { mColorList[id] = color; }
+	inline void setDisabledColor(JUtility::TColor color) { mDisabledColor = color; }
+
+	inline void reset()
+	{
+		mColor = mColorList[0];
+		mFrame = 0;
+	}
 
 	// _00     = VTBL
 	// _00-_1C = P2DScreen::Node
 	JUtility::TColor* mColorList;    // _1C
 	JUtility::TColor mColor;         // _20
 	JUtility::TColor mDisabledColor; // _24
-	int mPaneNum;                    // _28
+	int mColorCount;                 // _28
 	int mLength;                     // _2C
 	int mFrame;                      // _30
 	bool mUpdateMode;                // _34

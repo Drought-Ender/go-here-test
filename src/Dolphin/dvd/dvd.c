@@ -96,7 +96,7 @@ void DVDInit()
 	OSInitThreadQueue(&__DVDThreadQueue);
 	__DIRegs[DI_STATUS]       = 42;
 	__DIRegs[DI_COVER_STATUS] = 0;
-	if (bootInfo->magic == 0xE5207C22) {
+	if (bootInfo->magic == OS_BOOTINFO_MAGIC_JTAG) {
 		OSReport("load fst\n");
 		__fstLoad();
 	} else if (bootInfo->magic != 0xD15EA5E) {
@@ -1265,15 +1265,15 @@ s32 DVDGetDriveStatus()
 	int interrupts = OSDisableInterrupts();
 	int result;
 	if (FatalErrorFlag != FALSE) {
-		result = -1;
+		result = DVD_STATE_FATAL_ERROR;
 	} else {
 		if (PausingFlag != FALSE) {
-			result = 8;
+			result = DVD_STATE_PAUSING;
 		} else {
 			if (executing == nullptr) {
-				result = 0;
+				result = DVD_STATE_END;
 			} else if (executing == &DummyCommandBlock) {
-				result = 0;
+				result = DVD_STATE_END;
 			} else {
 				result = DVDGetCommandBlockStatus((struct DVDCommandBlock*)executing);
 			}

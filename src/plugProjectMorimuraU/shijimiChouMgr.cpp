@@ -16,7 +16,7 @@ Mgr::Mgr(int objLimit, u8 modelType)
 {
 	mUpdateMgr   = nullptr;
 	mGroupLeader = nullptr;
-	mName        = "シジミ蝶マネージャ"; // clam butterfly manager
+	mName        = "繧ｷ繧ｸ繝溯攜繝槭ロ繝ｼ繧ｸ繝｣"; // clam butterfly manager
 }
 
 /**
@@ -51,13 +51,13 @@ void Mgr::loadModelData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 	P2ASSERTLINE(71, model);
 
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "mat_shijimi_hane_v")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x01000000);
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(J3DMDF_DiffColorReg);
 		}
 	}
 
@@ -111,7 +111,7 @@ void Mgr::doAnimation()
 void Mgr::fetch(J3DModel* model, f32 p1)
 {
 	if (mMtxCacheRef) {
-		mMtxCacheRef->mCache->_00 = 0.5f + p1;
+		mMtxCacheRef->mCache->mAnimationFrame = 0.5f + p1;
 		mMtxCacheRef->fetch(model);
 	}
 }

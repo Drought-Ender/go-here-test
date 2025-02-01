@@ -95,7 +95,7 @@ void StateAppear::init(EnemyBase* enemy, StateArg* stateArg)
 
 	rock->enableEvent(0, EB_ModelHidden);
 	rock->disableEvent(0, EB_Cullable);
-	rock->disableEvent(0, EB_14);
+	rock->disableEvent(0, EB_CullSound);
 
 	rock->mTargetVelocity = Vector3f(0.0f);
 	rock->startMotion(ROCKANIM_Run, nullptr);
@@ -154,7 +154,7 @@ void StateDropWait::cleanup(EnemyBase* enemy)
 {
 	Obj* rock = OBJ(enemy);
 	rock->disableEvent(0, EB_Cullable);
-	rock->disableEvent(0, EB_14);
+	rock->disableEvent(0, EB_CullSound);
 
 	shadowMgr->addShadow(rock);
 	shadowMgr->setForceVisible(rock, true);
@@ -178,7 +178,7 @@ void StateFall::init(EnemyBase* enemy, StateArg* stateArg)
  */
 void StateFall::exec(EnemyBase* enemy)
 {
-	if (enemy->mBounceTriangle) {
+	if (enemy->mFloorTriangle) {
 		transit(enemy, ROCK_Dead, nullptr);
 	} else if (enemy->isEvent(0, EB_Colliding)) {
 		transit(enemy, ROCK_Dead, nullptr);
@@ -196,8 +196,8 @@ void StateFall::cleanup(EnemyBase* enemy)
 	rock->finishFallEffect();
 
 	Vector3f position = rock->getPosition();
-	cameraMgr->startVibration(27, position, 2);
-	rumbleMgr->startRumble(14, position, 2);
+	cameraMgr->startVibration(VIBTYPE_Crash, position, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, position, RUMBLEID_Both);
 }
 
 /**
@@ -208,7 +208,7 @@ void StateMove::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	Obj* rock = OBJ(enemy);
 	rock->disableEvent(0, EB_Cullable);
-	rock->disableEvent(0, EB_14);
+	rock->disableEvent(0, EB_CullSound);
 	rock->startMotion(ROCKANIM_Run, nullptr);
 	rock->mTimer = 0.0f;
 
@@ -248,7 +248,7 @@ void StateMove::cleanup(EnemyBase* enemy)
 	rock->finishRollingWaterEffect();
 
 	Vector3f position = rock->getPosition();
-	rumbleMgr->startRumble(14, position, 2);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, position, RUMBLEID_Both);
 }
 
 /**

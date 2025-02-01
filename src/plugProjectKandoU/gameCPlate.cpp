@@ -38,7 +38,7 @@ void* CPlate::getEnd() { return (void*)mSlotCount; }
  * @note Address: 0x80195054
  * @note Size: 0xC
  */
-void CPlate::shrink() { _100 = 10; }
+void CPlate::shrink() { mShrinkTimer = 10; }
 
 /**
  * @note Address: N/A
@@ -59,7 +59,7 @@ CPlate::CPlate(int slotLimit)
     , mParms()
     , mSlotLimit(slotLimit)
 {
-	_B4              = 10.0f;
+	mMoveStickRadius = 10.0f;
 	mBaseRadius      = 10.0f;
 	mPosition        = Vector3f(0.0f);
 	mAngle           = 0.0f;
@@ -67,25 +67,23 @@ CPlate::CPlate(int slotLimit)
 	mActiveGroupSize = 0;
 	mSlotCount       = 0;
 	_110             = 0;
-	_111             = 1;
-	_F4              = 0.0f;
-	_F8              = 0.0f;
-	_FC              = 0.0f;
-	for (int i = 0; i < ARRAY_SIZE(_104); i++) {
-		_104[i] = 0;
+	mIsPositionUnset = 1;
+	mUnused          = Vector3f(0.0f);
+	for (int i = 0; i < ARRAY_SIZE(mHappaStageCounts); i++) {
+		mHappaStageCounts[i] = 0;
 	}
-	mVelocity = Vector3f(0.0f);
-	_D8       = Vector3f(0.0f);
-	_100      = 0;
+	mVelocity           = Vector3f(0.0f);
+	mBasePositionOffset = Vector3f(0.0f);
+	mShrinkTimer        = 0;
 }
 
 /**
  * Sets the position, angle, velocity, and scale of the CPlate object.
  *
- * @param position The new position of the CPlate object.
- * @param angle The new angle of the CPlate object.
- * @param velocity The new velocity of the CPlate object.
- * @param scale The scale factor to be applied to the CPlate object.
+ * @param position The position vector of the CPlate object.
+ * @param angle The angle of rotation for the CPlate object.
+ * @param velocity The velocity vector of the CPlate object.
+ * @param scale The scale factor for the CPlate object.
  *
  * @note Address: 0x801952EC
  * @note Size: 0x210
@@ -95,48 +93,50 @@ void CPlate::setPos(Vector3f& position, f32 angle, Vector3f& velocity, f32 scale
 	f32 offset = mParms.mStartingOffset();
 	offset *= scale;
 
+	// Cap the offset if the velocity is too high
 	if (mVelocity.length2D() > 5.0f) {
 		offset = 0.0f;
 	}
 
-	f32 rad = mBaseRadius + offset;
+	f32 currentRadius = mBaseRadius + offset;
 
 	mAngle    = angle;
 	mPosition = position;
 
-	Vector3f dir = Vector3f(rad * sinf(angle), 0.0f, rad * cosf(angle));
-	_D8          = mPosition + dir;
-	mVelocity    = velocity;
+	Vector3f dir        = Vector3f(currentRadius * sinf(angle), 0.0f, currentRadius * cosf(angle));
+	mBasePositionOffset = mPosition + dir;
+	mVelocity           = velocity;
 
-	Vector3f secondDir = Vector3f(_B8 * sinf(angle), 0.0f, _B8 * cosf(angle));
-	_A4                = position + secondDir;
-	_111               = 0;
+	Vector3f secondDir = Vector3f(mMaxRadius * sinf(angle), 0.0f, mMaxRadius * cosf(angle));
+	mMaxPositionOffset = position + secondDir;
+
+	mIsPositionUnset = 0;
 }
 
 /**
  * @note Address: 0x801954FC
  * @note Size: 0x20C
  */
-void CPlate::setPosGray(Vector3f& position, f32 angle, Vector3f& velocity, f32 p4)
+void CPlate::setPosGray(Vector3f& position, f32 angle, Vector3f& velocity, f32 scale)
 {
 	f32 offset = mParms.mStartingOffset();
-	offset *= p4;
+	offset *= scale;
 
 	if (mVelocity.length2D() > 5.0f) {
 		offset = 0.0f;
 	}
 
-	f32 rad = mBaseRadius + offset;
+	f32 baseRadius = mBaseRadius + offset;
 
 	mPosition = position;
 
-	Vector3f dir = Vector3f(rad * sinf(angle), 0.0f, rad * cosf(angle));
-	_D8          = mPosition + dir;
-	mVelocity    = velocity;
+	Vector3f baseDirection = Vector3f(baseRadius * sinf(angle), 0.0f, baseRadius * cosf(angle));
+	mBasePositionOffset    = mPosition + baseDirection;
+	mVelocity              = velocity;
 
-	Vector3f secondDir = Vector3f(_B8 * sinf(angle), 0.0f, _B8 * cosf(angle));
-	_A4                = position + secondDir;
-	_111               = 0;
+	Vector3f maxDirection = Vector3f(mMaxRadius * sinf(angle), 0.0f, mMaxRadius * cosf(angle));
+	mMaxPositionOffset    = position + maxDirection;
+	mIsPositionUnset      = 0;
 }
 
 /**
@@ -152,16 +152,16 @@ void CPlate::setPosNeutral(Vector3f& p1, f32 p2, Vector3f& p3, f32 p4)
  * @note Address: 0x80195708
  * @note Size: 0xA8
  */
-int CPlate::getSlot(Creature* piki, SlotChangeListener* listener, bool p3)
+int CPlate::getSlot(Creature* piki, SlotChangeListener* listener, bool doCheckValid)
 {
-	if (!p3) {
+	if (!doCheckValid) {
 		static_cast<Piki*>(piki)->mNavi->getOlimarData();
 		if (mSlotCount >= 100) {
 			return -1;
 		}
 	}
 
-	_104[static_cast<Piki*>(piki)->mHappaKind]++;
+	mHappaStageCounts[static_cast<Piki*>(piki)->mHappaKind]++;
 	int slot               = mSlotCount;
 	mSlots[slot].mCreature = piki;
 	mSlots[slot].mListener = listener;
@@ -177,16 +177,16 @@ int CPlate::getSlot(Creature* piki, SlotChangeListener* listener, bool p3)
 void CPlate::changeFlower(Creature* creature)
 {
 	P2ASSERTLINE(312, creature->isPiki());
-	int happa     = static_cast<Piki*>(creature)->mHappaKind;
-	int prevHappa = (happa + (PikiGrowthStageCount - 1)) % PikiGrowthStageCount;
-	/* EpochFlame explains:
-	 * PikiGrowthStageCount is 3 in vanilla, so here's how this code works. Hopefully this scales as I thought.
-	 * Let's say happa is 2 (flower), so (happa + (PikiGrowthStageCount-1)) resolves to 2 + 3-1 = 4
-	 * 4 % PikiGrowthStageCount is 4 % 3. 4/3 has a remainder of 1, which is Bud, so the previous happa is Bud.
-	 * I think
-	 */
-	_104[happa]++;
-	_104[prevHappa]--;
+
+	// What's the current flower state?
+	int currentKind = static_cast<Piki*>(creature)->mHappaKind;
+
+	// What's the previous flower state?
+	int previousKind = (currentKind + (PikiGrowthStageCount - 1)) % PikiGrowthStageCount;
+
+	// Update it (Priority is given to the flower over the bud, and bud over the leaf)
+	mHappaStageCounts[currentKind]++;
+	mHappaStageCounts[previousKind]--;
 }
 
 /**
@@ -196,12 +196,15 @@ void CPlate::changeFlower(Creature* creature)
 void CPlate::releaseSlot(Creature* creature, int idx)
 {
 	Slot& slot = mSlots[idx];
-	JUT_ASSERTLINE(331, slot.mCreature == creature, " sorry ...\n");
-	_104[static_cast<Piki*>(creature)->mHappaKind]--;
+	JUT_ASSERTLINE(331, slot.mCreature == creature, " sorry ...\n"); // LOL
+
+	mHappaStageCounts[static_cast<Piki*>(creature)->mHappaKind]--;
 	slot.mCreature = nullptr;
+
 	mSlotCount--;
 	mActiveGroupSize--;
 	if (mSlotCount < 0) {
+		// Stripped debug code
 		creature->getTypeName();
 	}
 
@@ -217,9 +220,25 @@ void CPlate::releaseSlot(Creature* creature, int idx)
  * @note Address: N/A
  * @note Size: 0xB0
  */
-void CPlate::swapSlot(int, int)
+void CPlate::swapSlot(int i, int j)
 {
-	// UNUSED FUNCTION
+	Slot* slot     = &mSlots[i];
+	Slot* prevSlot = &mSlots[j];
+
+	Creature* iCreature           = slot->mCreature;
+	SlotChangeListener* iListener = slot->mListener;
+	Creature* jCreature           = prevSlot->mCreature;
+	SlotChangeListener* jListener = prevSlot->mListener;
+
+	slot->mCreature = nullptr;
+	slot->mCreature = jCreature;
+	slot->mListener = jListener;
+	slot->mListener->inform(i);
+
+	prevSlot->mCreature = nullptr;
+	prevSlot->mCreature = iCreature;
+	prevSlot->mListener = iListener;
+	prevSlot->mListener->inform(j);
 }
 
 /**
@@ -228,21 +247,28 @@ void CPlate::swapSlot(int, int)
  */
 bool CPlate::validSlot(int index)
 {
-	if (0 > index || index >= mSlotCount) {
+	if (index < 0 || index >= mSlotCount) {
 		return false;
 	}
+
 	return true;
 }
-
 } // namespace Game
 
 /**
  * @note Address: N/A
  * @note Size: 0xCC
  */
-void getPriority(int*, int)
+int getPriority(int* pikiCounts, int color)
 {
-	// UNUSED FUNCTION
+	for (int i = 0; i < Game::PikiColorCount; i++) {
+		if (color == pikiCounts[i]) {
+			return i;
+		}
+	}
+
+	JUT_PANICLINE(405, "col %d : sort failed !\n", color);
+	return 128;
 }
 
 namespace Game {
@@ -261,29 +287,43 @@ void CPlate::sortByColor(Creature* piki, int happaType)
 		pikiCounts[i] = (kind + i) % PikiColorCount;
 	}
 
-	int happaSlots[PikiHappaCount];
+	int happaSlots[PikiGrowthStageCount];
 	if (happaType != -1) {
-		happaSlots[happaType]                        = Leaf;
-		happaSlots[(happaType + 1) % PikiHappaCount] = Bud;
-		happaSlots[(happaType + 2) % PikiHappaCount] = Flower;
+		happaSlots[happaType]                              = Leaf;
+		happaSlots[(happaType + 1) % PikiGrowthStageCount] = Bud;
+		happaSlots[(happaType + 2) % PikiGrowthStageCount] = Flower;
 	}
 
-	for (int i = 0; i < mSlotCount; i++) {
-		for (int j = 0; j < mSlotCount; j++) {
+	for (int i = 0; i < mSlotCount; i++) {     // r25, r26
+		for (int j = 0; j < mSlotCount; j++) { // r24, r27
 			Piki* iPiki = static_cast<Piki*>(mSlots[i].mCreature);
 			Piki* jPiki = static_cast<Piki*>(mSlots[j].mCreature);
 			int iKind   = iPiki->getKind();
 			int jKind   = jPiki->getKind();
 
 			if (iKind != jKind) {
-				int nextType;
-				for (int k = 0; k < PikiColorCount; k++) {
-					if (iKind == pikiCounts[k]) {
-						nextType = pikiCounts[k];
-						break;
-					}
+				int iPrio = getPriority(pikiCounts, iKind);
+				int jPrio = getPriority(pikiCounts, jKind);
+
+				if (j > i && jPrio < iPrio) {
+					swapSlot(j, i);
 				}
+				continue;
+			}
+
+			// Remove the additional mr r6, r4 by making this an INLINE!!
+			int iPrio;
+			int jPrio;
+			if (happaType == -1) {
+				jPrio = happa != jPiki->getHappa();
+				iPrio = happa != iPiki->getHappa();
 			} else {
+				jPrio = happaSlots[jPiki->getHappa()];
+				iPrio = happaSlots[iPiki->getHappa()];
+			}
+
+			if (j > i && jPrio < iPrio) {
+				swapSlot(j, i);
 			}
 		}
 	}
@@ -641,368 +681,160 @@ lbl_80195E34:
  * @note Address: 0x80195E54
  * @note Size: 0x1E0
  */
-void CPlate::rearrangeSlot(Vector3f& p1, f32 p2, Vector3f& p3)
+void CPlate::rearrangeSlot(Vector3f& target, f32 direction, Vector3f& velocity)
 {
-	/*
-	stwu     r1, -0x60(r1)
-	mflr     r0
-	stw      r0, 0x64(r1)
-	stfd     f31, 0x50(r1)
-	psq_st   f31, 88(r1), 0, qr0
-	stfd     f30, 0x40(r1)
-	psq_st   f30, 72(r1), 0, qr0
-	stmw     r24, 0x20(r1)
-	mr       r27, r3
-	lwz      r3, 0xc8(r3)
-	lfs      f31, lbl_80518EF4@sda21(r2)
-	mr       r28, r4
-	addi     r30, r3, -1
-	b        lbl_80196008
+	for (int i = mSlotCount - 1; i >= 1; i--) {
+		for (int j = i; j >= 1; j--) {
+			Vector3f currPikiPos      = mSlots[j].mCreature->getPosition();
+			Vector3f fromPikiToTarget = target - currPikiPos;
+			f32 distance              = fromPikiToTarget.length();
 
-lbl_80195E8C:
-	mr       r29, r30
-	slwi     r31, r30, 5
-	b        lbl_80195FFC
+			Vector3f prevPikiPos = mSlots[j - 1].mCreature->getPosition();
 
-lbl_80195E98:
-	lwz      r4, 0xc0(r27)
-	addi     r0, r31, 0x18
-	addi     r3, r1, 0x14
-	lwzx     r4, r4, r0
-	lwz      r12, 0(r4)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 4(r28)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 8(r28)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 0(r28)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f0, f1, f0
-	fmuls    f1, f2, f2
-	fmadds   f0, f0, f0, f3
-	fadds    f30, f1, f0
-	fcmpo    cr0, f30, f31
-	ble      lbl_80195F04
-	ble      lbl_80195F08
-	frsqrte  f0, f30
-	fmuls    f30, f0, f30
-	b        lbl_80195F08
-
-lbl_80195F04:
-	fmr      f30, f31
-
-lbl_80195F08:
-	lwz      r4, 0xc0(r27)
-	addi     r0, r31, -8
-	addi     r3, r1, 8
-	lwzx     r4, r4, r0
-	lwz      r12, 0(r4)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 4(r28)
-	lfs      f0, 0xc(r1)
-	lfs      f3, 0(r28)
-	fsubs    f4, f1, f0
-	lfs      f2, 8(r1)
-	lfs      f1, 8(r28)
-	lfs      f0, 0x10(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	fmadds   f0, f2, f2, f3
-	fmuls    f1, f1, f1
-	fadds    f0, f1, f0
-	fcmpo    cr0, f0, f31
-	ble      lbl_80195F74
-	ble      lbl_80195F78
-	frsqrte  f1, f0
-	fmuls    f0, f1, f0
-	b        lbl_80195F78
-
-lbl_80195F74:
-	fmr      f0, f31
-
-lbl_80195F78:
-	fcmpo    cr0, f30, f0
-	bge      lbl_80195FF4
-	addi     r0, r29, -1
-	lwz      r5, 0xc0(r27)
-	slwi     r3, r0, 5
-	li       r0, 0
-	add      r6, r5, r31
-	mr       r4, r29
-	add      r24, r5, r3
-	lwz      r25, 0x18(r6)
-	lwz      r26, 0x1c(r6)
-	lwz      r5, 0x18(r24)
-	lwz      r3, 0x1c(r24)
-	stw      r0, 0x18(r6)
-	stw      r5, 0x18(r6)
-	stw      r3, 0x1c(r6)
-	lwz      r3, 0x1c(r6)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	li       r0, 0
-	addi     r4, r29, -1
-	stw      r0, 0x18(r24)
-	stw      r25, 0x18(r24)
-	stw      r26, 0x1c(r24)
-	lwz      r3, 0x1c(r24)
-	lwz      r12, 0(r3)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-
-lbl_80195FF4:
-	addi     r31, r31, -32
-	addi     r29, r29, -1
-
-lbl_80195FFC:
-	cmpwi    r29, 1
-	bge      lbl_80195E98
-	addi     r30, r30, -1
-
-lbl_80196008:
-	cmpwi    r30, 1
-	bge      lbl_80195E8C
-	psq_l    f31, 88(r1), 0, qr0
-	lfd      f31, 0x50(r1)
-	psq_l    f30, 72(r1), 0, qr0
-	lfd      f30, 0x40(r1)
-	lmw      r24, 0x20(r1)
-	lwz      r0, 0x64(r1)
-	mtlr     r0
-	addi     r1, r1, 0x60
-	blr
-	*/
+			// If the Pikmin is closer than the previous, swap them
+			if (distance < target.distance(prevPikiPos)) {
+				swapSlot(j, j - 1);
+			}
+		}
+	}
 }
 
 /**
  * @note Address: 0x80196034
  * @note Size: 0xC4
  */
-// void getSlotPosition__Q24Game6CPlateFiR10Vector3f()
-void CPlate::getSlotPosition(int p1, Vector3f& p2)
+void CPlate::getSlotPosition(int idx, Vector3f& outPosition)
 {
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	mr       r31, r5
-	stw      r30, 0x18(r1)
-	or.      r30, r4, r4
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	blt      lbl_80196068
-	lwz      r0, 0xc8(r29)
-	cmpw     r30, r0
-	blt      lbl_80196070
-
-lbl_80196068:
-	li       r0, 0
-	b        lbl_80196074
-
-lbl_80196070:
-	li       r0, 1
-
-lbl_80196074:
-	clrlwi.  r0, r0, 0x18
-	bne      lbl_8019609C
-	lis      r3, lbl_8047EFF0@ha
-	lis      r4, lbl_8047F030@ha
-	addi     r5, r4, lbl_8047F030@l
-	mr       r6, r30
-	addi     r3, r3, lbl_8047EFF0@l
-	li       r4, 0x273
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_8019609C:
-	slwi     r3, r30, 5
-	lwz      r0, 0xc0(r29)
-	addi     r3, r3, 0xc
-	lfs      f0, 0xd8(r29)
-	add      r3, r0, r3
-	lfs      f2, 0xdc(r29)
-	lfs      f1, 0(r3)
-	lfs      f3, 4(r3)
-	fadds    f0, f1, f0
-	lfs      f4, 8(r3)
-	lfs      f1, 0xe0(r29)
-	fadds    f2, f3, f2
-	stfs     f0, 0(r31)
-	fadds    f0, f4, f1
-	stfs     f2, 4(r31)
-	stfs     f0, 8(r31)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	lwz      r0, 0x24(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
+	JUT_ASSERTLINE(627, validSlot(idx), "invalid slot idx %d\n", idx);
+	outPosition = mSlots[idx].mPosition + mBasePositionOffset;
 }
+
+#define RADIUS_VARIANCE 0.1f
 
 /**
  * @note Address: 0x801960F8
  * @note Size: 0x1B8
  */
-void CPlate::refresh(int, f32)
+void CPlate::refresh(int formationSize, f32 moveStrength)
 {
-	/*
-	stwu     r1, -0x10(r1)
-	mflr     r0
-	lfs      f0, lbl_80518F0C@sda21(r2)
-	stw      r0, 0x14(r1)
-	fcmpo    cr0, f1, f0
-	ble      lbl_80196118
-	fmr      f1, f0
-	b        lbl_80196128
+	if (moveStrength > 1.0f) {
+		moveStrength = 1.0f;
+	} else if (moveStrength < 0.0f) {
+		moveStrength = 0.0f;
+	}
 
-lbl_80196118:
-	lfs      f0, lbl_80518EF4@sda21(r2)
-	fcmpo    cr0, f1, f0
-	bge      lbl_80196128
-	fmr      f1, f0
+	if (formationSize < mActiveGroupSize) {
+		mSlotCount -= (mActiveGroupSize - formationSize);
+	}
 
-lbl_80196128:
-	lwz      r5, 0xbc(r3)
-	cmpw     r4, r5
-	bge      lbl_80196144
-	lwz      r0, 0xc8(r3)
-	subf     r5, r4, r5
-	subf     r0, r5, r0
-	stw      r0, 0xc8(r3)
+	mActiveGroupSize = formationSize;
 
-lbl_80196144:
-	stw      r4, 0xbc(r3)
-	lbz      r0, 0x100(r3)
-	lfs      f2, 0x90(r3)
-	cmplwi   r0, 0
-	beq      lbl_80196160
-	lfs      f0, lbl_80518F20@sda21(r2)
-	b        lbl_80196164
+	f32 maxPositionSize  = mParms.mMaxPositionSize();
+	f32 effectiveMaxSize = maxPositionSize * (mShrinkTimer ? 0.5f : 1.0f);
 
-lbl_80196160:
-	lfs      f0, lbl_80518F0C@sda21(r2)
+	f32 radiusFactor = (f32)formationSize / PI;
+	radiusFactor     = _sqrtf(radiusFactor);
 
-lbl_80196164:
-	xoris    r5, r4, 0x8000
-	lis      r0, 0x4330
-	stw      r5, 0xc(r1)
-	fmuls    f0, f2, f0
-	lfd      f5, lbl_80518F38@sda21(r2)
-	stw      r0, 8(r1)
-	lfs      f3, lbl_80518F24@sda21(r2)
-	lfd      f4, 8(r1)
-	lfs      f2, lbl_80518EF4@sda21(r2)
-	fsubs    f4, f4, f5
-	fdivs    f4, f4, f3
-	fcmpo    cr0, f4, f2
-	ble      lbl_801961A8
-	ble      lbl_801961AC
-	frsqrte  f2, f4
-	fmuls    f4, f2, f4
-	b        lbl_801961AC
+	mMaxRadius        = ((2.0f + RADIUS_VARIANCE) * effectiveMaxSize) * radiusFactor;
+	f32 smallerRadius = (2.0f - RADIUS_VARIANCE) * effectiveMaxSize;
 
-lbl_801961A8:
-	fmr      f4, f2
+	f32 largerRadius = mMaxRadius;
+	if (smallerRadius > largerRadius) {
+		radiusFactor = smallerRadius;
+	} else {
+		radiusFactor = largerRadius;
+		largerRadius = smallerRadius;
+	}
 
-lbl_801961AC:
-	lfs      f3, lbl_80518F28@sda21(r2)
-	lfs      f2, lbl_80518F2C@sda21(r2)
-	fmuls    f3, f3, f0
-	fmuls    f5, f2, f0
-	fmuls    f2, f3, f4
-	stfs     f2, 0xb8(r3)
-	lfs      f2, 0xb8(r3)
-	fcmpo    cr0, f5, f2
-	ble      lbl_801961D8
-	fmr      f4, f5
-	b        lbl_801961E0
+	mMoveStickRadius = (moveStrength * -(radiusFactor - largerRadius)) + radiusFactor;
+	if (mMoveStickRadius == 0.0f) {
+		mBaseRadius = 10.0f;
+	} else {
+		mBaseRadius = (effectiveMaxSize * ((4.0f * (f32)formationSize) * effectiveMaxSize)) / (PI * mMoveStickRadius);
+	}
 
-lbl_801961D8:
-	fmr      f4, f2
-	fmr      f2, f5
+	f32 lengthLimit = mParms.mLengthLimit();
+	if (mBaseRadius > lengthLimit) {
+		mBaseRadius      = lengthLimit;
+		mMoveStickRadius = (effectiveMaxSize * ((4.0f * (f32)formationSize) * effectiveMaxSize)) / (PI * mBaseRadius);
+	}
 
-lbl_801961E0:
-	fsubs    f3, f4, f2
-	lfs      f2, lbl_80518EF4@sda21(r2)
-	fneg     f3, f3
-	fmadds   f3, f1, f3, f4
-	stfs     f3, 0xb4(r3)
-	lfs      f3, 0xb4(r3)
-	fcmpu    cr0, f2, f3
-	bne      lbl_8019620C
-	lfs      f2, lbl_80518F00@sda21(r2)
-	stfs     f2, 0xb0(r3)
-	b        lbl_80196248
-
-lbl_8019620C:
-	xoris    r5, r4, 0x8000
-	lis      r0, 0x4330
-	stw      r5, 0xc(r1)
-	lfs      f2, lbl_80518F24@sda21(r2)
-	stw      r0, 8(r1)
-	lfd      f4, lbl_80518F38@sda21(r2)
-	fmuls    f2, f2, f3
-	lfd      f3, 8(r1)
-	lfs      f5, lbl_80518F30@sda21(r2)
-	fsubs    f3, f3, f4
-	fmuls    f3, f5, f3
-	fmuls    f3, f3, f0
-	fmuls    f3, f0, f3
-	fdivs    f2, f3, f2
-	stfs     f2, 0xb0(r3)
-
-lbl_80196248:
-	lfs      f4, 0x68(r3)
-	lfs      f2, 0xb0(r3)
-	fcmpo    cr0, f2, f4
-	ble      lbl_8019629C
-	xoris    r4, r4, 0x8000
-	lis      r0, 0x4330
-	stw      r4, 0xc(r1)
-	lfd      f3, lbl_80518F38@sda21(r2)
-	stw      r0, 8(r1)
-	lfs      f5, lbl_80518F30@sda21(r2)
-	lfd      f2, 8(r1)
-	stfs     f4, 0xb0(r3)
-	fsubs    f4, f2, f3
-	lfs      f3, lbl_80518F24@sda21(r2)
-	lfs      f2, 0xb0(r3)
-	fmuls    f4, f5, f4
-	fmuls    f2, f3, f2
-	fmuls    f3, f4, f0
-	fmuls    f0, f0, f3
-	fdivs    f0, f0, f2
-	stfs     f0, 0xb4(r3)
-
-lbl_8019629C:
-	bl       refreshSlot__Q24Game6CPlateFf
-	lwz      r0, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x10
-	blr
-	*/
+	refreshSlot(moveStrength);
 }
 
 /**
  * @note Address: 0x801962B0
  * @note Size: 0x2EC
  */
-void CPlate::refreshSlot(f32)
+void CPlate::refreshSlot(f32 p1)
 {
+	int slotCount = 0;            // r31
+	f32 radius    = -mBaseRadius; // f26
+
+	Matrixf rotationMtx;
+	Vector3f rotation(0.0f, mAngle, 0.0f);
+	Vector3f scale(1.0f);
+	rotationMtx.makeSR(scale, rotation);
+
+	f32 maxPositionSize = mParms.mMaxPositionSize;
+
+	// This is probably an INLINE!!!
+	f32 shrinkModifier = mShrinkTimer ? 0.5f : 1.0f;
+	f32 maxSize        = maxPositionSize * shrinkModifier; // f25
+
+	Vector3f vec(0.0f);
+	mUnused = rotationMtx.mtxMult(vec);
+
+	int direction = 1; // r30
+	int row       = 0; // r26
+
+	while (slotCount < mActiveGroupSize) {
+		f32 sqrBase          = mBaseRadius * mBaseRadius;
+		f32 sqrRad           = radius * radius;
+		f32 radiusDifference = sqrBase - sqrRad;
+
+		if (radiusDifference > 0.0f) {
+			f32 areaDifference = sqrRad * sqrRad - mBaseRadius;
+			radiusDifference   = sqrtf(areaDifference);
+		} else {
+			radiusDifference = 0.0f;
+		}
+
+		f32 movestickScaled = mMoveStickRadius * radiusDifference;
+		int val             = static_cast<int>(movestickScaled / sqrRad / (2.0f * maxSize));
+		if (val < 0) {
+			val = 0;
+		}
+
+		if (p1 < 0.1f && val == 0) {
+			int group = mActiveGroupSize - slotCount;
+
+			if (group > 1) {
+				val = 1;
+			}
+		}
+
+		f32 maxSizeScaled = val * maxSize * 2.0f;
+		f32 fCounter      = (f32)direction * maxSizeScaled; // f22
+		f32 stepDistance  = direction * maxSize * 2.0f;     // f23
+
+		int i = val * 2 + 1;
+		while (i > 0) {
+			if (slotCount < mActiveGroupSize) {
+				mSlots[row].mRelativePosition = Vector3f(fCounter, 0.0f, radius);
+				mSlots[row].mPosition         = rotationMtx.mtxMult(mSlots[row].mRelativePosition);
+
+				row++;
+				slotCount++;
+			}
+
+			fCounter -= stepDistance;
+			i--;
+		}
+
+		radius += maxSize * 2.0f;
+		direction *= -1;
+	}
 	/*
 	stwu     r1, -0x150(r1)
 	mflr     r0
@@ -1224,10 +1056,11 @@ lbl_8019652C:
  */
 void CPlate::update()
 {
-	if (_100 == 0) {
+	if (mShrinkTimer == 0) {
 		return;
 	}
-	_100--;
+
+	mShrinkTimer--;
 }
 
 /**

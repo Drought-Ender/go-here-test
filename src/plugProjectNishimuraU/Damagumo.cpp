@@ -75,10 +75,10 @@ void Obj::onInit(CreatureInitArg* initArg)
 	mStateDuration = 0.0f;
 	mNextState     = DAMAGUMO_NULL;
 
-	mTargetPosition = mHomePosition;
-	mShadowScale    = 0.0f;
-	_2DC            = 0;
-	mIsSmoking      = false;
+	mTargetPosition    = mHomePosition;
+	mShadowScale       = 0.0f;
+	mDoPlayDeadMatAnim = false;
+	mIsSmoking         = false;
 
 	setupIKSystem();
 	setupShadowSystem();
@@ -208,7 +208,7 @@ void Obj::collisionCallback(CollEvent& event)
 {
 	if (!isEvent(0, EB_Bittered)) {
 		Creature* creature = event.mCollidingCreature;
-		if (creature && event.mCollisionObj && creature->isAlive() && creature->mBounceTriangle) {
+		if (creature && event.mCollisionObj && creature->isAlive() && creature->mFloorTriangle) {
 			if (creature->isNavi() || creature->isPiki()) {
 				if (isCollisionCheck(event.mHitPart)) {
 					InteractPress press(this, C_GENERALPARMS.mAttackDamage.mValue, nullptr);
@@ -295,7 +295,7 @@ void Obj::getTargetPosition()
 		} else if (sqrDistanceXZ(mPosition, mTargetPosition) < 625.0f) {
 			f32 range       = (C_GENERALPARMS.mTerritoryRadius.mValue - C_GENERALPARMS.mHomeRadius.mValue);
 			f32 randDist    = C_GENERALPARMS.mHomeRadius.mValue + randWeightFloat(range);
-			f32 angleToHome = JMath::atanTable_.atan2_(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
+			f32 angleToHome = JMAAtan2Radian(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
 
 			f32 randomAngle = randWeightFloat(PI);
 			f32 fixedAngle  = HALF_PI;
@@ -500,7 +500,7 @@ void Obj::startMaterialAnimation()
  */
 void Obj::updateMaterialAnimation()
 {
-	if (_2DC) {
+	if (mDoPlayDeadMatAnim) {
 		f32 maxFrame;
 		f32 currFrame = mMatLoopAnimator[1].mCurrFrame;
 		if (mMatLoopAnimator[1].mAnimation) {
@@ -556,7 +556,7 @@ void Obj::createItemAndEnemy()
 			EnemyBirthArg birthArg;
 			birthArg.mFaceDir = mFaceDir;
 			getThrowupItemPosition(&birthArg.mPosition);
-			specMgr->createGroupByBigFoot(birthArg, 25);
+			specMgr->createGroupByBigFoot(birthArg, SHIJIMICHOU_GROUP_COUNT);
 		}
 	}
 }
@@ -568,7 +568,7 @@ void Obj::createItemAndEnemy()
 void Obj::startBossFlickBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Flick);
 }
 
@@ -579,7 +579,7 @@ void Obj::startBossFlickBGM()
 void Obj::updateBossBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	if (mStuckPikminCount) {
 		soundObj->postPikiAttack(true);
@@ -595,7 +595,7 @@ void Obj::updateBossBGM()
 void Obj::resetBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(false);
 	soundObj->mHasReset = 1;
 }
@@ -607,7 +607,7 @@ void Obj::resetBossAppearBGM()
 void Obj::setBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(true);
 }
 
@@ -700,8 +700,8 @@ void Obj::createOnGroundEffect(int footIdx, WaterBox* wbox)
 	}
 
 	PSStartSoundVec(PSSE_EN_SPIDER_WALK, (Vec*)&mJointPositions[footIdx][3]);
-	cameraMgr->startVibration(6, effectPos, 2);
-	rumbleMgr->startRumble(14, effectPos, RUMBLEID_Both);
+	cameraMgr->startVibration(VIBTYPE_LightFastShort, effectPos, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, effectPos, RUMBLEID_Both);
 }
 
 /**

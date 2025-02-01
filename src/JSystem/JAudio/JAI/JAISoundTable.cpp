@@ -17,15 +17,15 @@ u8* JAInter::SoundTable::mAddress;
  */
 void JAInter::SoundTable::init(u8* data, u32 dataSize)
 {
-	mVersion         = data[3];
-	mDatasize        = dataSize;
-	mAddress         = data;
+	mDatasize = dataSize;
+	mAddress  = data;
+	mVersion  = data[3];
+
 	mSoundMax        = new (JAIBasic::msCurrentHeap, 4) u16[0x12];
 	mPointerCategory = new (JAIBasic::msCurrentHeap, 4) SoundInfo*[0x12];
 	for (u8 i = 0; i < 0x12; i++) {
-		mSoundMax[i]        = *reinterpret_cast<u16**>(&mAddress[6])[i];
-		mPointerCategory[i] = reinterpret_cast<SoundInfo**>(&mAddress[0x50])[reinterpret_cast<u16*>(&mAddress[8])[i]];
-		// mPointerCategory[i] = *(SoundInfo**)(mAddress + *(u16*)(mAddress + (i * 4) + 8) * 0x10 + 0x50);
+		mSoundMax[i]        = reinterpret_cast<u16*>(&mAddress[6])[i * 2];
+		mPointerCategory[i] = reinterpret_cast<SoundInfo*>(&mAddress[0x50] + reinterpret_cast<u16*>(&mAddress[8])[i] * sizeof(SoundInfo));
 		if (i < 0x10 && mSoundMax[i] != 0) {
 			mCategotyMax = i + 1;
 		}
@@ -99,15 +99,15 @@ JAInter::SoundInfo* JAInter::SoundTable::getInfoPointer(u32 soundID)
 {
 	SoundInfo* info = nullptr;
 	u32 category;
-	switch (soundID & 0xC0000000) {
-	case 0x00000000:
+	switch (soundID & JAISoundID_TypeMask) {
+	case JAISoundID_Type_Se:
 		category = soundID >> 0xC & 0xFF;
 		JAIGlobalParameter::getParamSeCategoryMax();
 		break;
-	case 0x80000000:
+	case JAISoundID_Type_Sequence:
 		category = 0x10;
 		break;
-	case 0xC0000000:
+	case JAISoundID_Type_Stream:
 		category = 0x11;
 		break;
 	}
@@ -126,13 +126,13 @@ u32 JAInter::SoundTable::getInfoFormat(u32 id)
 {
 	u32 retval = 0;
 	switch (id & JAISoundID_TypeMask) {
-	case 0x00000000:
+	case JAISoundID_Type_Se:
 		retval = mAddress[0];
 		break;
-	case 0x80000000:
+	case JAISoundID_Type_Sequence:
 		retval = mAddress[1];
 		break;
-	case 0xC0000000:
+	case JAISoundID_Type_Stream:
 		retval = mAddress[2];
 		break;
 	}
@@ -158,7 +158,7 @@ u8 JAInter::SoundTable::getCategotyMax() { return mCategotyMax; }
  * @note Address: 0x800B763C
  * @note Size: 0x10
  */
-u16 JAInter::SoundTable::getSoundMax(u8 p1) { return mSoundMax[p1]; }
+u16 JAInter::SoundTable::getSoundMax(u8 cat) { return mSoundMax[cat]; }
 
 /**
  * @note Address: N/A

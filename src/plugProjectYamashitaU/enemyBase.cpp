@@ -642,12 +642,12 @@ void EarthquakeState::cleanup(EnemyBase* enemy)
  */
 void EarthquakeState::updateCullingOff(EnemyBase* enemy)
 {
-	if (enemy->isDead() && enemy->mBounceTriangle) {
+	if (enemy->isDead() && enemy->mFloorTriangle) {
 		transit(enemy, EBS_Living, nullptr);
 		return;
 	}
 
-	if (++mEarthquakeStepTimer > 3 && enemy->mBounceTriangle) {
+	if (++mEarthquakeStepTimer > 3 && enemy->mFloorTriangle) {
 		f32 randChance = randFloat();
 		if (enemy->mStunAnimTimer > 0.0f
 		    || (randChance < enemy->getParms().mPurplePikiStunChance.mValue && !enemy->isEvent(0, EB_BitterQueued)
@@ -694,7 +694,7 @@ void StoneState::init(EnemyBase* enemy, StateArg* arg)
 	enemy->stopMotion();
 	enemy->mCurrentVelocity = 0.0f;
 
-	if (enemy->mBounceTriangle) {
+	if (enemy->mFloorTriangle) {
 		enemy->enableEvent(0, EB_Constrained);
 	} else {
 		enemy->enableEvent(0, EB_Constrained);
@@ -724,7 +724,7 @@ void StoneState::cleanup(EnemyBase* enemy)
 	enemy->startMotion();
 	enemy->doFinishStoneState();
 
-	if ((enemy->mSfxEmotion == EMOTE_Excitement) && PSGetDirectedMainBgm()) {
+	if (enemy->mSfxEmotion == EMOTE_Excitement && PSGetDirectedMainBgm()) {
 		enemy->mSoundObj->battleOn();
 	}
 }
@@ -739,12 +739,12 @@ void StoneState::updateAlways(EnemyBase* enemy)
 	enemy->mBitterTimer += sys->mDeltaTime;
 
 	if (enemy->mEnemyStoneObj->isFlag(EnemyStone::STONE_HasViewedDemo)) {
-		if (!enemy->mBounceTriangle) {
+		if (!enemy->mFloorTriangle) {
 			enemy->constraintOff();
 			enemy->disableEvent(0, EB_Untargetable);
 		}
 
-		// dev typo
+		// dev typo- likely should have been bool
 		f32 isBitterFinish = (enemy->mBitterTimer > enemy->getParms().mBitterDuration.mValue);
 		if (isBitterFinish) {
 			if (enemy->mEnemyStoneObj->isFlag(EnemyStone::STONE_Shake)) {
@@ -831,7 +831,7 @@ EnemyBase::EnemyBase()
     , mEventBuffer()
     , mSfxEmotion(EMOTE_Caution)
     , mCreatureID(0xFF)
-    , _1F2(0xFF)
+    , mUnused1F2(0xFF)
     , mStuckPikminCount(0)
     , mStunAnimTimer(0.0f)
     , mFriction(0.0f)
@@ -862,8 +862,8 @@ EnemyBase::EnemyBase()
 	mCurAnim         = new EnemyAnimKeyEvent;
 	mDamageAnimTimer = 0.0f;
 	mTargetCreature  = nullptr;
-	mBounceTriangle  = nullptr;
-	mLifecycleFSM    = new EnemyBaseFSM::StateMachine();
+	mFloorTriangle   = nullptr;
+	mLifecycleFSM    = new EnemyBaseFSM::StateMachine;
 	mLifecycleFSM->init(this);
 	clearStick();
 	mCurAnim->mIsPlaying = false;
@@ -1251,7 +1251,7 @@ void EnemyBase::onKill(CreatureKillArg* inputArg)
 
 	endStick();
 
-	if ((!killArg || !(killArg->isFlag(CKILL_Unk29))) && isEvent(0, EB_DeathEffectEnabled)) {
+	if ((!killArg || !killArg->isFlag(CKILL_DisableDeathEffects)) && isEvent(0, EB_DeathEffectEnabled)) {
 		Vector3f effectPos;
 		getCommonEffectPos(effectPos);
 		f32 scaleMod                      = mScaleModifier;
@@ -1264,7 +1264,7 @@ void EnemyBase::onKill(CreatureKillArg* inputArg)
 		PSStartEnemyGhostSE(this, 0.0f);
 	}
 
-	if (!killArg || !(killArg->isFlag(CKILL_Unk31))) {
+	if (!killArg || !(killArg->isFlag(CKILL_NotKilledByPlayer))) {
 		if (isEvent(0, EB_Bittered)) {
 			mEnemyStoneObj->dead();
 			deathProcedure();
@@ -1321,8 +1321,8 @@ void EnemyBase::onKill(CreatureKillArg* inputArg)
 					Sys::Sphere ball;
 					getBoundingSphere(ball);
 
-					ItemHoney::InitArg honeyArg(honeyKind, 0);
-					ItemHoney::Item* drop = static_cast<ItemHoney::Item*>(ItemHoney::mgr->birth());
+					ItemHoney::InitArg honeyArg(honeyKind, false);
+					ItemHoney::Item* drop = ItemHoney::mgr->birth();
 
 					if (drop != nullptr) {
 						drop->init((CreatureInitArg*)&honeyArg);
@@ -1344,7 +1344,7 @@ void EnemyBase::onKill(CreatureKillArg* inputArg)
 			forceKillEffects();
 			becomeCarcass();
 
-		} else if (mExistDuration == 0.0f && isEvent(0, EB_LeaveCarcass) && (!killArg || !(killArg->isFlag(CKILL_Unk30)))) {
+		} else if (mExistDuration == 0.0f && isEvent(0, EB_LeaveCarcass) && (!killArg || !(killArg->isFlag(CKILL_LeaveNoCarcass)))) {
 			if (!mPellet) {
 				PelletViewArg pvArg;
 				setCarcassArg(pvArg);
@@ -1395,7 +1395,7 @@ void EnemyBase::setZukanVisible(bool updateStats)
 
 	if ((gameSystem->isFlag(GAMESYS_DisableDeathCounter)) == FALSE) {
 		EnemyInfo* enemyInfo = EnemyInfoFunc::getEnemyInfo(getEnemyTypeID(), 0xFFFF);
-		if ((enemyInfo->mFlags & 0x200) == FALSE) {
+		if ((enemyInfo->mFlags & EFlag_HasNoInfo) == FALSE) {
 			TekiStat::Info* tekiInfo = playData->mTekiStatMgr.getTekiInfo(getEnemyTypeID());
 			P2ASSERTLINE(1859, tekiInfo);
 
@@ -1442,7 +1442,7 @@ void EnemyBase::birth(Vector3f& pos, f32 faceDir)
 	mFaceDir    = faceDir;
 	mRotation.y = mFaceDir;
 
-	mBounceTriangle   = nullptr;
+	mFloorTriangle    = nullptr;
 	mStuckPikminCount = 0;
 	mHeldPellet       = nullptr;
 
@@ -1451,7 +1451,7 @@ void EnemyBase::birth(Vector3f& pos, f32 faceDir)
 	updateSpheres();
 	resetCollEvent();
 
-	_1F2 = 0xFF;
+	mUnused1F2 = 0xFF;
 	setParameters();
 
 	shadowMgr->addShadow(this);
@@ -1511,7 +1511,7 @@ void EnemyBase::update() { static_cast<EnemyBaseFSM::StateMachine*>(mLifecycleFS
  */
 bool EnemyBase::isFinishableWaitingBirthTypeDrop()
 {
-	Sys::Sphere sphere(mPosition, static_cast<EnemyParmsBase*>(mParms)->mGeneral.mPrivateRadius.mValue);
+	Sys::Sphere sphere(mPosition, getParms().mPrivateRadius.mValue);
 	bool result = false;
 
 	CellIteratorArg ciArg(sphere);
@@ -1525,7 +1525,7 @@ bool EnemyBase::isFinishableWaitingBirthTypeDrop()
 
 		// Is creature Pikmin or Navi?
 		if (creature->isNavi() || (creature->isPiki() && static_cast<Piki*>(creature)->isPikmin())) {
-			f32 privateRadius = static_cast<EnemyParmsBase*>(mParms)->mGeneral.mPrivateRadius.mValue;
+			f32 privateRadius = getParms().mPrivateRadius.mValue;
 			Vector2f delta;
 			getDistanceTo(creature, delta);
 
@@ -1589,7 +1589,7 @@ void EnemyBase::doUpdateCommon()
 	scaleDamageAnim();
 	resetCollEvent();
 
-	if ((mLod.isFlag(AILOD_IsVisible)) && isAlive()) {
+	if (mLod.isFlag(AILOD_IsVisible) && isAlive()) {
 		updateEffects();
 	}
 }
@@ -1612,10 +1612,7 @@ void EnemyBase::doAnimationUpdateAnimator()
 	mAnimator->animate(mAnimator->mSpeed * sys->mDeltaTime);
 
 	SysShape::Animator* animator = &mAnimator->getAnimator();
-	SysShape::Model* model       = mModel;
-	J3DMtxCalc* calc             = static_cast<SysShape::BaseAnimator*>(animator)->getCalc();
-
-	model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = static_cast<J3DMtxCalcAnmBase*>(calc);
+	animator->setModelCalc(mModel, 0);
 }
 
 /**
@@ -1660,7 +1657,7 @@ void EnemyBase::doAnimationCullingOff()
 	sys->mTimers->_stop("e-calc");
 	mCollTree->update();
 
-	if (mAnimator->getAnimator().mFlags & 1) {
+	if (mAnimator->getAnimator().isFlag(SysShape::Animator::AnimCompleted)) {
 		static_cast<PSM::CreatureAnime*>(mSoundObj)->setAnime(nullptr, 1, 0.0f, 0.0f);
 	}
 }
@@ -1747,7 +1744,7 @@ void EnemyBase::doEntryLiving()
 		hide();
 	}
 
-	if (!(isEvent(0, EB_ModelHidden))) {
+	if (!isEvent(0, EB_ModelHidden)) {
 		mModel->mJ3dModel->entry();
 	}
 }
@@ -2013,14 +2010,14 @@ void EnemyBase::collisionMapAndPlat(f32 frameRate)
 
 		mAcceleration.y = 0.0f;
 
-		Vector3f totalVel = mCurrentVelocity + mAcceleration;
+		Vector3f newVelocity = mCurrentVelocity + mAcceleration;
 
 		// Check where our wanted movement will reach us
-		MoveInfo moveInfo(&collSphere, &totalVel, bounceAmount);
-		moveInfo.mInfoOrigin = (BaseItem*)this;
+		MoveInfo moveInfo(&collSphere, &newVelocity, bounceAmount);
+		moveInfo.mMovingCreature = this;
 		mapMgr->traceMove(moveInfo, frameRate);
 
-		mCurrentVelocity = totalVel;
+		mCurrentVelocity = newVelocity;
 
 		// Apply acceleration by converting the velocity to a direction,
 		// clamping it, and then setting the velocity again
@@ -2040,12 +2037,12 @@ void EnemyBase::collisionMapAndPlat(f32 frameRate)
 		}
 
 		// Apply bounce triangle logic
-		if (!mBounceTriangle && moveInfo.mBounceTriangle) {
-			bounceProcedure(moveInfo.mBounceTriangle);
+		if (!mFloorTriangle && moveInfo.mFloorTriangle) {
+			bounceProcedure(moveInfo.mFloorTriangle);
 		}
 
-		mBounceTriangle    = moveInfo.mBounceTriangle;
-		mCollisionPosition = moveInfo.mPosition;
+		mFloorTriangle = moveInfo.mFloorTriangle;
+		mFloorNormal   = moveInfo.mFloorNormal;
 
 		// Apply wall triangle logic
 		if (!mWallTriangle && moveInfo.mWallTriangle) {
@@ -2059,13 +2056,13 @@ void EnemyBase::collisionMapAndPlat(f32 frameRate)
 			moveInfo.mVelocity = &mCurrentVelocity;
 			platMgr->traceMove(moveInfo, frameRate);
 
-			if (!mBounceTriangle) {
-				if (moveInfo.mBounceTriangle) {
-					bounceProcedure(moveInfo.mBounceTriangle);
+			if (!mFloorTriangle) {
+				if (moveInfo.mFloorTriangle) {
+					bounceProcedure(moveInfo.mFloorTriangle);
 				}
 
-				mBounceTriangle    = moveInfo.mBounceTriangle;
-				mCollisionPosition = moveInfo.mPosition;
+				mFloorTriangle = moveInfo.mFloorTriangle;
+				mFloorNormal   = moveInfo.mFloorNormal;
 			}
 
 			if (!mWallTriangle && moveInfo.mWallTriangle) {
@@ -2118,11 +2115,11 @@ void EnemyBase::doSimulation(f32 frameRate) { mLifecycleFSM->simulation(this, fr
  */
 void EnemyBase::doSimulationConstraint(f32 frameRate)
 {
-	if (!(isEvent(0, EB_HardConstrained))) {
+	if (!isEvent(0, EB_HardConstrained)) {
 		// If we're moving somewhere, enable checking collision
 		if (mAcceleration.x != 0.0f || mAcceleration.z != 0.0f) {
 			enableEvent(0, EB_CollisionActive);
-		} else if (mBounceTriangle) {
+		} else if (mFloorTriangle) {
 			// If we've just bounce off a triangle, disable collision
 			disableEvent(0, EB_CollisionActive);
 		}
@@ -2148,7 +2145,7 @@ void EnemyBase::gotoHell()
 	}
 
 	throwupItem();
-	EnemyKillArg killArg(CKILL_Unk29 | CKILL_Unk30 | CKILL_Unk31);
+	EnemyKillArg killArg(CKILL_DisableDeathEffects | CKILL_LeaveNoCarcass | CKILL_NotKilledByPlayer);
 	kill(&killArg);
 }
 
@@ -2169,24 +2166,23 @@ void EnemyBase::setAnimMgr(SysShape::AnimMgr* mgr) { mAnimator->setAnimMgr(mgr);
  */
 void EnemyBase::setPSEnemyBaseAnime()
 {
-	if (isEvent(0, EB_PS1)) {
-		int idx = getCurrAnimIndex();
+	if (isEvent(0, EB_IsAnimated)) {
+		SysShape::AnimInfo* info
+		    = static_cast<SysShape::AnimInfo*>(mAnimator->getAnimator(0).mAnimMgr->mAnimInfo.mChild)->getInfoByID(getCurrAnimIndex());
 
-		SysShape::AnimInfo* info = static_cast<SysShape::AnimInfo*>(mAnimator->getAnimator(0).mAnimMgr->mAnimInfo.mChild)->getInfoByID(idx);
-
-		JAIAnimeFrameSoundData* file = info->mBasFile;
+		JAIAnimeSoundData* file = info->getData();
 		if (file) {
-			SysShape::KeyEvent* event1 = info->getAnimKeyByType(0);
-			SysShape::KeyEvent* event2 = info->getAnimKeyByType(1);
+			SysShape::KeyEvent* event1 = info->getAnimKeyByType(KEYEVENT_LOOP_START);
+			SysShape::KeyEvent* event2 = info->getAnimKeyByType(KEYEVENT_LOOP_END);
 
 			if (event1 && event2) {
-				f32 val1 = (f32)event1->mFrame;
-				f32 val2 = (f32)event2->mFrame;
-				mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, val1, val2);
+				f32 loopStart = (f32)event1->mFrame;
+				f32 loopEnd   = (f32)event2->mFrame;
+				mSoundObj->setAnime(file, 1, loopStart, loopEnd);
 				return;
 			}
 
-			mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, 0.0f, 0.0f);
+			mSoundObj->setAnime(file, 1, 0.0f, 0.0f);
 			return;
 		}
 
@@ -2199,7 +2195,7 @@ void EnemyBase::setPSEnemyBaseAnime()
 		return;
 	}
 
-	if (isEvent(0, EB_PS3)) {
+	if (isEvent(0, EB_IsBlendAnimated)) {
 		mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
 		return;
 	}
@@ -2223,49 +2219,15 @@ void EnemyBase::startBlend(int start, int end, SysShape::BlendFunction* blendFun
 {
 	SysShape::MotionListener* listener = inputListener;
 	if (!listener) {
-		listener = static_cast<SysShape::MotionListener*>(this);
+		listener = this;
 	}
 
 	static_cast<EnemyBlendAnimatorBase*>(mAnimator)->startBlend(start, end, blendFunc, framerate, listener);
 
-	disableEvent(0, EB_PS1 + EB_PS2 + EB_PS3 + EB_PS4);
-	enableEvent(0, EB_PS3);
+	disableEvent(0, EB_IsAnimated + EB_PS2 + EB_IsBlendAnimated + EB_PS4);
+	enableEvent(0, EB_IsBlendAnimated);
 
-	if (isEvent(0, EB_PS1)) {
-		int idx                  = getCurrAnimIndex();
-		SysShape::AnimInfo* info = static_cast<SysShape::AnimInfo*>(mAnimator->getAnimator(0).mAnimMgr->mAnimInfo.mChild)->getInfoByID(idx);
-		JAIAnimeFrameSoundData* file = info->mBasFile;
-
-		if (file) {
-			SysShape::KeyEvent* event1 = info->getAnimKeyByType(0);
-			SysShape::KeyEvent* event2 = info->getAnimKeyByType(1);
-
-			if (event1 && event2) {
-				f32 val1 = (f32)event1->mFrame;
-				f32 val2 = (f32)event2->mFrame;
-				mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, val1, val2);
-				return;
-			}
-
-			mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, 0.0f, 0.0f);
-			return;
-		}
-
-		mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	if (isEvent(0, EB_PS2)) {
-		mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	if (isEvent(0, EB_PS3)) {
-		mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
+	setPSEnemyBaseAnime();
 }
 
 /**
@@ -2285,55 +2247,21 @@ void EnemyBase::endBlend()
  */
 void EnemyBase::startMotion(int id, SysShape::MotionListener* inputListener)
 {
-	SysShape::MotionListener* listener;
-	if (!(listener = inputListener)) {
-		inputListener = static_cast<SysShape::MotionListener*>(this);
+	SysShape::MotionListener* listener = inputListener;
+	if (!listener) {
+		inputListener = this;
 	}
 
 	EnemyAnimatorBase* animator = mAnimator;
-	animator->mFlags.unset(EANIM_FLAG_STOPPED | EANIM_FLAG_FINISHED);
+	animator->mFlags.unset(SysShape::Animator::AnimCompleted | SysShape::Animator::AnimFinishMotion);
 	animator->mNormalizedTime = 1.0f;
 
 	animator->getAnimator(0).startAnim(id, inputListener);
 
-	disableEvent(0, EB_PS1 + EB_PS2 + EB_PS3 + EB_PS4);
-	enableEvent(0, EB_PS1);
+	disableEvent(0, EB_IsAnimated + EB_PS2 + EB_IsBlendAnimated + EB_PS4);
+	enableEvent(0, EB_IsAnimated);
 
-	if (isEvent(0, EB_PS1)) {
-		int idx                  = getCurrAnimIndex();
-		SysShape::AnimInfo* info = static_cast<SysShape::AnimInfo*>(mAnimator->getAnimator(0).mAnimMgr->mAnimInfo.mChild)->getInfoByID(idx);
-		JAIAnimeFrameSoundData* file = info->mBasFile;
-
-		if (file) {
-			SysShape::KeyEvent* event1 = info->getAnimKeyByType(0);
-			SysShape::KeyEvent* event2 = info->getAnimKeyByType(1);
-
-			if (event1 && event2) {
-				f32 val1 = (f32)event1->mFrame;
-				f32 val2 = (f32)event2->mFrame;
-				mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, val1, val2);
-				return;
-			}
-
-			mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, 0.0f, 0.0f);
-			return;
-		}
-
-		mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	if (isEvent(0, EB_PS2)) {
-		mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	if (isEvent(0, EB_PS3)) {
-		mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-		return;
-	}
-
-	mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
+	setPSEnemyBaseAnime();
 }
 
 /**
@@ -2352,7 +2280,7 @@ f32 EnemyBase::getMotionFrame() { return mAnimator->getAnimator().mTimer; }
  * @note Address: 0x801052A0
  * @note Size: 0x40
  */
-void EnemyBase::finishMotion() { SET_FLAG(mAnimator->getAnimator(0).mFlags, EANIM_FLAG_FINISHED); }
+void EnemyBase::finishMotion() { mAnimator->getAnimator(0).setFlag(SysShape::Animator::AnimFinishMotion); }
 
 /**
  * @note Address: 0x801052E0
@@ -2444,7 +2372,7 @@ void EnemyBase::scaleDamageAnim()
 
 		mDamageAnimRotation.y = 0.0f;
 
-		f32 zWobbleAmt        = altSin(2.0f * horizontalModifier * TAU) * ((TAU / 144.0f) * factor);
+		f32 zWobbleAmt        = sinf(2.0f * horizontalModifier * TAU) * ((TAU / 144.0f) * factor);
 		mDamageAnimRotation.z = horizontalModifier * zWobbleAmt;
 
 		f32 scaleVal = mScaleModifier;
@@ -2564,7 +2492,7 @@ void EnemyBase::throwupItem()
 	PelletInitArg pelletInitArg;
 
 	if (pelletMgr->makePelletInitArg(pelletInitArg, mPelletDropCode)) {
-		pelletInitArg.mState         = 2;
+		pelletInitArg.mState         = PelBirthType_ScaleAppear;
 		EnemyTypeID::EEnemyTypeID id = getEnemyTypeID();
 
 		// For bosses in the final floor of a cave in story mode,
@@ -2602,16 +2530,9 @@ void EnemyBase::throwupItem()
 		return;
 	}
 
-	f32 range = (mPelletInfo.mMaxPellets - mPelletInfo.mMinPellets) * randFloat();
-
-	f32 roundRange;
-	if (range >= 0.0f) {
-		roundRange = range + 0.5f;
-	} else {
-		roundRange = range - 0.5f;
-	}
-
-	int pelletAmount = mPelletInfo.mMinPellets + (int)roundRange;
+	f32 range        = (mPelletInfo.mMaxPellets - mPelletInfo.mMinPellets) * randFloat();
+	range            = (range >= 0.0f) ? range + 0.5f : range - 0.5f;
+	int pelletAmount = mPelletInfo.mMinPellets + (int)range;
 
 	f32 velocity = 0.0f;
 	switch (mPelletInfo.mSize) {
@@ -2636,7 +2557,7 @@ void EnemyBase::throwupItem()
 		}
 
 		PelletNumberInitArg numberInitArg(mPelletInfo.mSize, pelletColor);
-		numberInitArg.mState = 2;
+		numberInitArg.mState = PelBirthType_ScaleAppear;
 
 		Pellet* pellet = pelletMgr->birth(&numberInitArg);
 		if (pellet) {
@@ -2677,13 +2598,11 @@ void EnemyBase::getLifeGaugeParam(LifeGaugeParam& param)
  */
 void EnemyBase::doGetLifeGaugeParam(LifeGaugeParam& param)
 {
-	f32 heightOffset = mPosition.y + getParms().mLifeMeterHeight.mValue;
-	f32 z            = mPosition.z;
-	f32 x            = mPosition.x;
+	f32 y           = mPosition.y + getParms().mLifeMeterHeight();
+	param.mPosition = Vector3f(mPosition.x, y, mPosition.z);
 
-	param.mPosition            = Vector3f(x, heightOffset, z);
-	param.mCurHealthPercentage = mHealth / mMaxHealth;
-	param.mRadius              = 10.0f;
+	param.mCurrHealthRatio = mHealth / mMaxHealth;
+	param.mRadius          = 10.0f;
 }
 
 /**
@@ -2755,16 +2674,7 @@ void EnemyBase::addDamage(f32 damageAmt, f32 flickSpeed)
  */
 bool EnemyBase::damageCallBack(Creature* sourceCreature, f32 damage, CollPart* p3)
 {
-	if (isEvent(0, EB_Invulnerable) == false) {
-		mInstantDamage += damage;
-
-		if (isEvent(0, EB_FlickEnabled)) {
-			mFlickTimer += 1.0f;
-		}
-
-		enableEvent(0, EB_TakingDamage);
-	}
-
+	addDamage(damage, 1.0f);
 	return true;
 }
 
@@ -2786,21 +2696,10 @@ bool EnemyBase::flyCollisionCallBack(Creature*, f32, CollPart*) { return false; 
  */
 bool EnemyBase::hipdropCallBack(Creature* sourceCreature, f32 damage, CollPart* p3)
 {
-	f32 purpleDamage = getParms().mPurplePikiStunDamage;
-
-	if (isEvent(0, EB_Invulnerable) == false) {
-		mInstantDamage += purpleDamage;
-
-		if (isEvent(0, EB_FlickEnabled)) {
-			mFlickTimer += 1.0f;
-		}
-
-		enableEvent(0, EB_TakingDamage);
-	}
-
+	addDamage(getParms().mPurplePikiStunDamage, 1.0f);
 	enableEvent(0, EB_SquashOnDamageAnim);
 
-	if (mBounceTriangle) {
+	if (mFloorTriangle) {
 		createBounceEffect(mPosition, getDownSmokeScale());
 	}
 
@@ -2841,7 +2740,7 @@ bool EnemyBase::checkBirthTypeDropEarthquake()
  */
 bool EnemyBase::earthquakeCallBack(Creature* creature, f32 bounceFactor)
 {
-	if (mBounceTriangle && !isDead() && !isFlying() && isAlive() && !isEvent(0, EB_HardConstrained) && !isEvent(0, EB_Bittered)) {
+	if (mFloorTriangle && !isDead() && !isFlying() && isAlive() && !isEvent(0, EB_HardConstrained) && !isEvent(0, EB_Bittered)) {
 		if (((isEvent(0, EB_NoInterrupt)) || (isEvent(0, EB_BitterImmune))) == false) {
 			EarthquakeStateArg eqArg;
 			eqArg.mBounceFactor = bounceFactor;
@@ -2888,16 +2787,7 @@ bool EnemyBase::farmCallBack(Creature*, f32 power) { return false; }
  */
 bool EnemyBase::bombCallBack(Creature* creature, Vector3f& direction, f32 damage)
 {
-	if (!(isEvent(0, EB_Invulnerable))) {
-		mInstantDamage += damage;
-
-		if (isEvent(0, EB_FlickEnabled)) {
-			mFlickTimer += 1.0f;
-		}
-
-		enableEvent(0, EB_TakingDamage);
-	}
-
+	addDamage(damage, 1.0f);
 	return true;
 }
 
@@ -2997,7 +2887,7 @@ void EnemyBase::view_start_carrymotion() { startCarcassMotion(); }
  * @note Address: 0x80106A78
  * @note Size: 0x40
  */
-void EnemyBase::view_finish_carrymotion() { mAnimator->getAnimator(0).mFlags |= 2; }
+void EnemyBase::view_finish_carrymotion() { mAnimator->getAnimator(0).setFlag(SysShape::Animator::AnimFinishMotion); }
 
 /**
  * @note Address: 0x80106AB8
@@ -3113,7 +3003,7 @@ PSM::EnemyBase* EnemyBase::createPSEnemyBase()
 void EnemyBase::startMotion()
 {
 	EnemyAnimatorBase* animator = mAnimator;
-	RESET_FLAG(animator->mFlags.typeView, EANIM_FLAG_STOPPED | EANIM_FLAG_FINISHED);
+	RESET_FLAG(animator->mFlags.typeView, SysShape::Animator::AnimCompleted | SysShape::Animator::AnimFinishMotion);
 	animator->mNormalizedTime = 1.0f;
 }
 
@@ -3121,7 +3011,7 @@ void EnemyBase::startMotion()
  * @note Address: 0x80107220
  * @note Size: 0x58
  */
-f32 EnemyBase::getMotionFrameMax() { return mAnimator->getAnimator().mAnimInfo->mAnm->mFrameLength; }
+f32 EnemyBase::getMotionFrameMax() { return mAnimator->getAnimator().mAnimInfo->mAnm->mTotalFrameCount; }
 
 /**
  * @note Address: 0x80107278
@@ -3144,21 +3034,21 @@ f32 EnemyBase::getFirstKeyFrame()
 void EnemyBase::stopMotion()
 {
 	EnemyAnimatorBase* animator = mAnimator;
-	RESET_FLAG(animator->mFlags.typeView, EANIM_FLAG_PLAYING);
-	SET_FLAG(animator->mFlags.typeView, EANIM_FLAG_STOPPED);
+	animator->mFlags.unset(SysShape::Animator::AnimInProgress);
+	animator->mFlags.set(SysShape::Animator::AnimCompleted);
 }
 
 /**
  * @note Address: 0x80107300
  * @note Size: 0x38
  */
-bool EnemyBase::isFinishMotion() { return mAnimator->getAnimator().mFlags >> 1 & 1; }
+bool EnemyBase::isFinishMotion() { return mAnimator->getAnimator().isFlag(SysShape::Animator::AnimFinishMotion); }
 
 /**
  * @note Address: 0x80107338
  * @note Size: 0x10
  */
-bool EnemyBase::isStopMotion() { return mAnimator->mFlags.isSet(EANIM_FLAG_STOPPED); }
+bool EnemyBase::isStopMotion() { return mAnimator->mFlags.isSet(SysShape::Animator::AnimCompleted); }
 
 /**
  * @note Address: 0x80107348

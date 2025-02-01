@@ -3,6 +3,8 @@
 
 #include "JSystem/JKernel/JKRDisposer.h"
 #include "JSystem/JAudio/JAS/JASTrack.h"
+#include "JSystem/JAudio/JAI/JAInter.h"
+#include "JSystem/JAudio/JAD/JADUtility.h"
 #include "SoundID.h"
 #include "P2Macros.h"
 #include "PSSystem/Seq.h"
@@ -57,8 +59,9 @@ struct Scene {
 struct SceneMgr {
 	SceneMgr()
 	{
-		mScenes   = nullptr;
-		mEndScene = nullptr;
+		mScenes     = nullptr;
+		mEndScene   = nullptr;
+		mAccessMode = JADUtility::MODE_0;
 	}
 
 	virtual void exec()
@@ -105,9 +108,30 @@ struct SceneMgr {
 		mScenes->mChild->startMainSeq();
 	}
 
+	inline void doStopMainSeq(u32 time)
+	{
+		checkScene();
+		mScenes->mChild->stopMainSeq(time);
+	}
+
+	inline void doStopMainSeqCheck(u32 time)
+	{
+		checkScene();
+		Scene* scene = mScenes->mChild;
+		if (scene)
+			scene->stopMainSeq(time);
+	}
+
+	inline Scene* getChild()
+	{
+		checkScene();
+		return mScenes->mChild;
+	}
+
 	// _00	= VTBL
 	Scene* mScenes;   // _04
 	Scene* mEndScene; // _08
+	u8 mAccessMode;   // _0C,  JADUtility::AccessMode
 };
 
 inline Scene* checkChildScene(Scene* scene)

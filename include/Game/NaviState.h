@@ -39,7 +39,7 @@ enum ENaviStateID {
 	NSID_Climb       = 25,
 	NSID_PathMove    = 26,
 	NSID_GoHere      = 27,
-	NSID_StateCount, // 27
+	NSID_StateCount,
 };
 
 struct NaviState : public FSMState<Navi> {
@@ -371,23 +371,29 @@ struct NaviFlickState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	s32 _10;             // _10
+	s32 mSubState;       // _10
 	Creature* mFlicker;  // _14
 	Vector3f mDirection; // _18
 	f32 mDamage;         // _24
 };
 
 struct NaviFollowArg : public StateArg {
-	inline NaviFollowArg(bool p1)
-	    : _00(p1)
+	inline NaviFollowArg(bool isNewToParty)
+	    : mIsNewToParty(isNewToParty)
 	{
 	}
 
-	bool _00; // _00
-	bool _01; // _01
+	bool mIsNewToParty; // _00, true if whistled/bumped into, false if just swapped control from or coming out of plucking state
 };
 
 struct NaviFollowState : public NaviState {
+	enum FollowState {
+		FOLLOW_AlertJump   = 0,
+		FOLLOW_Normal      = 1,
+		FOLLOW_IdleGoof    = 2,
+		FOLLOW_PunchTarget = 3,
+	};
+
 	inline NaviFollowState()
 	    : NaviState(NSID_Follow)
 	{
@@ -401,12 +407,12 @@ struct NaviFollowState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	Navi* mTargetNavi;   // _10
-	u8 _14;              // _14
-	Creature* mRunEnemy; // _18
-	u8 _1C;              // _1C, counter?
-	u8 mAnimID;          // _1D, motion?
-	u8 _1E;              // _1E, counter 2?
+	Navi* mTargetNavi;      // _10
+	u8 mFollowState;        // _14, see FollowState enum
+	Creature* mTargetEnemy; // _18, enemy leader just punched that we're ALSO gonna punch
+	u8 mIdleCounter;        // _1C, try and do a lil idle goof every 90 frames (3s)
+	u8 mAnimID;             // _1D
+	u8 mPunchSeekCounter;   // _1E, time out seeking punch target after 60 frames (2s)
 };
 
 struct NaviGatherArg : public StateArg {
@@ -439,18 +445,18 @@ struct NaviGatherState : public NaviState {
 };
 
 struct NaviKokeDamageInitArg : public StateArg {
-	inline NaviKokeDamageInitArg(f32 p1, u8 p2, Creature* p3, f32 damage)
-	    : mCreature(p3)
+	inline NaviKokeDamageInitArg(f32 timer, bool toPlaySound, Creature* creature, f32 damage)
+	    : mCreature(creature)
 	    , mDamage(damage)
-	    , _08(p1)
-	    , _0C(p2)
+	    , mTimer(timer)
+	    , mPlaySoundOnDamage(toPlaySound)
 	{
 	}
 
-	Creature* mCreature; // _00
-	f32 mDamage;         // _04
-	f32 _08;             // _08
-	bool _0C;            // _0C
+	Creature* mCreature;     // _00
+	f32 mDamage;             // _04
+	f32 mTimer;              // _08
+	bool mPlaySoundOnDamage; // _0C
 };
 
 struct NaviDamageArg : public StateArg {
@@ -478,11 +484,11 @@ struct NaviKokeDamageState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	f32 mDamage;         // _10
-	f32 mTimer;          // _14
-	int mState;          // _18
-	Creature* mCreature; // _1C
-	bool _20;            // _20
+	f32 mDamage;             // _10
+	f32 mTimer;              // _14
+	int mState;              // _18
+	Creature* mCreature;     // _1C
+	bool mPlaySoundOnDamage; // _20
 };
 
 struct NaviNukuAdjustStateArg : public StateArg {
@@ -491,9 +497,9 @@ struct NaviNukuAdjustStateArg : public StateArg {
 	{
 	}
 
-	f32 _00;                       // _00
-	Vector3f _04;                  // _04
-	int _10;                       // _10
+	f32 mAngleToItem;              // _00
+	Vector3f mUnusedVelocity;      // _04
+	int mUnusedState;              // _10
 	ItemPikihead::Item* mPikihead; // _14
 	u8 _18;                        // _18
 };
@@ -501,7 +507,7 @@ struct NaviNukuAdjustStateArg : public StateArg {
 struct NaviNukuAdjustState : public NaviState {
 	inline NaviNukuAdjustState()
 	    : NaviState(NSID_NukuAdjust)
-	    , _48(0)
+	    , mIsFollowing(0)
 	{
 	}
 
@@ -514,23 +520,23 @@ struct NaviNukuAdjustState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	f32 _10;
-	Vector3f _14;
-	bool _20;
-	Vector3f _24;
-	f32 _30;
-	Vector3f _34;
-	int _40;
-	ItemPikihead::Item* mPikiHead;
-	u8 _48;       // _48
-	u8 _49[0x3];  // _49, unknown/buffer
-	u8 _4C;       // _4C
-	Vector3f _50; // _50
-	u8 _5C;       // _5C
+	f32 mAngleToPiki;               // _10
+	Vector3f mTargetPosition;       // _14
+	bool mUnusedBool;               // _20
+	Vector3f mNaviPosition;         // _24
+	f32 mAngleToItem;               // _30
+	Vector3f mUnusedVelocity;       // _34
+	int mUnusedState;               // _40
+	ItemPikihead::Item* mPikiHead;  // _44
+	u8 mIsFollowing;                // _48
+	u8 _49[0x3];                    // _49, unknown/buffer
+	u8 mIsMoving;                   // _4C
+	Vector3f mCollidedPikiPosition; // _50
+	u8 mWallHitCounter;             // _5C
 };
 
 struct NaviNukuArg : public StateArg {
-	u8 _00; // _00
+	u8 mIsFollowing; // _00
 };
 
 struct NaviNukuState : public NaviState {
@@ -608,8 +614,8 @@ struct NaviPelletState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	u8 _10;     // _10
-	int mState; // _14
+	u8 mDoForceWakeup; // _10, never set to true
+	int mState;        // _14
 };
 
 struct NaviPressedState : public NaviState {
@@ -634,13 +640,13 @@ struct NaviPressedState : public NaviState {
 
 struct NaviPunchArg : public StateArg {
 	inline NaviPunchArg()
-	    : _00(0)
-	    , _04(0)
+	    : mIsFollowing(false)
+	    , mNextState(NSID_Walk)
 	{
 	}
 
-	u8 _00;  // _00
-	u32 _04; // _04
+	bool mIsFollowing; // _00
+	u32 mNextState;    // _04
 };
 
 struct NaviPunchState : public NaviState {
@@ -655,17 +661,17 @@ struct NaviPunchState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	u8 _10;            // _10
-	Creature* mTarget; // _14
-	Navi* mNavi;       // _18
-	u8 _1C;            // _1C
-	u8 _1D;            // _1D
-	u8 _1E;            // _1E
-	u8 _1F;            // _1F
-	u8 _20;            // _20
-	u8 _21[0x3];       // _21, unknown/padding
-	u8 _24;            // _24
-	u32 mNextStateID;  // _28
+	bool mIsPunchReady;     // _10, just gets set and unset, doesn't get checked
+	Creature* mTarget;      // _14
+	Navi* mNavi;            // _18
+	u8 mUnused1C;           // _1C, unused, just set to 0, probably some leftover debug thing
+	bool mIsNextPunchReady; // _1D
+	u8 mComboCounter;       // _1E, 0=first punch, 1=second punch, 2=final punch (big one for rocket fist)
+	bool mIsTargetHit;      // _1F, just gets set and unset, doesn't get checked
+	u8 mIdleCounter;        // _20
+	u8 mUnused21[0x3];      // _21, padding
+	bool mIsFollowing;      // _24, is navi following another navi
+	u32 mNextStateID;       // _28
 };
 
 struct NaviSaraiExitState : public NaviState {
@@ -697,7 +703,7 @@ struct NaviSaraiState : public NaviState {
 
 	// _00     = VTBL
 	// _00-_10 = NaviState
-	u32 _10;           // _10
+	u32 mInputFlags;   // _10
 	u16 mEscapeInputs; // _14
 };
 
@@ -720,6 +726,8 @@ struct NaviStuckState : public NaviState {
 };
 
 struct NaviThrowInitArg : public StateArg {
+	NaviThrowInitArg(Piki* piki) { mPiki = piki; }
+
 	Piki* mPiki; // _00
 };
 
@@ -738,10 +746,10 @@ struct NaviThrowState : public NaviState, virtual public SysShape::MotionListene
 	// _00-_10 = NaviState
 	// _10-_14 = MotionListener VTBL
 
-	u8 _14;      // _14
-	u8 _15;      // _15
-	Piki* mPiki; // _18
-	Navi* mNavi; // _1C
+	u8 mHasThrown; // _14
+	u8 mDidCancel; // _15, set to true on pressing b, never used
+	Piki* mPiki;   // _18
+	Navi* mNavi;   // _1C
 
 	// _20 = MotionListener
 };
@@ -767,11 +775,11 @@ struct NaviThrowWaitState : public NaviState, virtual public SysShape::MotionLis
 	// _10-_14 = MotionListener VTBL
 	Piki* mHeldPiki;                         // _14, held piki to be thrown
 	Piki* mNextPiki;                         // _18
-	int _1C;                                 // _1C
-	bool _20;                                // _20
+	int mHoldChargeLevel;                    // _1C
+	bool mHasHeldPiki;                       // _20
 	int _24;                                 // _24
-	f32 _28;                                 // _28
-	f32 _2C;                                 // _2C
+	f32 mNextPikiTimeLimit;                  // _28
+	f32 mInitialSortDelayTimer;              // _2C
 	Delegate<NaviThrowWaitState>* mDelegate; // _30
 	Navi* mNavi;                             // _34
 	int mCurrHappa;                          // _38

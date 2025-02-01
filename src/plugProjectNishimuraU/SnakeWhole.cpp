@@ -283,9 +283,9 @@ void Obj::updateFace()
  */
 void Obj::updateConstraint()
 {
-	if (getStateID() >= SNAKEWHOLE_Wait && !mIsJumping && mBounceTriangle) {
+	if (getStateID() >= SNAKEWHOLE_Wait && !mIsJumping && mFloorTriangle) {
 		// i.e. snagret is fully above ground + is ON ground
-		if (mCollisionPosition.y > 0.5f) {
+		if (mFloorNormal.y > 0.5f) {
 			enableEvent(0, EB_Constrained);
 		} else {
 			constraintOff();
@@ -319,8 +319,8 @@ void Obj::appearNearByTarget(Creature* target)
 	}
 
 	CurrTriInfo info;
-	info.mPosition        = newPos;
-	info.mUpdateOnNewMaxY = false;
+	info.mPosition          = newPos;
+	info.mGetTopPolygonInfo = false;
 	mapMgr->getCurrTri(info);
 
 	if (info.mTriangle) {
@@ -331,8 +331,8 @@ void Obj::appearNearByTarget(Creature* target)
 		newPos *= 120.0f;
 		newPos += targetPos;
 		CurrTriInfo newInfo;
-		newInfo.mPosition        = newPos;
-		newInfo.mUpdateOnNewMaxY = false;
+		newInfo.mPosition          = newPos;
+		newInfo.mGetTopPolygonInfo = false;
 		mapMgr->getCurrTri(newInfo);
 		if (newInfo.mTriangle) {
 			newPos.y = newInfo.mMaxY;
@@ -905,8 +905,8 @@ Piki* Obj::getAttackPiki(int animIdx)
 		if (piki->isAlive() && piki->isPikmin() && !piki->isStickToMouth()) {
 			Vector3f pikiPos = piki->getPosition();
 			Vector3f sep     = pikiPos - snakePos;
-			f32 dotDir       = dot(dir, sep);      // f1
-			f32 dotPerpDir   = dot(orthoDir, sep); // f2
+			f32 dotDir       = dir.dot(sep);      // f1
+			f32 dotPerpDir   = orthoDir.dot(sep); // f2
 			for (int i = p1; i < p2; i++) {
 				if (dotDir < maxDotDirs[i] && dotDir > minDotDirs[i] && dotPerpDir < maxDotPerpDirs[i] && dotPerpDir > minDotPerpDirs[i]
 				    && sep.y < maxYs[i] && sep.y > minYs[i]) {
@@ -1371,8 +1371,8 @@ Navi* Obj::getAttackNavi(int animIdx)
 		if (navi->isAlive()) {
 			Vector3f naviPos = navi->getPosition();
 			Vector3f sep     = naviPos - snakePos;
-			f32 dotDir       = dot(dir, sep);      // f1
-			f32 dotPerpDir   = dot(orthoDir, sep); // f2
+			f32 dotDir       = dir.dot(sep);      // f1
+			f32 dotPerpDir   = orthoDir.dot(sep); // f2
 			for (int i = p1; i < p2; i++) {
 				if (dotDir < maxDotDirs[i] && dotDir > minDotDirs[i] && dotPerpDir < maxDotPerpDirs[i] && dotPerpDir > minDotPerpDirs[i]
 				    && sep.y < maxYs[i] && sep.y > minYs[i]) {
@@ -1886,7 +1886,7 @@ void Obj::finishAnimationJointCallBack() { mSnakeJointMgr->finishAnimation(); }
 void Obj::startJointCallBack()
 {
 	f32 y                     = mAttackPositions[mAttackAnimIdx].y - mPosition.y;
-	SysShape::KeyEvent* event = mAnimator->getAnimator().mAnimInfo->getAnimKeyByType(3);
+	SysShape::KeyEvent* event = mAnimator->getAnimator().mAnimInfo->getAnimKeyByType(KEYEVENT_3);
 	f32 frame                 = getMotionFrame();
 	mSnakeJointMgr->startModify(y, (f32)event->mFrame - frame);
 }
@@ -1897,7 +1897,7 @@ void Obj::startJointCallBack()
  */
 void Obj::returnJointCallBack()
 {
-	SysShape::KeyEvent* event = mAnimator->getAnimator().mAnimInfo->getAnimKeyByType(4);
+	SysShape::KeyEvent* event = mAnimator->getAnimator().mAnimInfo->getAnimKeyByType(KEYEVENT_4);
 	f32 frame                 = getMotionFrame();
 	mSnakeJointMgr->returnModify((f32)event->mFrame - frame);
 }
@@ -1985,7 +1985,7 @@ void Obj::startBossAttackBGM()
 		mIsFirstAttackBGM = false; // don't play normal boss attack BGM on first getup
 	} else {
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-		PSM::checkBoss(soundObj);
+		PSM::assertIsBoss(soundObj);
 		soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Attack);
 	}
 }
@@ -1997,7 +1997,7 @@ void Obj::startBossAttackBGM()
 void Obj::startBossFlickBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Flick);
 }
 
@@ -2008,7 +2008,7 @@ void Obj::startBossFlickBGM()
 void Obj::updateBossBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	if (mStuckPikminCount != 0) {
 		soundObj->postPikiAttack(true);
 	} else {
@@ -2025,7 +2025,7 @@ void Obj::resetBossAppearBGM()
 	if (!mIsAppearBGMEnabled) {
 		mIsAppearBGMEnabled      = true;
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-		PSM::checkBoss(soundObj);
+		PSM::assertIsBoss(soundObj);
 		soundObj->setAppearFlag(false);
 	}
 }
@@ -2039,7 +2039,7 @@ void Obj::setBossAppearBGM()
 	if (mIsAppearBGMEnabled) {
 		mIsAppearBGMEnabled      = false;
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-		PSM::checkBoss(soundObj);
+		PSM::assertIsBoss(soundObj);
 		soundObj->setAppearFlag(true);
 	}
 }

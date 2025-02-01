@@ -65,7 +65,7 @@ enum EnemyEvent {
 	EB_Constrained         = 0x400,      // position is fixed, but can rotate or be moved externally
 	EB_LifegaugeVisible    = 0x800,      // has visible lifegauge
 	EB_PlatformCollEnabled = 0x1000,     // can interact with platform collision
-	EB_14                  = 0x2000,     // unknown (only set by an imomushi state, reset by imomushi and rock states?)
+	EB_CullSound           = 0x2000,     // unknown (only set by an imomushi state, reset by imomushi and rock states?)
 	EB_EatingWhitePikmin   = 0x4000,     // has eaten white pikmin (trigger poison effect, damage)
 	EB_Animating           = 0x8000,     // currently animating
 	EB_AttackingNavi0      = 0x10000,    // is attacking the player's main character?
@@ -76,14 +76,13 @@ enum EnemyEvent {
 	EB_NoInterrupt         = 0x200000,   // cannot currently interrupt anim/action - cannot be stunned, bitters will be queued
 	EB_BitterImmune        = 0x400000,   // cannot be bittered
 	EB_24                  = 0x800000,   // unknown
-	EB_PS1                 = 0x1000000,  // sound-related
-	EB_PS2                 = 0x2000000,  // sound-related
-	EB_PS3                 = 0x4000000,  // sound-related
-	EB_PS4                 = 0x8000000,  // sound-related
+	EB_IsAnimated          = 0x1000000,  // set when an enemy (non-blended) animation is playing, needed for .bas based sounds to work
+	EB_PS2                 = 0x2000000,  // disabled on animation start, never enabled, has similar purpose to EB_IsBlendAnimated
+	EB_IsBlendAnimated     = 0x4000000,  // set when an enemy blended animation is playing
+	EB_PS4                 = 0x8000000,  // disabled on animation start, never enabled
 	EB_Alive               = 0x10000000, //
 	EB_CollisionActive     = 0x20000000, //
 	EB_ModelHidden         = 0x40000000, //
-	EB_32                  = 0x80000000  // unknown
 };
 
 enum EnemyEvent2 {
@@ -263,7 +262,7 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 	virtual bool sound_culling()                                                     // _104 (weak)
 	{
 		bool culling = false;
-		if (isEvent(0, EB_14)) {
+		if (isEvent(0, EB_CullSound)) {
 			if (!mLod.isFlag(AILOD_IsVisible) && !mLod.isFlag(AILOD_PikiInCell)) {
 				culling = true;
 			}
@@ -280,49 +279,14 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 		SysShape::MotionListener* listener = this;
 
 		EnemyAnimatorBase* animator = mAnimator;
-		animator->mFlags.unset(EANIM_FLAG_STOPPED | EANIM_FLAG_FINISHED);
+		animator->mFlags.unset(SysShape::Animator::AnimCompleted | SysShape::Animator::AnimFinishMotion);
 		animator->mNormalizedTime = 1.0f;
 		animator->getAnimator(0).startAnim(0, listener);
 
-		disableEvent(0, EB_PS1 + EB_PS2 + EB_PS3 + EB_PS4);
-		enableEvent(0, EB_PS1);
+		disableEvent(0, EB_IsAnimated + EB_PS2 + EB_IsBlendAnimated + EB_PS4);
+		enableEvent(0, EB_IsAnimated);
 
-		if (isEvent(0, EB_PS1)) {
-			int idx = getCurrAnimIndex();
-			SysShape::AnimInfo* info
-			    = static_cast<SysShape::AnimInfo*>(mAnimator->getAnimator(0).mAnimMgr->mAnimInfo.mChild)->getInfoByID(idx);
-			JAIAnimeFrameSoundData* file = info->mBasFile;
-
-			if (file) {
-				SysShape::KeyEvent* event1 = info->getAnimKeyByType(0);
-				SysShape::KeyEvent* event2 = info->getAnimKeyByType(1);
-
-				if (event1 != nullptr && event2) {
-					f32 val1 = (f32)event1->mFrame;
-					f32 val2 = (f32)event2->mFrame;
-					mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, val1, val2);
-					return;
-				}
-
-				mSoundObj->setAnime((JAIAnimeSoundData*)file, 1, 0.0f, 0.0f);
-				return;
-			}
-
-			mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
-			return;
-		}
-
-		if (isEvent(0, EB_PS2)) {
-			mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-			return;
-		}
-
-		if (isEvent(0, EB_PS3)) {
-			mSoundObj->setAnime((JAIAnimeSoundData*)-1, 1, 0.0f, 0.0f);
-			return;
-		}
-
-		mSoundObj->setAnime(nullptr, 1, 0.0f, 0.0f);
+		setPSEnemyBaseAnime();
 	}
 	virtual void setCarcassArg(PelletViewArg& settings);                  // _2C8
 	virtual f32 getCarcassArgHeight() { return mBoundingSphere.mRadius; } // _2CC (weak)
@@ -449,17 +413,23 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 
 	inline f32 getCreatureViewAngle(Creature* target)
 	{
-		Vector3f targetPos = target->getPosition();
-		Vector3f pos       = getPosition();
-		f32 ang            = _angXZ(targetPos.x, targetPos.z, pos.x, pos.z);
-		return angDist(ang, getFaceDir());
+		Vector3f targetPosition = target->getPosition();
+		Vector3f myPosition     = getPosition();
+
+		f32 x = targetPosition.x - myPosition.x;
+		f32 z = targetPosition.z - myPosition.z;
+
+		return angDist(angXZ(x, z), getFaceDir());
 	}
 
 	inline f32 getCreatureViewAngle(Vector3f& targetPos)
 	{
 		Vector3f pos = getPosition();
-		f32 ang      = _angXZ(targetPos.x, targetPos.z, pos.x, pos.z);
-		return angDist(ang, getFaceDir());
+
+		f32 x = targetPos.x - pos.x;
+		f32 z = targetPos.z - pos.z;
+
+		return angDist(angXZ(x, z), getFaceDir());
 	}
 
 	// this seems necessary and correct based on BombSarai::Obj::throwBomb
@@ -546,41 +516,40 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 		sep.x = target->getPosition().x - getPosition().x;
 		sep.y = target->getPosition().y - getPosition().y;
 		sep.z = target->getPosition().z - getPosition().z;
-		if ((sep.sqrMagnitude() < SQUARE(attackDist)) && FABS(angleDiff) <= TORADIANS(attackAngle)) {
+		if ((sep.sqrMagnitude() < SQUARE(attackDist)) && (FABS(angleDiff) <= TORADIANS(attackAngle))) {
 			result = true;
 		}
 		return result;
 	}
 
-	inline bool isTargetOutOfRange(Creature* target, f32 angle, f32 privateRad, f32 sightRad, f32 fov, f32 viewAngle)
+	/**
+	 * Checks if a target is within the range of the enemy.
+	 *
+	 * @param target The target creature to check.
+	 * @param pAngle The angle between the enemy and the target.
+	 * @param pPrivateRadius The private radius of the enemy.
+	 * @param pSightRadius The sight radius of the enemy.
+	 * @param pFov The field of view of the enemy.
+	 * @param pViewAngle The view angle of the enemy.
+	 * @return True if the target is within range, false otherwise.
+	 */
+	inline bool isTargetWithinRange(Creature* target, f32 pAngle, f32 pPrivateRadius, f32 pSightRadius, f32 pFov, f32 pViewAngle)
 	{
+		// Calculate the separation between us and target
 		Vector3f sep;
 		sep.x = target->getPosition().x - getPosition().x;
 		sep.y = target->getPosition().y - getPosition().y;
 		sep.z = target->getPosition().z - getPosition().z;
 
-		f32 rad1 = SQUARE(privateRad);
-		f32 rad2 = SQUARE(sightRad);
+		// Calculate the squared distance between us and target
+		f32 privateRadius = SQUARE(pPrivateRadius);
+		f32 sightRadius   = SQUARE(pSightRadius);
+		f32 distance      = sep.sqrMagnitude2D();
 
-		bool result         = true;  // r3
-		bool isOutsideRange = false; // r4
-		bool isOutsideSight;
-		f32 dist2D = sep.sqrMagnitude2D();
-		if (dist2D > rad1) {
-			isOutsideSight = false;
-			if (dist2D > rad2 && absF(sep.y) < fov) {
-				isOutsideSight = true;
-			}
-
-			if (isOutsideSight) {
-				isOutsideRange = true;
-			}
-		}
-
-		if (!isOutsideRange && absF(angle) <= TORADIANS(viewAngle)) {
-			result = false;
-		}
-		return result;
+		// Check if the target is outside the private and sight radius and within the field of view
+		return (distance > privateRadius && (distance > sightRadius && absF(sep.y) < pFov))
+		    // Check if the angle to the target is within the field of view
+		    || (FABS(pAngle) <= TORADIANS(pViewAngle)) == false;
 	}
 
 	inline f32 changeFaceDir2(Creature* target)
@@ -672,6 +641,10 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 		return angleDist;
 	}
 
+	inline void getPosition2D(Vector3f& pos) { pos = Vector3f(mPosition.x, 0.0f, mPosition.z); }
+
+	inline Vector3f getEBPosition2D() { return Vector3f(mPosition.x, 0.0f, mPosition.z); }
+
 	inline void forceMovePosition(Vector3f offset) { mPosition += offset; }
 
 	inline f32 getDamageAnimFrac(f32 scale) { return (mDamageAnimTimer / scale); }
@@ -693,6 +666,7 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 	inline Vector3f getTargetVelocity() { return mTargetVelocity; }
 	inline void setTargetVelocity(const Vector3f& ref) { mTargetVelocity = ref; }
 
+	inline f32 getMoveSpeed() { return static_cast<EnemyParmsBase*>(mParms)->mGeneral.mMoveSpeed(); }
 	inline f32 getMoveSpeed(f32 speedFactor) { return speedFactor * static_cast<EnemyParmsBase*>(mParms)->mGeneral.mMoveSpeed(); }
 
 	inline f32 getScaleMod() const { return mScaleModifier; }
@@ -700,10 +674,10 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 	inline void setTargetVelocity(f32 speedFactor)
 	{
 		f32 x, y, z;
-		f32 speed = getMoveSpeed(speedFactor);
-		x         = (f32)sin(getFaceDir());
+		f32 speed = speedFactor * static_cast<EnemyParmsBase*>(mParms)->mGeneral.mMoveSpeed();
+		x         = dolsinf(getFaceDir());
 		y         = getTargetVelocity().y;
-		z         = (f32)cos(getFaceDir());
+		z         = dolcosf(getFaceDir());
 
 		mTargetVelocity = Vector3f(speed * x, y, speed * z);
 	}
@@ -712,11 +686,22 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 	{
 		f32 x, y, z;
 		f32 speed = static_cast<EnemyParmsBase*>(mParms)->mGeneral.mMoveSpeed();
-		x         = (f32)sin(getFaceDir());
+		x         = dolsinf(getFaceDir());
 		y         = getTargetVelocity().y;
-		z         = (f32)cos(getFaceDir());
+		z         = dolcosf(getFaceDir());
 
 		mTargetVelocity = Vector3f(speed * x, y, speed * z);
+	}
+
+	inline f32 getSquareDistanceTo2D(Creature* target, Vector3f& position)
+	{
+		f32 z       = position.z;
+		f32 x       = position.x;
+		f32 targetZ = target->getPosition().z;
+		f32 targetX = target->getPosition().x;
+		f32 diffZ   = targetZ - z;
+		f32 diffX   = targetX - x;
+		return SQUARE(diffX) + SQUARE(diffZ);
 	}
 
 	inline bool isAlertLife() { return bool(mHealth < static_cast<EnemyParmsBase*>(mParms)->mGeneral.mLifeBeforeAlert); }
@@ -769,7 +754,7 @@ struct EnemyBase : public Creature, public SysShape::MotionListener, virtual pub
 	BitFlagArray<u32, 2> mEventBuffer;          // _1E8
 	u8 mSfxEmotion;                             // _1F0, the 'emotion' used for bg music
 	u8 mCreatureID;                             // _1F1
-	u8 _1F2;                                    // _1F2, set to 0xFF by ctor/birth function, never used
+	u8 mUnused1F2;                              // _1F2, set to 0xFF by ctor/birth function, never used
 	bool mInPiklopedia;                         // _1F3
 	int mStuckPikminCount;                      // _1F4
 	f32 mScaleModifier;                         // _1F8

@@ -82,30 +82,30 @@ struct J2DPerspGraph : public J2DGrafContext {
 	// _00 		= VTBL
 	// _00-_BC	= J2DGrafContext
 	f32 mFovY; // _BC
-	f32 _C0;   // _C0
-	f32 _C4;   // _C4
-	f32 _C8;   // _C8
+	f32 mNear; // _C0
+	f32 mFar;  // _C4
+	f32 mZPos; // _C8
 };
 
 struct J2DOrthoGraph : public J2DGrafContext {
 	J2DOrthoGraph();
-	J2DOrthoGraph(f32, f32, f32, f32, f32, f32);
+	J2DOrthoGraph(f32 left, f32 top, f32 right, f32 bottom, f32 nearPlaneDistance, f32 farPlaneDistance);
 
 	virtual ~J2DOrthoGraph() {};                                       // _08 (weak)
 	virtual void setPort();                                            // _14
 	virtual J2DGrafType getGrafType() const { return J2DGraf_Ortho; }; // _20 (weak)
 	virtual void setLookat();                                          // _24
 
-	void setOrtho(JGeometry::TBox2f const&, f32, f32);
-	void scissorBounds(JGeometry::TBox2f*, JGeometry::TBox2f const*);
+	void setOrtho(JGeometry::TBox2<f32> const& bounds, f32 far, f32 near);
+	void scissorBounds(JGeometry::TBox2<f32>* outputBounds, JGeometry::TBox2<f32> const* inputBounds);
 
 	f32 getWidthPower() const { return mBounds.getWidth() / mOrtho.getWidth(); }
 	f32 getHeightPower() const { return mBounds.getHeight() / mOrtho.getHeight(); }
 
-	void setOrtho(f32 param_0, f32 param_1, f32 param_2, f32 param_3, f32 param_4, f32 param_5)
+	void setOrtho(f32 startX, f32 startY, f32 width, f32 height, f32 nearPlane, f32 farPlane)
 	{
-		JGeometry::TBox2<f32> ortho(param_0, param_1, param_0 + param_2, param_1 + param_3);
-		setOrtho(ortho, param_4, param_5);
+		JGeometry::TBox2<f32> bounds(startX, startY, startX + width, startY + height);
+		setOrtho(bounds, nearPlane, farPlane);
 	}
 
 	// _00 		= VTBL
@@ -115,14 +115,16 @@ struct J2DOrthoGraph : public J2DGrafContext {
 	f32 mFar;                 // _D0
 };
 
-void J2DFillBox(f32 param_0, f32 param_1, f32 param_2, f32 param_3, JUtility::TColor color);
-void J2DFillBox(JGeometry::TBox2f const& param_0, JUtility::TColor param_1);
-void J2DFillBox(f32, f32, f32, f32, JUtility::TColor, JUtility::TColor, JUtility::TColor, JUtility::TColor);
-void J2DFillBox(const JGeometry::TBox2f&, JUtility::TColor, JUtility::TColor, JUtility::TColor, JUtility::TColor);
+void J2DFillBox(f32 startX, f32 startY, f32 width, f32 height, JUtility::TColor fillColor);
+void J2DFillBox(JGeometry::TBox2<f32> const& boxDimensions, JUtility::TColor fillColor);
+void J2DFillBox(f32 startX, f32 startY, f32 endX, f32 endY, JUtility::TColor color1, JUtility::TColor color2, JUtility::TColor color3,
+                JUtility::TColor color4);
+void J2DFillBox(const JGeometry::TBox2<f32>& boxDimensions, JUtility::TColor color1, JUtility::TColor color2, JUtility::TColor color3,
+                JUtility::TColor color4);
 
-void J2DDrawFrame(f32 param_0, f32 param_1, f32 param_2, f32 param_3, JUtility::TColor param_4, u8 param_5);
-void J2DDrawFrame(JGeometry::TBox2f const& param_0, JUtility::TColor param_1, u8 param_2);
+void J2DDrawFrame(f32 startX, f32 startY, f32 width, f32 height, JUtility::TColor frameColor, u8 lineWidth);
+void J2DDrawFrame(JGeometry::TBox2<f32> const& frameBounds, JUtility::TColor frameColor, u8 lineWidth);
 
-void J2DDrawLine(f32, f32, f32, f32, JUtility::TColor, int);
+void J2DDrawLine(f32 startX, f32 startY, f32 endX, f32 endY, JUtility::TColor color, int lineWidth);
 
 #endif

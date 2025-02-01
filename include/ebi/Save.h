@@ -143,14 +143,6 @@ struct FSMState_NowSave : public FSMState {
 	virtual void do_init(TMgr*, Game::StateArg*); // _20
 	virtual void do_exec(TMgr*);                  // _24
 
-	inline bool isSaveError()
-	{
-		if (sys->mCardMgr->isSaveInvalid() && sys->mCardMgr->isCardReady()) {
-			return true;
-		}
-		return false;
-	}
-
 	// _00     = VTBL
 	// _00-_10 = FSMState
 	int mState;
@@ -201,7 +193,7 @@ struct FSMState_MountCheck : public FSMState_CardRequest {
 struct TMgr : public JKRDisposer {
 	typedef FSMState StateType;
 
-	enum enumEnd { End_0 = 0, End_1 = 1, End_2 = 2, End_3 = 3, End_4 = 4 };
+	enum enumEnd { End_SaveDone = 0, End_Cancel = 1, End_SelectNoSave = 2, End_ReturnToFS = 3, End_Error = 4 };
 
 	TMgr();
 
@@ -255,10 +247,10 @@ struct TMgr : public JKRDisposer {
 	Controller* mController;                          // _3D0
 	Game::MemoryCard::PlayerFileInfo mPlayerFileInfo; // _3D4
 	BOOL mIsStoryGameSave;                            // _470
-	int mCurrStateID;                                 // _474
+	enumEnd mEndState;                                // _474
 	u8 mSaveType;                                     // _478
 	bool mIsAutosaveOn;                               // _479
-	u8 _47A;                                          // _47A
+	u8 mDoRetryOnError;                               // _47A
 	bool mDVDErrorSuspended;                          // _47B
 	FSMStateMachine mStateMachine;                    // _47C
 	FSMState* mCurrentState;                          // _498

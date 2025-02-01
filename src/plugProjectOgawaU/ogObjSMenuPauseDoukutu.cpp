@@ -113,10 +113,10 @@ void ObjSMenuPauseDoukutu::doCreate(JKRArchive* arc)
 	}
 
 	mAnims = new og::Screen::AnimGroup(4);
-	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l.btk", msBaseVal._00);
-	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_02.btk", msBaseVal._00);
-	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_03.btk", msBaseVal._00);
-	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_04.btk", msBaseVal._00);
+	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l.btk", msBaseVal.mAnimSpeed);
+	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_02.btk", msBaseVal.mAnimSpeed);
+	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_03.btk", msBaseVal.mAnimSpeed);
+	og::Screen::registAnimGroupScreen(mAnims, arc, mScreenPause, "s_menu_pause_doukutu_l_04.btk", msBaseVal.mAnimSpeed);
 	doCreateAfter(arc, mScreenPause);
 }
 
@@ -127,7 +127,7 @@ void ObjSMenuPauseDoukutu::doCreate(JKRArchive* arc)
 void ObjSMenuPauseDoukutu::commonUpdate()
 {
 	commonUpdateBase();
-	setSMenuScale(msVal._00, msVal._04);
+	setSMenuScale(msVal.mMenuScaleX, msVal.mMenuScaleY);
 	mPokos = mDisp->mPreCavePokos + mDisp->mCavePokos;
 	mAnims->update();
 	mScreenPause->setXY(mMovePos, 0.0f);
@@ -240,15 +240,16 @@ void ObjSMenuPauseDoukutu::doUpdateFadeoutFinish()
 	case MENUCLOSE_None:
 		SceneSMenuBase* scene = static_cast<SceneSMenuBase*>(getOwner());
 		switch (mDisp->mExitStatus) {
-		case 5:
+		case og::Screen::MENUFINISH_ContinueCave:
 			scene->setBackupScene();
 			scene->startScene(nullptr);
 			finishPause();
 			break;
-		case 6:
+
+		case og::Screen::MENUFINISH_GiveUpEscape:
 			scene->endScene(nullptr);
 			finishPause();
-			scene->setColorBG(0, 0, 0, 0);
+			scene->setColorBG(0, 0, 0, 0); // cut to black
 			break;
 		}
 		setFinishState(mDisp->mExitStatus);
@@ -276,7 +277,7 @@ bool ObjSMenuPauseDoukutu::menu_pause()
 	Controller* pad = getGamePad();
 	mMenuPause->update();
 
-	u32 input = pad->mButton.mButtonDown;
+	u32 input = pad->getButtonDown();
 	if (input & Controller::PRESS_UP) {
 		if (mCurrPauseSel > 0) {
 			mCurrPauseSel--;
@@ -306,9 +307,9 @@ bool ObjSMenuPauseDoukutu::menu_pause()
 
 		} else if (mCurrPauseSel == 0) {
 			mMenuPause->killCursor();
-			mDisp->mExitStatus = 5;
+			mDisp->mExitStatus = og::Screen::MENUFINISH_ContinueCave;
 			out_L();
-			ret = 1;
+			ret = true;
 			ogSound->setDecide();
 		}
 
@@ -323,7 +324,7 @@ bool ObjSMenuPauseDoukutu::menu_pause()
  * @note Address: 0x80322DA8
  * @note Size: 0x10
  */
-void ObjSMenuPauseDoukutu::doUpdateCancelAction() { mDisp->mExitStatus = 5; }
+void ObjSMenuPauseDoukutu::doUpdateCancelAction() { mDisp->mExitStatus = og::Screen::MENUFINISH_ContinueCave; }
 
 /**
  * @note Address: 0x80322DB8
@@ -341,7 +342,7 @@ void ObjSMenuPauseDoukutu::doUpdateLAction()
  */
 void ObjSMenuPauseDoukutu::doUpdateRAction()
 {
-	if (msBaseVal.mUseController) {
+	if (msBaseVal.mUseControlMenu) {
 		::Screen::SetSceneArg arg(SCENE_PAUSE_MENU_CONTROLS, getDispMember());
 		jump_R(arg);
 	} else {
@@ -366,7 +367,7 @@ bool ObjSMenuPauseDoukutu::menu_giveup()
 	Controller* pad = getGamePad();
 	mMenuGiveup->update();
 
-	u32 input = pad->mButton.mButtonDown;
+	u32 input = pad->getButtonDown();
 	if (input & Controller::PRESS_UP) {
 		if (mCurrGiveupSel > 0) {
 			mCurrGiveupSel--;
@@ -390,7 +391,7 @@ bool ObjSMenuPauseDoukutu::menu_giveup()
 
 	} else if (mGiveupOpened && (input & Controller::PRESS_A)) {
 		if (mCurrGiveupSel == 0) {
-			mDisp->mExitStatus = 6;
+			mDisp->mExitStatus = og::Screen::MENUFINISH_GiveUpEscape;
 			out_L();
 			ret = true;
 
@@ -505,7 +506,7 @@ void ObjSMenuPauseDoukutu::set_Blink_Normal()
 		} else {
 			mTextContinue->blink(0.0f, 0.0f);
 		}
-		mTextDoGiveup->mColorType = 2;
+		mTextDoGiveup->mColorType = og::Screen::ANIMTEXTCOLOR_GreyedOut;
 	} else {
 		if (mCurrPauseSel == 0) {
 			mTextContinue->blink(0.6f, 0.0f);
@@ -564,7 +565,7 @@ void ObjSMenuPauseDoukutu::set_Menu_YesNo()
 	set_Blink_YesNo();
 	mGiveupOpened    = false;
 	mMenuGiveupTimer = 0.0f;
-	mWarningTimer    = msVal._08;
+	mWarningTimer    = msVal.mPikiWarningTime;
 }
 
 ObjSMenuPauseDoukutu::StaticValues ObjSMenuPauseDoukutu::msVal;

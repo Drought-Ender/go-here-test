@@ -27,13 +27,13 @@ Mgr* mgr;
 void FSM::init(Item*)
 {
 	create(PIKIHEAD_StateCount);
-	registerState(new FallState());
-	registerState(new BuryState());
-	registerState(new WaitState());
-	registerState(new TaneState());
-	registerState(new HatugaState());
-	registerState(new GrowState());
-	registerState(new SioreState());
+	registerState(new FallState);
+	registerState(new BuryState);
+	registerState(new WaitState);
+	registerState(new TaneState);
+	registerState(new HatugaState);
+	registerState(new GrowState);
+	registerState(new SioreState);
 }
 
 /**
@@ -42,9 +42,9 @@ void FSM::init(Item*)
  */
 void FallState::init(Item* item, StateArg* arg)
 {
-	_14 = 10.0f - randFloat() * 0.5f; // 9.5-10.5
-	_10 = _14 * 0.2f;                 // 1.9-2.1
-	item->mEfxTane->createTanekira_(item->mEfxTane->mPos);
+	mVerticalDrag   = RAND_FLOAT_RANGE(10.0f, 0.5f); // 9.5-10.5
+	mHorizontalDrag = mVerticalDrag * 0.2f;          // 1.9-2.1
+	item->mEfxTane->createTanekira_(item->mEfxTane->mEfxPos);
 	item->mAnimator.startAnim(4, nullptr);
 }
 
@@ -52,7 +52,7 @@ void FallState::init(Item* item, StateArg* arg)
  * @note Address: 0x801D8DE8
  * @note Size: 0x38
  */
-void FallState::exec(Item* item) { item->applyAirDrag(sys->getDeltaTime(), _10, _14); }
+void FallState::exec(Item* item) { item->applyAirDrag(sys->getDeltaTime(), mHorizontalDrag, mVerticalDrag); }
 
 /**
  * @note Address: 0x801D8E20
@@ -227,7 +227,7 @@ void HatugaState::onKeyEvent(Item* item, const SysShape::KeyEvent& keyEvent) { t
  */
 void WaitState::init(Item* item, StateArg* arg)
 {
-	item->mEfxTane->createKourin_(item->mEfxTane->mPos);
+	item->mEfxTane->createKourin_(item->mEfxTane->mEfxPos);
 	item->mAnimator.startAnim(0, item);
 	if (item->mHeadType == Flower) {
 		mTimer = 2.0f * randFloat() + pikiMgr->mParms->mPikiParms.mWitherFromFlowerTime.mValue;
@@ -242,7 +242,7 @@ void WaitState::init(Item* item, StateArg* arg)
  */
 void WaitState::exec(Item* item)
 {
-	if (!moviePlayer || moviePlayer->mDemoState == MoviePlayer::MOVIEPLAY_SUCCESS) {
+	if (!moviePlayer || moviePlayer->mDemoState == DEMOSTATE_Inactive) {
 		mTimer -= sys->mDeltaTime;
 	}
 
@@ -274,7 +274,7 @@ void WaitState::onKeyEvent(Item* item, const SysShape::KeyEvent& keyEvent) { ite
 void GrowState::init(Item* item, StateArg* arg)
 {
 	item->mAnimator.startAnim(6, item);
-	item->mEfxTane->createGlow1_(item->mEfxTane->mPos);
+	item->mEfxTane->createGlow1_(item->mEfxTane->mEfxPos);
 }
 
 /**
@@ -297,7 +297,7 @@ void GrowState::onKeyEvent(Item* item, const SysShape::KeyEvent& keyEvent)
 {
 	if (keyEvent.mType == KEYEVENT_2) {
 		item->mHeadType = (item->mHeadType + 1) % 3;
-		efx::createSimpleGlow2(*item->mEfxTane->mPos); // TODO: not declared yet
+		efx::createSimpleGlow2(*item->mEfxTane->mEfxPos); // TODO: not declared yet
 		if (item->mHeadType == Bud) {
 			item->startSound(PSSE_PK_SE_ONY_TSUBOMI);
 		} else if (item->mHeadType == Flower) {
@@ -379,20 +379,20 @@ void Item::onInit(CreatureInitArg* settings)
 		if (itemInitArg->mPikminType == -1) {
 			mColor = Blue;
 		}
-		mVelocity = itemInitArg->mVelocity;
-		mHeadType = itemInitArg->mHeadType;
-		_1E4      = itemInitArg->_1C;
+		mVelocity         = itemInitArg->mVelocity;
+		mHeadType         = itemInitArg->mHeadType;
+		mAutopluckedTimer = itemInitArg->mAutopluckTimer;
 	} else {
-		mColor    = randFloat() * 5.0f;
-		mHeadType = Leaf;
-		_1E4      = -1.0f;
+		mColor            = randInt(5);
+		mHeadType         = Leaf;
+		mAutopluckedTimer = -1.0f;
 	}
 	mEfxTane->init();
-	mEfxTane->mPikiColor = mColor;
-	mEfxTane->_08        = &mPosition;
-	mEfxTane->mPos       = &mEfxPosition;
-	mEfxTane->_10        = &mBaseTrMatrix;
-	mEfxTane->_0C        = mModel->getJoint("happajnt3")->getWorldMatrix();
+	mEfxTane->mPikiColor   = mColor;
+	mEfxTane->mObjPos      = &mPosition;
+	mEfxTane->mEfxPos      = &mEfxPosition;
+	mEfxTane->mObjMatrix   = &mBaseTrMatrix;
+	mEfxTane->mHappaJntMtx = mModel->getJoint("happajnt3")->getWorldMatrix();
 	if (itemInitArg && itemInitArg->mIsAlreadyBuried) {
 		mFsm->start(this, PIKIHEAD_Hatuga, nullptr);
 	} else {
@@ -417,7 +417,7 @@ void Item::onKill(CreatureKillArg* settings)
 		mCurrentState->cleanup(this);
 	}
 	mgr->kill(this);
-	if (!settings || !settings->isFlag(CKILL_Unk1)) {
+	if (!settings || !settings->isFlag(CKILL_DontCountAsDeath)) {
 		GameStat::mePikis.dec(mColor);
 	}
 }
@@ -460,25 +460,22 @@ void Item::cacheLoad(Stream& input)
  */
 void Item::makeTrMatrix()
 {
-	if (getStateID() == PIKIHEAD_Fall) {
-		if (mVelocity.length() > 0.0f) {
-			Vector3f xVec = mVelocity;
-			_normalise2(xVec);
-			xVec *= -1.0f;
+	if (getStateID() == PIKIHEAD_Fall && mVelocity.length() > 0.0f) {
+		Vector3f yVec = mVelocity;
+		yVec.normalise();
+		yVec = yVec * -1.0f;
 
-			Vector3f zAxis(0.0f, 0.0f, -5.0f);
-			Vector3f yVec = cross(xVec, zAxis);
-			_normalise2(yVec);
+		Vector3f zAxis(0.0f, 0.0f, 1.0f);
+		Vector3f xVec = yVec.cross(zAxis);
+		xVec.normalise();
 
-			Vector3f xAxis(1.0f, 0.0f, 0.0f);
-			Vector3f zVec = cross(yVec, xAxis);
-			_normalise2(zVec);
+		Vector3f zVec = xVec.cross(yVec);
+		zVec.normalise();
 
-			mBaseTrMatrix.setColumn(0, xVec);
-			mBaseTrMatrix.setColumn(1, yVec);
-			mBaseTrMatrix.setColumn(2, zVec);
-			mBaseTrMatrix.setTranslation(mPosition);
-		}
+		mBaseTrMatrix.setColumn(0, xVec);
+		mBaseTrMatrix.setColumn(1, yVec);
+		mBaseTrMatrix.setColumn(2, zVec);
+		mBaseTrMatrix.setTranslation(mPosition);
 	} else {
 		BaseItem::makeTrMatrix();
 	}
@@ -648,12 +645,12 @@ lbl_801DA0E8:
 void Item::doAI()
 {
 	mFsm->exec(this);
-	if (_1E4 > 0.0f) {
-		_1E4 -= sys->mDeltaTime;
-		if (_1E4 <= 0.0f) {
-			PikiMgr::mBirthMode = 1;
+	if (mAutopluckedTimer > 0.0f) {
+		mAutopluckedTimer -= sys->mDeltaTime;
+		if (mAutopluckedTimer <= 0.0f) {
+			PikiMgr::mBirthMode = PikiMgr::PSM_Force;
 			Piki* piki          = pikiMgr->birth();
-			PikiMgr::mBirthMode = 0;
+			PikiMgr::mBirthMode = PikiMgr::PSM_Normal;
 			if (piki) {
 				piki->init(nullptr);
 				piki->changeShape(mColor);
@@ -677,20 +674,20 @@ void Item::doAI()
  */
 void Item::changeMaterial()
 {
-	J3DMaterial* mat = mModel->mJ3dModel->mModelData->getMaterialNodePointer(0);
-	if (mat) {
+	// J3DMaterial* mat = mModel->mJ3dModel->getModelData()->getMaterialNodePointer(0);
+	if (mModel->mJ3dModel->getModelData()->getMaterialNodePointer(0)) {
 		Color4 pikiColor = Piki::pikiColors[mColor];
-		J2DGXColorS10 color(pikiColor.r, pikiColor.g, pikiColor.b, pikiColor.a);
-		mat->mTevBlock->setTevColor(0, color);
+		mModel->mJ3dModel->getModelData()->getMaterialNodePointer(0)->getTevBlock()->setTevColor(
+		    0, J2DGXColorS10(pikiColor.r, pikiColor.g, pikiColor.b, pikiColor.a));
 	}
 
 	mModel->mJ3dModel->calcMaterial();
 
 	for (u16 i = 0; i < mModel->mJ3dModel->getModelData()->getMaterialNum(); i++) {
-		J3DMatPacket* packet = &mModel->mJ3dModel->mMatPackets[i];
+		J3DMatPacket* packet = mModel->mJ3dModel->getMatPacket(i);
 		if (packet->mInitShapePacket->mDisplayList) {
 			packet->beginDiff();
-			mModel->mJ3dModel->getModelData()->getMaterialNodePointer(i)->mTevBlock->diff(0x1000000);
+			mModel->mJ3dModel->getModelData()->getMaterialNodePointer(i)->getTevBlock()->diff(0x1000000);
 			packet->endDiff();
 		}
 	}
@@ -859,7 +856,7 @@ bool Item::canPullout()
  */
 bool Item::interactFue(InteractFue& whistle)
 {
-	if (canPullout() && isAlive()) {
+	if (canPullout() != false && isAlive()) {
 		Navi* navi = static_cast<Navi*>(whistle.mCreature);
 		if (!navi->getOlimarData()->hasItem(OlimarData::ODII_ProfessionalNoisemaker)) {
 			return false;
@@ -871,9 +868,9 @@ bool Item::interactFue(InteractFue& whistle)
 			}
 		}
 
-		PikiMgr::mBirthMode = 1;
+		PikiMgr::mBirthMode = PikiMgr::PSM_Force;
 		Piki* piki          = pikiMgr->birth();
-		PikiMgr::mBirthMode = 0;
+		PikiMgr::mBirthMode = PikiMgr::PSM_Normal;
 
 		if (piki) {
 			P2ASSERTLINE(701, whistle.mCreature->isNavi());
@@ -888,128 +885,7 @@ bool Item::interactFue(InteractFue& whistle)
 			return true;
 		}
 	}
-
 	return false;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	mr       r31, r3
-	stw      r30, 0x18(r1)
-	stw      r29, 0x14(r1)
-	stw      r28, 0x10(r1)
-	mr       r28, r4
-	bl
-"getStateID__Q24Game89FSMItem<Q34Game12ItemPikihead4Item,Q34Game12ItemPikihead3FSM,Q34Game12ItemPikihead5State>Fv"
-	subfic   r0, r3, 2
-	cntlzw   r0, r0
-	rlwinm.  r0, r0, 0x1b, 0x18, 0x1f
-	beq      lbl_801DA644
-	mr       r3, r31
-	lwz      r12, 0(r31)
-	lwz      r12, 0xa8(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_801DA644
-	lwz      r30, 4(r28)
-	mr       r3, r30
-	bl       getOlimarData__Q24Game4NaviFv
-	li       r4, 3
-	bl       hasItem__Q24Game10OlimarDataFi
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801DA534
-	li       r3, 0
-	b        lbl_801DA648
-
-lbl_801DA534:
-	lwz      r3, gameSystem__4Game@sda21(r13)
-	lwz      r0, 0x44(r3)
-	cmpwi    r0, 1
-	bne      lbl_801DA55C
-	lhz      r3, 0x1f4(r31)
-	lhz      r0, 0x2dc(r30)
-	cmplw    r3, r0
-	bne      lbl_801DA55C
-	li       r3, 0
-	b        lbl_801DA648
-
-lbl_801DA55C:
-	li       r0, 1
-	lwz      r3, pikiMgr__4Game@sda21(r13)
-	stw      r0, mBirthMode__Q24Game7PikiMgr@sda21(r13)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x7c(r12)
-	mtctr    r12
-	bctrl
-	li       r0, 0
-	or.      r29, r3, r3
-	stw      r0, mBirthMode__Q24Game7PikiMgr@sda21(r13)
-	beq      lbl_801DA644
-	lwz      r3, 4(r28)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x1c(r12)
-	mtctr    r12
-	bctrl
-	clrlwi.  r0, r3, 0x18
-	bne      lbl_801DA5C0
-	lis      r3, lbl_80480828@ha
-	lis      r5, lbl_8048084C@ha
-	addi     r3, r3, lbl_80480828@l
-	li       r4, 0x2bd
-	addi     r5, r5, lbl_8048084C@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_801DA5C0:
-	mr       r3, r29
-	li       r4, 0
-	bl       init__Q24Game8CreatureFPQ24Game15CreatureInitArg
-	lhz      r4, 0x1f4(r31)
-	mr       r3, r29
-	bl       changeShape__Q24Game4PikiFi
-	lhz      r4, 0x1f6(r31)
-	mr       r3, r29
-	bl       changeHappa__Q24Game4PikiFi
-	stw      r30, 0x2c4(r29)
-	mr       r3, r29
-	addi     r4, r31, 0x19c
-	li       r5, 0
-	bl       "setPosition__Q24Game8CreatureFR10Vector3<f>b"
-	lwz      r3, 0x28c(r29)
-	mr       r4, r29
-	li       r5, 0x11
-	li       r6, 0
-	lwz      r12, 0(r3)
-	lwz      r12, 0x14(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r31
-	li       r4, 0
-	bl       kill__Q24Game8CreatureFPQ24Game15CreatureKillArg
-	mr       r3, r31
-	li       r4, 0
-	lwz      r12, 0(r31)
-	lwz      r12, 0xac(r12)
-	mtctr    r12
-	bctrl
-	li       r3, 1
-	b        lbl_801DA648
-
-lbl_801DA644:
-	li       r3, 0
-
-lbl_801DA648:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	lwz      r28, 0x10(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -1031,12 +907,12 @@ Mgr::Mgr()
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("pikihead.bmd", 0, 0x20000);
+	loadBmd("pikihead.bmd", 0, J3DMODEL_CreateNewDL);
 	(*mModelData)->newSharedDisplayList(0x40000);
 	JKRArchive* arc = openTextArc("texts.szs");
 	loadAnimMgr(arc, "pikiheadAnimMgr.txt");
 	closeTextArc(arc);
-	createMgr(100, 0x80000);
+	createMgr(MAX_PIKI_COUNT, 0x80000);
 }
 
 /**
@@ -1047,12 +923,12 @@ void Mgr::doSimpleDraw(Viewport* vp)
 {
 	// loop through head types (leaf, bud, flower, red bud, red flower)
 	for (int i = 0; i < PikiHappaCount; i++) {
-		J3DModelData* model     = pikiMgr->mHappaModel[i];
-		J3DMaterial* mat        = model->mJointTree.mJoints[0]->mMaterial;
-		j3dSys.mVtxPos          = model->mVertexData.mVtxPos;
-		j3dSys.mVtxNorm         = model->mVertexData.mVtxNorm;
-		j3dSys.mVtxColor        = model->mVertexData.mVtxColor[0];
-		J3DShape::sOldVcdVatCmd = nullptr;
+		J3DModelData* model = pikiMgr->mHappaModel[i];
+		J3DMaterial* mat    = model->getJointNodePointer(0)->getMesh();
+		j3dSys.setVtxPos(model->getVtxPosArray());
+		j3dSys.setVtxNrm(model->getVtxNrmArray());
+		j3dSys.setVtxCol(model->getVtxColorArray(0));
+		J3DShape::resetVcdVatCache();
 
 		while (mat) {
 			mat->loadSharedDL();
@@ -1110,15 +986,17 @@ void Mgr::onCreateModel(SysShape::Model* model)
 Item* Mgr::birth()
 {
 	switch (PikiMgr::mBirthMode) {
-	case 0:
+	case PikiMgr::PSM_Normal: // don't make a sprout if we're at or over 100 pikmin on the field
 		if (pikiMgr->mActiveCount + mMonoObjectMgr.mActiveCount >= 100) {
 			return nullptr;
 		}
 		break;
-	case 1:
+
+	case PikiMgr::PSM_Force: // just make the damn sprout
 		break;
-	case 2:
-		JUT_PANICLINE(834, "Ç±ÇÍÇÕÇ†ÇËÇ¶Ç»Ç¢ÇÊ\n"); // 'this is impossible' lol
+
+	case PikiMgr::PSM_Replace:                      // we should not be entering a cave floor and immediately making a sprout lol
+		JUT_PANICLINE(834, "„Åì„Çå„ÅØ„ÅÇ„Çä„Åà„Å™„ÅÑ„Çà\n"); // 'this is impossible' lol
 		break;
 	}
 

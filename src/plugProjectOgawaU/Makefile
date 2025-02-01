@@ -13,7 +13,7 @@ OGAWA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogCallBackMessage.o\
 	$(BUILD_DIR)/asm/plugProjectOgawaU/ogMenuMgr.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogCallBackScreen.o\
-	$(BUILD_DIR)/asm/plugProjectOgawaU/ogCounterRV.o\
+	$(BUILD_DIR)/src/plugProjectOgawaU/ogCounterRV.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSE.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogCounterDay.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/testScene.o\
@@ -26,7 +26,7 @@ OGAWA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogLib2D.o\
 	$(BUILD_DIR)/asm/plugProjectOgawaU/ogObjSMenuMap.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneSMenuMap.o\
-	$(BUILD_DIR)/asm/plugProjectOgawaU/ogObjSMenuItem.o\
+	$(BUILD_DIR)/src/plugProjectOgawaU/ogObjSMenuItem.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneSMenuItem.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneSMenuPause.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogObjSMenuPause.o\
@@ -63,7 +63,7 @@ OGAWA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogScaleMgr.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogObjSMenuPauseVs.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneSMenuPauseVs.o\
-	$(BUILD_DIR)/asm/plugProjectOgawaU/ogFuriko.o\
+	$(BUILD_DIR)/src/plugProjectOgawaU/ogFuriko.o\
 	$(BUILD_DIR)/asm/plugProjectOgawaU/ogCounterSlot.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogObjWorldMapInfoWindow0.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneWorldMapInfoWindow0.o\
@@ -75,7 +75,7 @@ OGAWA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogCallBackPicture.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogDrawAfter.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogOtakaraSensor.o\
-	$(BUILD_DIR)/asm/plugProjectOgawaU/ogTitleMsg.o\
+	$(BUILD_DIR)/src/plugProjectOgawaU/ogTitleMsg.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogAngleMgr.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogSceneSMenuCont.o\
 	$(BUILD_DIR)/src/plugProjectOgawaU/ogObjSMenuCont.o\

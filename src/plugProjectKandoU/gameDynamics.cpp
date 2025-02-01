@@ -1,5 +1,6 @@
 #include "DynamicsParms.h"
 #include "Game/Rigid.h"
+#include "trig.h"
 
 DynamicsParms* DynamicsParms::mInstance;
 
@@ -9,18 +10,18 @@ DynamicsParms* DynamicsParms::mInstance;
  */
 DynamicsParms::DynamicsParms()
     : Parameters(nullptr, "Dynamics")
-    , mNewFriction(this, 'd009', "VƒtƒŠƒNƒVƒ‡ƒ“", true, false, true) // 'new friction'
+    , mNewFriction(this, 'd009', "æ–°ãƒ•ãƒªã‚¯ã‚·ãƒ§ãƒ³", true, false, true) // 'new friction'
     , mStaParm(this, 'd011', "Sta-Parm", 140.0f, 0.0f, 5000.0f)
     , mStatic(this, 'd010', "Static", 10.0f, 0.0f, 5000.0f)
     , mMicroCollision(this, 'd000', "micro collision", 0.015f, 0.0f, 10.0f)
-    , mFrictionDuringResolve(this, 'd001', "ResolveŽž‚Ì–€ŽC", false, false, true) // 'friction during Resolve'
+    , mFrictionDuringResolve(this, 'd001', "Resolveæ™‚ã®æ‘©æ“¦", false, false, true) // 'friction during Resolve'
     , mElasticity(this, 'd002', "elasticity", 0.3f, 0.0f, 1.0f)
-    , mFriction(this, 'd003', "–€ŽC", true, false, true)                          // 'friction'
-    , mFrictionTangentVelocity(this, 'd004', "–€ŽC:tanvel", true, false, true)    // 'friction:tanvel' - tangent velocity?
-    , mFixedFriction(this, 'd005', "ŒÅ’è–€ŽC", true, false, true)                 // 'fixed friction'
-    , mFixedFrictionValue(this, 'd006', "ŒÅ’è–€ŽC’l", 100.0f, 0.0f, 10000.0f)     // 'fixed friction value'
-    , mNoRotationEffect(this, 'd007', "‰ñ“]‰e‹¿‚È‚µ‚É‚·‚é", true, false, true)    // 'no rotation effect'
-    , mRotatingMomentDamp(this, 'd008', "‰ñ“]ƒ‚[ƒƒ“ƒg Damp", 0.05f, 0.0f, 1.0f) // 'rotating moment Damp'
+    , mFriction(this, 'd003', "æ‘©æ“¦", true, false, true)                          // 'friction'
+    , mFrictionTangentVelocity(this, 'd004', "æ‘©æ“¦:tanvel", true, false, true)    // 'friction:tanvel' - tangent velocity?
+    , mFixedFriction(this, 'd005', "å›ºå®šæ‘©æ“¦", true, false, true)                 // 'fixed friction'
+    , mFixedFrictionValue(this, 'd006', "å›ºå®šæ‘©æ“¦å€¤", 100.0f, 0.0f, 10000.0f)     // 'fixed friction value'
+    , mNoRotationEffect(this, 'd007', "å›žè»¢å½±éŸ¿ãªã—ã«ã™ã‚‹", true, false, true)    // 'no rotation effect'
+    , mRotatingMomentDamp(this, 'd008', "å›žè»¢ãƒ¢ãƒ¼ãƒ¡ãƒ³ãƒˆ Damp", 0.05f, 0.0f, 1.0f) // 'rotating moment Damp'
 {
 	mInstance = this;
 }
@@ -56,9 +57,9 @@ void Game::Rigid::initPosition(Vector3f& posVec, Vector3f& quatVec)
 {
 	initPositionIndex(posVec, 0, quatVec);
 	initPositionIndex(posVec, 1, quatVec);
-	PSMTXIdentity(mConfigs[0]._58.mMatrix.mtxView);
-	PSMTXIdentity(mConfigs[1]._58.mMatrix.mtxView);
-	PSMTXIdentity(_144.mMatrix.mtxView);
+	PSMTXIdentity(mConfigs[0].mRotatedTransform.mMatrix.mtxView);
+	PSMTXIdentity(mConfigs[1].mRotatedTransform.mMatrix.mtxView);
+	PSMTXIdentity(mTransformationMtx.mMatrix.mtxView);
 	mTimeStep = 1.0f;
 	updateMatrix(0);
 }
@@ -69,14 +70,14 @@ void Game::Rigid::initPosition(Vector3f& posVec, Vector3f& quatVec)
  */
 void Game::Rigid::initPositionIndex(Vector3f& posVec, int configIdx, Vector3f& quatVec)
 {
-	RigidConfig* config = &mConfigs[configIdx];
-	config->mPosition   = posVec;
-	config->_18         = Vector3f(0.0f);
-	config->mVelocity   = Vector3f(0.0f);
-	config->_24         = Vector3f(0.0f);
-	config->_30         = Vector3f(0.0f);
-	config->_3C         = Vector3f(0.0f);
-	config->_48.set(quatVec);
+	RigidConfig* config      = &mConfigs[configIdx];
+	config->mPosition        = posVec;
+	config->mForce           = Vector3f(0.0f);
+	config->mVelocity        = Vector3f(0.0f);
+	config->mRotatedMomentum = Vector3f(0.0f);
+	config->mMomentum        = Vector3f(0.0f);
+	config->mTorque          = Vector3f(0.0f);
+	config->mPrimaryRotation.set(quatVec);
 }
 
 /**
@@ -86,7 +87,7 @@ void Game::Rigid::initPositionIndex(Vector3f& posVec, int configIdx, Vector3f& q
 void Game::Rigid::updateMatrix(int configIdx)
 {
 	RigidConfig* config = &mConfigs[configIdx];
-	_04.makeTQ(config->mPosition, config->_48);
+	mPrimaryMatrix.makeTQ(config->mPosition, config->mPrimaryRotation);
 }
 
 /**
@@ -96,12 +97,12 @@ void Game::Rigid::updateMatrix(int configIdx)
 void Game::Rigid::computeForces(int configIdx)
 {
 	RigidConfig* config = &mConfigs[configIdx];
-	config->_18         = Vector3f(0.0f);
-	config->_3C         = Vector3f(0.0f);
+	config->mForce      = Vector3f(0.0f);
+	config->mTorque     = Vector3f(0.0f);
 
 	f32 dampVal = DynamicsParms::mInstance->mRotatingMomentDamp.mValue;
 	if (dampVal > 0.0f) {
-		config->_30 = config->_30 - config->_30 * dampVal;
+		config->mMomentum = config->mMomentum - config->mMomentum * dampVal;
 	}
 }
 
@@ -111,32 +112,22 @@ void Game::Rigid::computeForces(int configIdx)
  */
 static f32 getYDegree(Quat& quat, Vector3f& vec)
 {
-	Quat q1(0.0f, Vector3f(0.0f, 1.0f, 0.0f)); // 0x9c
-	Quat q2;                                   // 0x8c
-	Quat q3;                                   // 0x7c
-	q3 = quat.inverse();                       // 0x60
+	Vector3f yAxis(0.0f, 1.0f, 0.0f);
 
-	Quat q4; // 0x24
-	q4.w = quat.w * q1.w - (quat.x * q1.x + q1.y * quat.y + quat.z * q1.z);
-	q4.x = quat.y * q1.z - quat.z * q1.y + q1.x * quat.w + quat.x * q1.w;
-	q4.y = quat.z * q1.x - quat.x * q1.z + q1.y * quat.w + quat.y * q1.w;
-	q4.z = quat.x * q1.y - quat.y * q1.x + q1.z * quat.w + quat.z * q1.w;
+	Quat yAxisQuat(0.0f, yAxis);
+	Quat intermediateQuat;
 
-	q2 = Quat(q4.w, Vector3f(q4.x, q4.y, q4.z));
+	Quat inverseQuat;
+	inverseQuat = quat.inverse();
 
-	Quat q5; // 0x8
-	q5.w = q2.w * q3.w - (q2.x * q3.x + q3.y * q2.y + q2.z * q3.z);
-	q5.x = q2.y * q3.z - q2.z * q3.y + q3.x * q2.w + q2.x * q3.w;
-	q5.y = q2.z * q3.x - q2.x * q3.z + q3.y * q2.w + q2.y * q3.w;
-	q5.z = q2.x * q3.y - q2.y * q3.x + q3.z * q2.w + q2.z * q3.w;
+	// Issues are here
+	intermediateQuat = quat * yAxisQuat;
 
-	q2 = Quat(q5.w, Vector3f(q5.x, q5.y, q5.z));
+	intermediateQuat = intermediateQuat * inverseQuat;
 
-	vec.x = q2.x;
-	vec.y = q2.y;
-	vec.z = q2.z;
+	vec = intermediateQuat.v;
 
-	return q2.y;
+	return intermediateQuat.v.y;
 
 	/*
 	stwu     r1, -0xc0(r1)
@@ -305,30 +296,65 @@ void Game::Rigid::integrate(f32 timeStep, int configIdx)
 	RigidConfig* thisConfig  = &mConfigs[configIdx]; // r31
 	RigidConfig* otherConfig = &mConfigs[1 - configIdx];
 
-	otherConfig->mPosition = thisConfig->mPosition;
-	otherConfig->_48       = thisConfig->_48;
-	Matrixf matQ; // 0x1d0
-	Matrixf matC; // 0x1a0
-	Matrixf matT; // 0x170
+	otherConfig->mPosition        = thisConfig->mPosition;
+	otherConfig->mPrimaryRotation = thisConfig->mPrimaryRotation;
 
-	matQ.makeQ(thisConfig->_48);
-	PSMTXTranspose(matQ.mMatrix.mtxView, matT.mMatrix.mtxView);
-	PSMTXConcat(matQ.mMatrix.mtxView, _144.mMatrix.mtxView, matC.mMatrix.mtxView);
-	PSMTXConcat(matC.mMatrix.mtxView, matT.mMatrix.mtxView, thisConfig->_58.mMatrix.mtxView);
+	Matrixf rotationMtx;  // 0x1d0
+	Matrixf concatMtx;    // 0x1a0
+	Matrixf transposeMtx; // 0x170
 
-	thisConfig->mPosition += thisConfig->mVelocity * timeStep;
-	thisConfig->_30 += thisConfig->_3C * timeStep;
-	thisConfig->mVelocity += thisConfig->_18 * (timeStep * mTimeStep);
+	rotationMtx.makeQ(thisConfig->mPrimaryRotation);
+	PSMTXTranspose(rotationMtx.mMatrix.mtxView, transposeMtx.mMatrix.mtxView);
+	PSMTXConcat(rotationMtx.mMatrix.mtxView, mTransformationMtx.mMatrix.mtxView, concatMtx.mMatrix.mtxView);
+	PSMTXConcat(concatMtx.mMatrix.mtxView, transposeMtx.mMatrix.mtxView, thisConfig->mRotatedTransform.mMatrix.mtxView);
 
-	thisConfig->_24 = thisConfig->_58.mtxMult(thisConfig->_30);
+	thisConfig->mPosition = thisConfig->mPosition + thisConfig->mVelocity * timeStep;
+	thisConfig->mMomentum = thisConfig->mMomentum + thisConfig->mTorque * timeStep;
+	thisConfig->mVelocity = thisConfig->mVelocity + thisConfig->mForce * (timeStep * mTimeStep);
 
-	Quat q1;                        // 0x160
-	Quat q2(0.0f, thisConfig->_24); // 0x150
+	thisConfig->mRotatedMomentum = thisConfig->mRotatedTransform.mtxMult(thisConfig->mMomentum);
 
-	// quat math
+	Quat primaryQ;                                             // 0x160
+	Quat rotatedMomentumQ(0.0f, thisConfig->mRotatedMomentum); // 0x150
 
-	thisConfig->_48.normalise();
-	_04.makeTQ(thisConfig->mPosition, thisConfig->_48);
+	primaryQ = rotatedMomentumQ * thisConfig->mPrimaryRotation;
+
+	if (mFlags.typeView & 1) {
+		Quat halfTimeQ; // 0x140
+		halfTimeQ = Quat((0.5f * timeStep) * primaryQ.w, primaryQ.v * (0.5f * timeStep));
+
+		Quat primaryRotatedQ; // 0x130
+		primaryRotatedQ = halfTimeQ + thisConfig->mPrimaryRotation;
+
+		Vector3f vec1; // 0x124
+		f32 yDeg48 = getYDegree(thisConfig->mPrimaryRotation, vec1);
+
+		Vector3f vec2; // 0x118
+		f32 yDeg4 = getYDegree(primaryRotatedQ, vec2);
+
+		f32 sinValue8192 = JMASSin(8192);
+		if (yDeg48 < JMASSin(10912)) {
+			if (yDeg4 < yDeg48) {
+				Vector3f yAxis(0.0f, 1.0f, 0.0);
+				thisConfig->mMomentum        = thisConfig->mMomentum + vec1.cross(yAxis) * 1000.0f;
+				thisConfig->mRotatedMomentum = thisConfig->mRotatedTransform.mtxMult(thisConfig->mMomentum);
+				if (!(yDeg4 < sinValue8192)) {
+					thisConfig->mPrimaryRotation = primaryRotatedQ;
+				}
+			} else {
+				thisConfig->mPrimaryRotation = primaryRotatedQ;
+			}
+		} else {
+			thisConfig->mPrimaryRotation = thisConfig->mPrimaryRotation + halfTimeQ;
+		}
+	} else {
+		Quat q5; // 0x108
+		q5                           = Quat((0.5f * timeStep) * primaryQ.w, primaryQ.v * (0.5f * timeStep));
+		thisConfig->mPrimaryRotation = thisConfig->mPrimaryRotation + q5;
+	}
+
+	thisConfig->mPrimaryRotation.normalise();
+	mPrimaryMatrix.makeTQ(thisConfig->mPosition, thisConfig->mPrimaryRotation);
 	/*
 	stwu     r1, -0x240(r1)
 	mflr     r0
@@ -759,17 +785,51 @@ lbl_8013AB2C:
  * @note Address: 0x8013AB74
  * @note Size: 0x300
  */
-bool Game::Rigid::resolveCollision(int index, Vector3f& p2, Vector3f& p3, f32 p4)
+bool Game::Rigid::resolveCollision(int configIndex, Vector3f& collisionPoint, Vector3f& collisionNormal, f32 restitutionCoefficient)
 {
 	if (DynamicsParms::mInstance->mMicroCollision.mValue == 1120.0f) {
-		;
+#if _DEBUG
+		// Stripped from release build
+		OSReport("rassclaaat");
+#endif
 	}
-	RigidConfig& config = mConfigs[index];
-	Vector3f v1         = p2 - config.mPosition;
-	Vector3f v2         = (config.mVelocity + cross(v1, config._24));
-	v2.negate();
-	v2     = v2 * p3;
-	f32 v3 = v2.x + v2.y + v2.z;
+
+	RigidConfig* config = &this->mConfigs[configIndex];
+
+	Vector3f positionDelta = collisionPoint - config->mPosition;
+
+	Vector3f angularMomentum(config->mRotatedMomentum.z * positionDelta.y - config->mRotatedMomentum.y * positionDelta.z,
+	                         config->mRotatedMomentum.x * positionDelta.z - config->mRotatedMomentum.z * positionDelta.x,
+	                         config->mRotatedMomentum.y * positionDelta.x - config->mRotatedMomentum.x * positionDelta.y);
+
+	config->mRotatedMomentum = angularMomentum;
+
+	Vector3f impulse = angularMomentum + config->mVelocity;
+	impulse.negate2();
+
+	f32 impulseMagnitude = impulse.dot(collisionNormal);
+
+	// If there's a collision
+	if (impulseMagnitude < 0.0f * -0.0f) {
+		return false;
+	}
+
+	// If it's tiny, just set it to 0
+	if (fabs(impulseMagnitude) <= 0.0f) {
+		restitutionCoefficient = 1.0f;
+		impulseMagnitude       = 0.0f;
+	}
+
+	Vector3f rotatedVelocity = config->mRotatedTransform.mtxMult(positionDelta.cross(collisionNormal));
+
+	f32 dynamicCoefficient = collisionNormal.dot(rotatedVelocity);
+	f32 scalar             = -(1.0f + restitutionCoefficient) * impulseMagnitude / dynamicCoefficient;
+
+	Vector3f collisionImpulse = positionDelta * (collisionNormal * scalar);
+
+	config->mVelocity = config->mVelocity + collisionImpulse;
+	config->setMomentum(positionDelta.cross(collisionImpulse));
+	return true;
 	/*
 	stwu     r1, -0x90(r1)
 	mflr     r0

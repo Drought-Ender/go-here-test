@@ -40,12 +40,12 @@ HorizonalSplitter::HorizonalSplitter(Graphics* gfx)
  */
 void HorizonalSplitter::split2(f32 split)
 {
-	Viewport* vp1 = mGraphics->getViewport(0);
-	Viewport* vp2 = mGraphics->getViewport(1);
+	Viewport* vp1 = mGraphics->getViewport(PLAYER1_VIEWPORT);
+	Viewport* vp2 = mGraphics->getViewport(PLAYER2_VIEWPORT);
 
-	vp1->_50.y = split / 0.5f;
-	vp2->_50.y = (1.0f - split) / 0.5f;
-	vp2->_48.y = vp1->_50.y * (vp1->mBounds.getHeight()) - mBounds.p2.y * 0.5f;
+	vp1->mSplitRatio.y = split / 0.5f;
+	vp2->mSplitRatio.y = (1.0f - split) / 0.5f;
+	vp2->mOffset.y     = vp1->mSplitRatio.y * (vp1->mBounds.getHeight()) - mBounds.p2.y * 0.5f;
 
 	vp1->refresh();
 	vp2->refresh();
@@ -95,14 +95,14 @@ Viewport::Viewport()
 {
 	mVpId = 0;
 
-	u16 y      = sys->getRenderModeObj()->efbHeight;
-	u16 x      = sys->getRenderModeObj()->fbWidth;
-	mBounds.p1 = 0.0f;
-	mBounds.p2 = Vector2f(x, y);
-	mFlags     = 0;
-	mCamera    = nullptr;
-	_48        = Vector2f(0.0f);
-	_50        = Vector2f(1.0f);
+	u16 y       = sys->getRenderModeObj()->efbHeight;
+	u16 x       = sys->getRenderModeObj()->fbWidth;
+	mBounds.p1  = 0.0f;
+	mBounds.p2  = Vector2f(x, y);
+	mFlags      = 0;
+	mCamera     = nullptr;
+	mOffset     = Vector2f(0.0f);
+	mSplitRatio = Vector2f(1.0f);
 	refresh();
 }
 
@@ -197,8 +197,8 @@ void Viewport::updateCameraAspect()
  */
 void Viewport::refresh()
 {
-	mBounds2.p1 = mBounds.p1 + _48;
-	mBounds2.p2 = mBounds2.p1 + Vector2f(_50.x * mBounds.getWidth(), _50.y * mBounds.getHeight());
+	mBounds2.p1 = mBounds.p1 + mOffset;
+	mBounds2.p2 = mBounds2.p1 + Vector2f(mSplitRatio.x * mBounds.getWidth(), mSplitRatio.y * mBounds.getHeight());
 	updateCameraAspect();
 	/*
 	lfs      f4, 0x1c(r3)
@@ -347,7 +347,7 @@ void Viewport::setOrthoGraph2d(J2DOrthoGraph&)
 SysShape::Model* Viewport::setJ3DViewMtx(bool flag)
 {
 	Matrixf* mtx = getMatrix(flag);
-	PSMTXCopy(mtx->mMatrix.mtxView, j3dSys.mViewMtx);
+	j3dSys.setViewMtx(mtx->mMatrix.mtxView);
 }
 
 /**
@@ -1943,7 +1943,7 @@ void Graphics::drawCone(Vector3f& start, Vector3f& end, f32 inAngle, int limit)
 	Vector3f xVec; // f3, f4, f5
 	Vector3f yVec; // f6, f7, f8
 	Vector3f yAxis(0.0f, 1.0f, 0.0f);
-	if (FABS(dot(sep, yAxis)) < 1.0E-7f) {
+	if (FABS(sep.dot(yAxis)) < 1.0E-7f) {
 		xVec = cross(yAxis, sep);
 		xVec.normalise();
 
@@ -2868,13 +2868,13 @@ void Graphics::perspPrintf(PerspPrintfInfo& info, Vector3f& position, char* form
 
 	case 2: {
 		f32 width = printer.getWidth(buf);
-		f32 val   = (width >= 0.0f) ? 0.5f + width : width - 0.5f;
+		f32 val   = ROUND_F32_TO_U8(width);
 		int x     = info.mPerspectiveOffsetX - (int)val;
 		printer.print(x, (f32)info.mPerspectiveOffsetY, buf);
 	} break;
 	default: {
 		f32 width = 0.5f * printer.getWidth(buf);
-		f32 val   = (width >= 0.0f) ? 0.5f + width : width - 0.5f;
+		f32 val   = ROUND_F32_TO_U8(width);
 		int x     = info.mPerspectiveOffsetX - (int)val;
 		printer.print(x, (f32)info.mPerspectiveOffsetY, buf);
 	} break;

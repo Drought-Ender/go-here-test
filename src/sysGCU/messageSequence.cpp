@@ -1,89 +1,9 @@
-#include "types.h"
 #include "P2JME/TSequenceProcessor.h"
 #include "P2JME/P2JME.h"
 #include "P2Macros.h"
 #include "SoundID.h"
 #include "System.h"
 #include "PSSystem/PSSystemIF.h"
-
-/*
-    Generated from dpostproc
-
-    .section .rodata  # 0x804732E0 - 0x8049E220
-    .global lbl_8049A8B0
-    lbl_8049A8B0:
-        .4byte 0x6D657373
-        .4byte 0x61676553
-        .4byte 0x65717565
-        .4byte 0x6E63652E
-        .4byte 0x63707000
-    .global lbl_8049A8C4
-    lbl_8049A8C4:
-        .asciz "P2Assert"
-        .skip 3
-
-    .section .data, "wa"  # 0x8049E220 - 0x804EFC20
-    .global __vt__Q25P2JME18TSequenceProcessor
-    __vt__Q25P2JME18TSequenceProcessor:
-        .4byte 0
-        .4byte 0
-        .4byte __dt__Q25P2JME18TSequenceProcessorFv
-        .4byte do_reset__Q28JMessage10TProcessorFv
-        .4byte do_character__Q25P2JME18TSequenceProcessorFi
-        .4byte do_tag__Q25P2JME18TSequenceProcessorFUlPCvUl
-        .4byte do_systemTagCode__Q25P2JME18TSequenceProcessorFUsPCvUl
-        .4byte do_select_begin__Q28JMessage10TProcessorFUl
-        .4byte do_select_end__Q28JMessage10TProcessorFv
-        .4byte do_select_separate__Q28JMessage10TProcessorFv
-        .4byte do_reset___Q28JMessage18TSequenceProcessorFPCc
-        .4byte do_setBegin_isReady___Q28JMessage18TSequenceProcessorCFv
-        .4byte do_begin___Q28JMessage18TSequenceProcessorFPCvPCc
-        .4byte do_end___Q28JMessage18TSequenceProcessorFv
-        .4byte do_tag___Q28JMessage18TSequenceProcessorFUlPCvUl
-        .4byte do_systemTagCode___Q28JMessage18TSequenceProcessorFUsPCvUl
-        .4byte do_begin__Q25P2JME18TSequenceProcessorFPCvPCc
-        .4byte do_end__Q25P2JME18TSequenceProcessorFv
-        .4byte do_isReady__Q25P2JME18TSequenceProcessorFv
-        .4byte do_jump_isReady__Q25P2JME18TSequenceProcessorFv
-        .4byte do_jump__Q25P2JME18TSequenceProcessorFPCvPCc
-        .4byte do_branch_query__Q25P2JME18TSequenceProcessorFUs
-        .4byte do_branch_queryResult__Q25P2JME18TSequenceProcessorFv
-        .4byte do_branch__Q25P2JME18TSequenceProcessorFPCvPCc
-        .4byte doResetAbtnWaitSE__Q25P2JME18TSequenceProcessorFv
-        .4byte doCharacterSEStart__Q25P2JME18TSequenceProcessorFv
-        .4byte doCharacterSE__Q25P2JME18TSequenceProcessorFi
-        .4byte doCharacterSEEnd__Q25P2JME18TSequenceProcessorFv
-        .4byte doFastForwardSE__Q25P2JME18TSequenceProcessorFv
-        .4byte reset__Q25P2JME18TSequenceProcessorFv
-
-    .section .sdata2, "a"     # 0x80516360 - 0x80520E40
-    .global lbl_80520868
-    lbl_80520868:
-        .4byte 0x00000000
-    .global lbl_8052086C
-    lbl_8052086C:
-        .4byte 0x3DE147AE
-    .global lbl_80520870
-    lbl_80520870:
-        .float 1.0
-    .global lbl_80520874
-    lbl_80520874:
-        .4byte 0x41200000
-    .global lbl_80520878
-    lbl_80520878:
-        .4byte 0x40200000
-    .global lbl_8052087C
-    lbl_8052087C:
-        .4byte 0x42C80000
-    .global lbl_80520880
-    lbl_80520880:
-        .4byte 0x43300000
-        .4byte 0x00000000
-    .global lbl_80520888
-    lbl_80520888:
-        .float 0.5
-        .4byte 0x00000000
-*/
 
 namespace P2JME {
 
@@ -93,16 +13,16 @@ namespace P2JME {
  */
 TSequenceProcessor::TSequenceProcessor(const JMessage::TReference* ref, JMessage::TControl* control)
     : JMessage::TSequenceProcessor(ref, control)
-    , _50(0.0f)
-    , mController1(0)
-    , mController2(0)
-    , _5C(0)
-    , _60(0)
-    , _64(0)
+    , mPageFinishWaitTimer(0.0f)
+    , mController1(nullptr)
+    , mController2(nullptr)
+    , mCharactersWritten(0)
+    , mUnused0(0)
+    , mUnused1(0)
 {
 	mFlags.clear();
 
-	_4C = 0.11f;
+	mPageFinishWaitDuration = 0.11f;
 }
 
 /**
@@ -111,13 +31,13 @@ TSequenceProcessor::TSequenceProcessor(const JMessage::TReference* ref, JMessage
  */
 void TSequenceProcessor::do_begin(const void* arg0, const char* arg1)
 {
-	mFlags.unset(8);
-	_4C = 0.11f;
-	_50 = _4C;
-	_5C = 0;
-	_60 = 0;
-	_64 = 0;
-	_6C = false;
+	resetFlag(SeqProc_IsForceFinish);
+	mPageFinishWaitDuration = 0.11f;
+	mPageFinishWaitTimer    = mPageFinishWaitDuration;
+	mCharactersWritten      = 0;
+	mUnused0                = 0;
+	mUnused1                = 0;
+	mFastSeType             = false;
 }
 
 /**
@@ -214,37 +134,37 @@ bool TSequenceProcessor::do_isReady()
 {
 	bool check = false;
 
-	if (mFlags.isSet(1)) {
+	if (isFlag(SeqProc_IsActive)) {
 		return false;
 	}
 
-	if (mFlags.isSet(2)) {
-		_50 -= sys->mDeltaTime;
-		if (_50 <= 0.0f) {
+	if (isFlag(SeqProc_IsWaitingPressA)) {
+		mPageFinishWaitTimer -= sys->mDeltaTime;
+		if (mPageFinishWaitTimer <= 0.0f) {
 			bool checkVars = (mController1 || mController2);
 			P2ASSERTLINE(381, checkVars);
 
-			if ((mController1 && (mController1->mButton.mButtonDown & PAD_BUTTON_A))
-			    || (mController2 && (mController2->mButton.mButtonDown & PAD_BUTTON_A))) {
+			if ((mController1 && (mController1->getButtonDown() & Controller::PRESS_A))
+			    || (mController2 && (mController2->getButtonDown() & Controller::PRESS_A))) {
 				resetAbtnWait();
-				mFlags.unset(8);
+				resetFlag(SeqProc_IsForceFinish);
 			}
 		}
 	} else {
 		f32 frameCount = 1.0f;
-		if (mFlags.isSet(8)) {
+		if (isFlag(SeqProc_IsForceFinish)) {
 			frameCount = 10.0f;
-		} else if ((mController1 && (mController1->mButton.mButtonDown & PAD_BUTTON_B))
-		           || (mController2 && (mController2->mButton.mButtonDown & PAD_BUTTON_B))) {
+		} else if ((mController1 && (mController1->getButtonDown() & Controller::PRESS_B))
+		           || (mController2 && (mController2->getButtonDown() & Controller::PRESS_B))) {
 			doFastForwardSE();
-			mFlags.set(8);
-		} else if ((mController1 && (mController1->getButton() & PAD_BUTTON_A))
-		           || (mController2 && (mController2->getButton() & PAD_BUTTON_A))) {
+			setFlag(SeqProc_IsForceFinish);
+		} else if ((mController1 && (mController1->getButton() & Controller::PRESS_A))
+		           || (mController2 && (mController2->getButton() & Controller::PRESS_A))) {
 			frameCount = 2.5f;
 		}
 
-		_50 = -((frameCount * sys->mDeltaTime) - _50);
-		if (_50 <= 0.0f) {
+		mPageFinishWaitTimer = -((frameCount * sys->mDeltaTime) - mPageFinishWaitTimer);
+		if (mPageFinishWaitTimer <= 0.0f) {
 			check = true;
 		}
 	}
@@ -261,7 +181,7 @@ bool TSequenceProcessor::do_jump_isReady() { return false; }
  * @note Address: 0x80437B90
  * @note Size: 0xC
  */
-void TSequenceProcessor::do_jump(const void* arg0, const char* arg1) { _50 = _4C; }
+void TSequenceProcessor::do_jump(const void* arg0, const char* arg1) { mPageFinishWaitTimer = mPageFinishWaitDuration; }
 
 /**
  * @note Address: 0x80437B9C
@@ -279,7 +199,7 @@ int TSequenceProcessor::do_branch_queryResult() { return -1; }
  * @note Address: 0x80437BA8
  * @note Size: 0xC
  */
-void TSequenceProcessor::do_branch(const void* arg0, const char* arg1) { _50 = _4C; }
+void TSequenceProcessor::do_branch(const void* arg0, const char* arg1) { mPageFinishWaitTimer = mPageFinishWaitDuration; }
 
 /**
  * @note Address: 0x80437BB4
@@ -296,14 +216,14 @@ void TSequenceProcessor::do_character(int arg0)
 		}
 	}
 
-	_50 += _4C;
+	mPageFinishWaitTimer += mPageFinishWaitDuration;
 	if (argCheck) {
-		if (_5C == 0) {
+		if (mCharactersWritten == 0) {
 			doCharacterSEStart();
 		} else {
 			doCharacterSE(arg0);
 		}
-		_5C += 1;
+		mCharactersWritten++;
 	}
 }
 
@@ -321,17 +241,17 @@ bool TSequenceProcessor::tagControl(u16 arg0, const void* arg1, u32 arg2)
 	case 1:
 		u8 byte = (s8) * ((s8*)arg1);
 		if (byte == 0xFF) {
-			_4C = 0.11f;
+			mPageFinishWaitDuration = 0.11f;
 		} else {
-			_4C = (f32)byte / 100.0f;
+			mPageFinishWaitDuration = (f32)byte / 100.0f;
 		}
-		_50 = _4C;
+		mPageFinishWaitTimer = mPageFinishWaitDuration;
 		break;
 	case 2:
-		_6C = *(s8*)arg1;
+		mFastSeType = *(s8*)arg1;
 		break;
 	default:
-		P2ASSERTLINE(633, 0);
+		P2ASSERTLINE(633, false);
 		break;
 	}
 
@@ -344,9 +264,9 @@ bool TSequenceProcessor::tagControl(u16 arg0, const void* arg1, u32 arg2)
  */
 void TSequenceProcessor::setAbtnWait()
 {
-	mFlags.set(2);
-	_50 = 0.5f;
-	mFlags.unset(4);
+	setFlag(SeqProc_IsWaitingPressA);
+	mPageFinishWaitTimer = 0.5f;
+	resetFlag(SeqProc_IsWriting);
 	doCharacterSEEnd();
 }
 
@@ -357,10 +277,10 @@ void TSequenceProcessor::setAbtnWait()
 void TSequenceProcessor::resetAbtnWait()
 {
 	doResetAbtnWaitSE();
-	mFlags.unset(2);
-	_50 = _4C;
-	mFlags.set(4);
-	_5C = 0;
+	resetFlag(SeqProc_IsWaitingPressA);
+	mPageFinishWaitTimer = mPageFinishWaitDuration;
+	setFlag(SeqProc_IsWriting);
+	mCharactersWritten = 0;
 }
 
 /**
@@ -373,11 +293,6 @@ void TSequenceProcessor::doResetAbtnWaitSE() { PSSystem::spSysIF->playSystemSe(P
  * @note Address: 0x80437E34
  * @note Size: 0x18
  */
-void TSequenceProcessor::reset()
-{
-	for (int i = 0; i < 4; i++) {
-		mFlags.byteView[i] = 0;
-	}
-}
+void TSequenceProcessor::reset() { mFlags.clear(); }
 
 } // namespace P2JME

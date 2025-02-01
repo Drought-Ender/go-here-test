@@ -10,7 +10,7 @@ namespace Game {
  * @note Size: 0x90
  */
 TimeMgr::TimeMgr()
-    : CNode("タイムマネージャ")
+    : CNode("繧ｿ繧､繝繝槭ロ繝ｼ繧ｸ繝｣")
     , mSpeedFactor(1.0f)
 {
 	init();
@@ -207,7 +207,7 @@ f32 TimeMgr::getRealDayTime()
  */
 void TimeMgr::loadSettingFile(char* filename)
 {
-	loadAndRead(&mParms.mParms, filename, JKRHeap::sSystemHeap);
+	loadFromFile(&mParms.mParms, filename, JKRHeap::sSystemHeap);
 	init();
 }
 

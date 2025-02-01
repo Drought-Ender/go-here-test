@@ -27,27 +27,17 @@ struct JPADrawInfo {
 };
 
 enum JPAEmitterFlags {
-	JPAEMIT_Unk1     = 0x1,
-	JPAEMIT_Unk2     = 0x2,
-	JPAEMIT_IsDemoOn = 0x4,
-	JPAEMIT_Unk4     = 0x8,
-	JPAEMIT_Unk5     = 0x10,
-	JPAEMIT_Unk6     = 0x20,
-	JPAEMIT_Unk7     = 0x40,
-	JPAEMIT_Unk8     = 0x80,
-	JPAEMIT_Unk9     = 0x100,
+	JPAEMIT_StopEmitting        = 0x1,
+	JPAEMIT_StopCalc            = 0x2,
+	JPAEMIT_StopDraw            = 0x4,
+	JPAEMIT_EnableDeleteEmitter = 0x8,
+	JPAEMIT_FirstEmit           = 0x10,
+	JPAEMIT_RateStepEmit        = 0x20,
+	JPAEMIT_Immortal            = 0x40,
+	JPAEMIT_DrawChild           = 0x80,
+	JPAEMIT_ForceDelete         = 0x100,
+	JPAEMIT_Unk10               = 0x200,
 };
-
-void noLoadPrj(const JPAEmitterWorkData* workData, const Mtx mtx);
-void loadPrj(const JPAEmitterWorkData* workData, const Mtx p2);
-void loadPrjAnm(const JPAEmitterWorkData* workData, const Mtx p2);
-void rotTypeX(f32, f32, Mtx&);
-void rotTypeY(f32, f32, Mtx&);
-void rotTypeZ(f32, f32, Mtx&);
-void rotTypeXYZ(f32, f32, Mtx&);
-void basePlaneTypeXY(f32 (*)[4], f32, f32);
-void basePlaneTypeXZ(f32 (*)[4], f32, f32);
-void basePlaneTypeX(f32 (*)[4], f32, f32);
 
 struct JPABaseParticle {
 	void init_p(JPAEmitterWorkData*);
@@ -72,6 +62,7 @@ struct JPABaseParticle {
 	void getGlobalPosition(JGeometry::TVec3<f32>& pos) const { pos.set(mPosition); }
 	f32 getParticleScaleX() const { return mParticleScaleX; }
 	f32 getParticleScaleY() const { return mParticleScaleY; }
+	void initStatus(u32 val) { mFlags = val; }
 	void setStatus(u32 flag) { mFlags |= flag; }
 	u32 checkStatus(u32 flag) { return mFlags & flag; }
 	void setInvisibleParticleFlag() { setStatus(8); }
@@ -96,9 +87,9 @@ struct JPABaseParticle {
 	u32 _78;                           // _78
 	uint mFlags;                       // _7C
 	s16 mAge;                          // _80
-	u16 mLifeTime;                     // _82
+	s16 mLifeTime;                     // _82
 	f32 mTime;                         // _84
-	s16 mRotateAngle;                  // _88
+	u16 mRotateAngle;                  // _88
 	s16 mRotateSpeed;                  // _8A
 	GXColor mPrmClr;                   // _8C
 	GXColor mEnvClr;                   // _90
@@ -108,9 +99,9 @@ struct JPABaseParticle {
 };
 
 struct JPAParticleCallBack {
-	virtual ~JPAParticleCallBack() = 0;                      // _08
-	virtual void execute(JPABaseEmitter*, JPABaseParticle*); // _0C (weak)
-	virtual void draw(JPABaseEmitter*, JPABaseParticle*);    // _10 (weak)
+	virtual ~JPAParticleCallBack() = 0;                         // _08
+	virtual void execute(JPABaseEmitter*, JPABaseParticle*) { } // _0C (weak)
+	virtual void draw(JPABaseEmitter*, JPABaseParticle*) { }    // _10 (weak)
 };
 
 struct JPABaseEmitter {
@@ -138,12 +129,12 @@ struct JPABaseEmitter {
 	void loadTexture(u8, _GXTexMapID);
 
 	u32 getParticleNumber() { return mAlivePtclBase.getNum() + mAlivePtclChld.getNum(); }
+	bool isEnableDeleteEmitter() { return isFlag(JPAEMIT_EnableDeleteEmitter) && getParticleNumber() == 0; }
 
 	void initFlag(u32 flag) { mFlags = flag; }
 	void setFlag(u32 flag) { mFlags |= flag; }
 	bool isFlag(u32 flag) const { return mFlags & flag; }
 	void resetFlag(u32 flag) { mFlags &= ~flag; }
-	bool is100() { return mFlags & 0x100; }
 
 	inline void setScale(f32 scale)
 	{
@@ -244,6 +235,13 @@ struct JPABaseEmitter {
 		mGlobalPrmClr.b = b;
 	}
 
+	inline void setEnvColorRGB(u8 r, u8 g, u8 b)
+	{
+		mGlobalEnvClr.r = r;
+		mGlobalEnvClr.g = g;
+		mGlobalEnvClr.b = b;
+	}
+
 	inline void setColorRGB(JUtility::TColor& color)
 	{
 		mGlobalEnvClr.r = color.r;
@@ -267,7 +265,13 @@ struct JPABaseEmitter {
 
 	inline void setPrmColor(JUtility::TColor& color)
 	{
-		mGlobalPrmClr.setRGB(color);
+		setPrmColorRGB(color.r, color.g, color.b);
+		mGlobalPrmClr.a = color.a;
+	}
+
+	inline void setPrmColor(Color4& color)
+	{
+		setPrmColorRGB(color.r, color.g, color.b);
 		mGlobalPrmClr.a = color.a;
 	}
 
@@ -278,16 +282,19 @@ struct JPABaseEmitter {
 		mGlobalTrs.z = z;
 	}
 
-	bool checkFlag(u32 flag) { return !!(mResource->getDyn()->getFlag() & flag); }
+	bool checkDynFlag(u32 flag) { return !!(mResource->getDyn()->getFlag() & flag); }
 	u8 getResourceManagerID() const { return mResMgrID; }
 	u8 getGroupID() const { return mGroupID; }
 	u8 getDrawTimes() const { return mDrawTimes; }
 	void setRate(f32 rate) { mRate = rate; }
 	void setEmitterCallBackPtr(JPAEmitterCallBack* ptr) { mEmitterCallback = ptr; }
 	void setGlobalRTMatrix(const Mtx m) { JPASetRMtxTVecfromMtx(m, mGlobalRot, &mGlobalTrs); }
+	void setGlobalRMatrix(const Mtx m) { JPASetRMtxfromMtx(m, mGlobalRot); }
 	void setGlobalTranslation(f32 x, f32 y, f32 z) { mGlobalTrs.set(x, y, z); }
+	void setGlobalTranslation(JGeometry::TVec3f& vec) { mGlobalTrs.set(vec); }
 	void getLocalTranslation(JGeometry::TVec3f& vec) { vec.set(mLocalTrs); }
 	void setGlobalRotation(const JGeometry::TVec3<s16>& rot) { JPAGetXYZRotateMtx(rot.x, rot.y, rot.z, mGlobalRot); }
+	void setGlobalRotation(s16 x, s16 y, s16 z) { JPAGetXYZRotateMtx(x, y, z, mGlobalRot); }
 	void setGlobalAlpha(u8 alpha) { mGlobalPrmClr.a = alpha; }
 	u8 getGlobalAlpha() { return mGlobalPrmClr.a; }
 	void getGlobalPrmColor(GXColor& color) { color = mGlobalPrmClr; }
@@ -305,6 +312,23 @@ struct JPABaseEmitter {
 	}
 	void setVolumeSize(u16 size) { mVolumeSize = size; }
 	void setLifeTime(s16 lifetime) { mLifeTime = lifetime; }
+	u32 getAge() const { return mCurrentFrame; }
+	void setGlobalSRTMatrix(const Mtx m)
+	{
+		JPASetRMtxSTVecfromMtx(m, mGlobalRot, &mGlobalScl, &mGlobalTrs);
+		mGlobalPScl.set(mGlobalScl.x, mGlobalScl.y);
+	}
+
+	f32 getRandF32() { return mRandom.getRandF32(); }
+	f32 getRandZP() { return mRandom.getRandZP(); }
+	f32 getRandZH() { return mRandom.getRandZH(); }
+	s16 getRandS16() { return mRandom.getRandS16(); }
+
+	void quitImmortalEmitter() { resetFlag(JPAEMIT_Immortal); }
+	void stopCalcEmitter() { setFlag(JPAEMIT_StopCalc); }
+	void playCalcEmitter() { resetFlag(JPAEMIT_StopCalc); }
+	void stopDrawParticle() { setFlag(JPAEMIT_StopDraw); }
+	void playDrawParticle() { resetFlag(JPAEMIT_StopDraw); }
 
 	JGeometry::TVec3f mLocalScl;             // _00
 	JGeometry::TVec3f mLocalTrs;             // _0C
@@ -328,11 +352,10 @@ struct JPABaseEmitter {
 	JGeometry::TVec3f mGlobalScl;            // _98
 	JGeometry::TVec3f mGlobalTrs;            // _A4
 	JGeometry::TVec2f mGlobalPScl;           // _B0
-	JUtility::TColor mGlobalPrmClr;          // _B8, NEEDS TO BE GXCOLOR
-	JUtility::TColor mGlobalEnvClr;          // _BC, NEEDS TO BE GXCOLOR
-	s32 : 0;                                 // reset alignment to _C0
+	GXColor mGlobalPrmClr;                   // _B8, NEEDS TO BE GXCOLOR
+	GXColor mGlobalEnvClr;                   // _BC, NEEDS TO BE GXCOLOR
 	s32 mpUserWork;                          // _C0
-	JMath::TRandom_fast_ mRandom;            // _C4
+	JPARandom mRandom;                       // _C4
 	JPAList<JPABaseParticle> mAlivePtclBase; // _C8
 	JPAList<JPABaseParticle> mAlivePtclChld; // _D4
 	JPAList<JPABaseParticle>* mPtclPool;     // _E0
@@ -343,7 +366,7 @@ struct JPABaseEmitter {
 	u32 mFlags;                              // _F4
 	f32 mEmitCount;                          // _F8
 	f32 mScaleOut;                           // _FC
-	u32 mTick;                               // _100
+	u32 mCurrentFrame;                       // _100
 	s16 mWaitTime;                           // _104
 	s16 mRateStepTimer;                      // _106
 	GXColor mPrmClr;                         // _108
@@ -374,7 +397,7 @@ struct JPAEmitterWorkData {
 	JPABaseEmitter* mEmitter;              // _00
 	JPAResource* mResource;                // _04
 	JPAResourceManager* mResourceMgr;      // _08
-	JMath::TRandom_fast_ mRndm;            // _0C
+	JPARandom mRndm;                       // _0C
 	JGeometry::TVec3f mVolumePos;          // _10
 	JGeometry::TVec3f mVelOmni;            // _1C
 	JGeometry::TVec3f mVelAxis;            // _28
@@ -382,7 +405,7 @@ struct JPAEmitterWorkData {
 	f32 mVolumeMinRad;                     // _38
 	f32 mVolumeSweep;                      // _3C
 	int mCreateNumber;                     // _40
-	u32 mVolumeEmitIdx;                    // _44
+	int mVolumeEmitIdx;                    // _44
 	Mtx mDirectionMtx;                     // _48
 	Mtx mRotationMtx;                      // _78
 	Mtx mGlobalRot;                        // _A8
@@ -397,7 +420,7 @@ struct JPAEmitterWorkData {
 	Mtx mYBBCamMtx;                        // _154
 	Mtx mPosCamMtx;                        // _184
 	Mtx mPrjMtx;                           // _1B4
-	JPANode<JPABaseParticle>* mpAlivePtcl; // _1E4
+	JPAList<JPABaseParticle>* mpAlivePtcl; // _1E4
 	JPANode<JPABaseParticle>* mpCurNode;   // _1E8
 	int mVolumeAngleNum;                   // _1EC
 	int mVolumeAngleMax;                   // _1F0
@@ -408,7 +431,7 @@ struct JPAEmitterWorkData {
 	int mRotType;                          // _204
 	int mPlaneType;                        // _208
 	int mDLType;                           // _20C
-	int mPrjType;                          // _210
+	int mProjectionType;                   // _210
 	s16 mClrKeyFrame;                      // _214
 	u8 mDrawCount;                         // _216
 };

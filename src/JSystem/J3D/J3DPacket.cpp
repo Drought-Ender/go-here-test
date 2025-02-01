@@ -14,10 +14,12 @@
 #include "JSystem/J3D/J3DSys.h"
 #include "JSystem/JKernel/JKRHeap.h"
 
-static u32 sDifferedRegister[7] = { 1, 2, 0x1000000, 0x10000000, 0x20000000, 0x2000000, 0x8000000 };
+static u32 sDifferedRegister[7] = { J3DMDF_DiffMatColor, J3DMDF_DiffLight,      J3DMDF_DiffColorReg,        J3DMDF_DiffFog,
+	                                J3DMDF_DiffBlend,    J3DMDF_DiffKonstColor, J3DMDF_DiffTevStageIndirect };
 static u32 sSizeOfDiffered[7]   = { 0xD, 0x15, 0x78, 0x37, 0xF, 0x13, 0x2D };
 
 int J3DDisplayListObj::sInterruptFlag;
+GDCurrentDL J3DDisplayListObj::sGDLObj;
 
 /**
  * @note Address: 0x8005F82C
@@ -96,8 +98,8 @@ void J3DDisplayListObj::beginDL()
 {
 	swapBuffer();
 	sInterruptFlag = OSDisableInterrupts();
-	GDInitGDLObj(&sGDLObj, mDisplayList[0], mCapacity);
-	__GDCurrentDL = &sGDLObj;
+	GDInitGDLObj(&J3DDisplayListObj::sGDLObj, mDisplayList[0], mCapacity);
+	__GDCurrentDL = &J3DDisplayListObj::sGDLObj;
 }
 
 /**
@@ -108,7 +110,7 @@ u32 J3DDisplayListObj::endDL()
 {
 	GDPadCurr32();
 	OSRestoreInterrupts(sInterruptFlag);
-	mSize = sGDLObj.pDisplayListData - sGDLObj.begin;
+	mSize = sGDLObj.data - sGDLObj.begin;
 	GDFlushCurrToMem();
 	__GDCurrentDL = nullptr;
 	return mSize;
@@ -291,7 +293,7 @@ void J3DMatPacket::draw()
 		}
 		packet->drawFast();
 	}
-	J3DShape::sOldVcdVatCmd = nullptr;
+	J3DShape::resetVcdVatCache();
 }
 
 /**
@@ -336,7 +338,7 @@ int J3DShapePacket::calcDifferedBufferSize(u32 flag)
 		if (uVar2 > local_4c) {
 			local_4c = uVar2;
 		}
-		if (flag & 0x1000) {
+		if (flag & J3DMDF_DiffTexGen) {
 			size += calcDifferedBufferSize_TexGenSize(local_4c);
 		} else {
 			size += calcDifferedBufferSize_TexMtxSize(local_4c);
@@ -353,7 +355,7 @@ int J3DShapePacket::calcDifferedBufferSize(u32 flag)
 		}
 		u32 local_50 = local_58;
 		local_50     = uVar2 > local_50 ? uVar2 : local_50;
-		if ((flag & 0x4000000)) {
+		if ((flag & J3DMDF_DiffTexCoordScale)) {
 			size += calcDifferedBufferSize_TexNoAndTexCoordScaleSize(local_50);
 		} else {
 			size += calcDifferedBufferSize_TexNoSize(local_50);
@@ -371,12 +373,12 @@ int J3DShapePacket::calcDifferedBufferSize(u32 flag)
 		u32 local_50 = local_58;
 		local_50     = uVar2 > local_50 ? uVar2 : local_50;
 		size += calcDifferedBufferSize_TevStageSize(local_50);
-		if (flag & 0x8000000) {
+		if (flag & J3DMDF_DiffTevStageIndirect) {
 			size += calcDifferedBufferSize_TevStageDirectSize(local_50);
 		}
 	}
 
-	return (size + 0x1f) & ~0x1f;
+	return OSRoundUp32B(size);
 }
 
 /**
@@ -399,7 +401,7 @@ J3DErrType J3DShapePacket::newDifferedDisplayList(u32 flag)
 J3DErrType J3DShapePacket::newDifferedTexMtx(J3DTexDiffFlag flag)
 {
 	switch (flag) {
-	case TexDiff_0: {
+	case TEXDIFF_Material: {
 		u32 texGenNum = mShape->getMaterial()->mTexGenBlock->getTexGenNum();
 		mTexMtxObj    = new J3DTexMtxObj(texGenNum);
 		if (mTexMtxObj == nullptr) {
@@ -407,7 +409,7 @@ J3DErrType J3DShapePacket::newDifferedTexMtx(J3DTexDiffFlag flag)
 		}
 		break;
 	}
-	case TexDiff_1:
+	case TEXDIFF_Default:
 		mTexMtxObj = new J3DTexMtxObj(8);
 		if (mTexMtxObj == nullptr) {
 			return JET_OutOfMemory;
@@ -429,7 +431,7 @@ void J3DShapePacket::prepareDraw() const
 	j3dSys.setModel(mModel);
 	j3dSys.setShapePacket((J3DShapePacket*)this);
 
-	J3DShapeMtx::setLODFlag(mModel->checkFlag(J3DMODEL_Unk5));
+	J3DShapeMtx::setLODFlag(mModel->checkFlag(J3DMODEL_LevelOfDetail));
 
 	if (mModel->checkFlag(J3DMODEL_SkinPosCpu)) {
 		mShape->onFlag(J3DMODEL_SkinPosCpu);

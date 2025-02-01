@@ -12,12 +12,25 @@ struct MotionListener;
 
 struct BaseAnimator {
 	virtual J3DMtxCalc* getCalc() = 0; // _08
+
+	void setModelCalc(SysShape::Model* model, int jointId)
+	{
+		model->getJ3DModel()->getModelData()->getJointNodePointer(jointId)->setMtxCalc(getCalc());
+	}
 };
 
 /**
  * @size{0x1C}
  */
 struct Animator : public BaseAnimator {
+	enum Flags {
+		AnimCompleted    = 1,
+		AnimFinishMotion = 2,
+		AnimInProgress   = 4,
+
+		Unk80 = 0x80,
+	};
+
 	Animator()
 	{
 		mFlags    = 0;
@@ -31,7 +44,7 @@ struct Animator : public BaseAnimator {
 	{
 		return (mAnimInfo != nullptr) ? mAnimInfo->mCalc : nullptr;
 	}
-	virtual void animate(f32); // _0C
+	virtual void animate(f32 speed); // _0C
 
 	void startAnim(int animID, MotionListener* listener);
 	void startExAnim(AnimInfo* info);
@@ -39,6 +52,10 @@ struct Animator : public BaseAnimator {
 	void setCurrFrame(f32 timer);
 	void setFrameByKeyType(u32);
 	void setLastFrame();
+
+	inline void setFlag(u8 flag) { mFlags |= flag; }
+	inline void resetFlag(u8 flag) { mFlags &= ~flag; }
+	inline bool isFlag(u8 flag) const { return mFlags & flag; }
 
 	inline int getAnimIndex()
 	{
@@ -66,7 +83,7 @@ struct Animator : public BaseAnimator {
 		}
 	}
 
-	inline KeyEvent* moveCurAnim() { return mCurAnimKey = (KeyEvent*)mCurAnimKey->mNext; }
+	inline f32 getTimer() const { return mTimer; }
 
 	MotionListener* mListener; // _04
 	f32 mTimer;                // _08
@@ -111,8 +128,6 @@ struct BlendAnimator : public BaseAnimator {
 
 	// unused/inlined:
 	void setWeight(f32);
-
-	void setModelCalc(SysShape::Model* model) { model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = getCalc(); }
 
 	Animator mAnimators[2];          // _04
 	f32 mTimer;                      // _3C

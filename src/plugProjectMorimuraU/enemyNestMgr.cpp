@@ -18,7 +18,7 @@ Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
 	mJigumoHouseData = nullptr;
-	mName            = "巣マネージャ"; // 'nest manager'
+	mName            = "蟾｣繝槭ロ繝ｼ繧ｸ繝｣"; // 'nest manager'
 	mMatColor.a      = 0xFF;
 	mMatColor.b      = 0xFF;
 	mMatColor.g      = 0xFF;
@@ -46,8 +46,9 @@ J3DModelData* Mgr::loadModelData(JKRArchive* archive)
 	void* enemyBMD = JKRFileLoader::getGlbResource("enemy.bmd", archive);
 
 	if (enemyBMD) {
-		mModelData = J3DModelLoaderDataBase::load(enemyBMD, 0x20240010);
-		mModelData->newSharedDisplayList(0x40000);
+		mModelData = J3DModelLoaderDataBase::load(enemyBMD, J3DMLF_Material_PE_FogOff | J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL
+		                                                        | J3DMLF_UseImmediateMtx);
+		mModelData->newSharedDisplayList(J3DMLF_UseSingleSharedDL);
 		mModelData->simpleCalcMaterial(0, *(Mtx*)(&j3dDefaultMtx));
 		mModelData->makeSharedDL();
 	}
@@ -61,8 +62,9 @@ J3DModelData* Mgr::loadModelData(JKRArchive* archive)
 
 	enemyBMD = JKRFileLoader::getGlbResource("enemy.bmd", jigumoArc);
 	if (enemyBMD) {
-		mJigumoHouseData = J3DModelLoaderDataBase::load(enemyBMD, 0x20240010);
-		mJigumoHouseData->newSharedDisplayList(0x40000);
+		mJigumoHouseData = J3DModelLoaderDataBase::load(enemyBMD, J3DMLF_Material_PE_FogOff | J3DMLF_UseUniqueMaterials
+		                                                              | J3DMLF_UseSingleSharedDL | J3DMLF_UseImmediateMtx);
+		mJigumoHouseData->newSharedDisplayList(J3DMLF_UseSingleSharedDL);
 		mJigumoHouseData->simpleCalcMaterial(0, *(Mtx*)(&j3dDefaultMtx));
 		mJigumoHouseData->makeSharedDL();
 	}
@@ -116,7 +118,8 @@ void Mgr::doSimpleDraw(Viewport* viewport)
 			j3dSys.setVtxPos(vtxData->getVtxPosArray());
 			j3dSys.setVtxNrm(vtxData->getVtxNrmArray());
 			j3dSys.setVtxCol(vtxData->getVtxColorArray(0));
-			J3DShape::sOldVcdVatCmd = nullptr;
+			J3DShape::resetVcdVatCache();
+
 			material->loadSharedDL();
 			material->mShape->loadPreDrawSetting();
 			material->calc(matMtx);
@@ -153,7 +156,7 @@ void Mgr::doSimpleDraw(Viewport* viewport)
  */
 void Mgr::initObjects()
 {
-	char path[256];
+	char path[PATH_MAX];
 	if (isValidEnemyTypeID()) {
 		char* collisionFolder = EnemyInfoFunc::getEnemyInfo(getEnemyTypeID(), 0xFFFF)->mCollName;
 		if (*collisionFolder == '\0') {

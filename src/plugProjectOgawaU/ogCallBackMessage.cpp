@@ -19,8 +19,8 @@ CallBack_Message::CallBack_Message()
 	mMessageIDAsULL    = 0;
 	mMessageIDAs2UL[0] = 0;
 	mMessageIDAs2UL[1] = 0;
-	_30                = 0.0f;
-	_34                = 0.0f;
+	mWidth             = 0.0f;
+	mHeight            = 0.0f;
 	mMaxY              = 1.0f;
 	mMaxX              = 1.0f;
 	mMinY              = 1.0f;
@@ -44,8 +44,8 @@ void CallBack_Message::draw(Graphics& gfx, J2DGrafContext& graf)
 		GXLoadPosMtxImm(mtx.mMatrix.mtxView, 0);
 
 		J2DPane* pane = mPane;
-		f32 x1        = pane->mBounds.getWidth();
-		f32 y1        = pane->mBounds.getHeight();
+		f32 x1        = pane->getWidth();
+		f32 y1        = pane->getHeight();
 		int flag      = pane->mBasePosition % 3;
 
 		f32 y2, x2;
@@ -66,11 +66,11 @@ void CallBack_Message::draw(Graphics& gfx, J2DGrafContext& graf)
 			y2 = y1;
 		}
 
-		_30                              = x2;
-		_34                              = y2;
+		mWidth                           = x2;
+		mHeight                          = y2;
 		P2JME::TRenderingProcessor* proc = mMessage->mProcessor;
-		proc->_54                        = -_30;
-		proc->_58                        = -_34;
+		proc->mXOffset                   = -mWidth;
+		proc->mYOffset                   = -mHeight;
 		proc->setTextBoxInfo(mPane);
 
 		mMessage->mProcessor->mMesgBounds.set(mMinX, mMinY, mMaxX, mMaxY);
@@ -106,7 +106,7 @@ bool checkVisibleGlb(J2DPane* pane)
  */
 void setCallBackMessageSub(P2DScreen::Mgr* mgr, J2DPane* pane)
 {
-	if ((u16)pane->getTypeID() == 0x13) {
+	if ((u16)pane->getTypeID() == PANETYPE_TextBox) {
 		if (pane->getUserInfo()) {
 			u64 tag = pane->getTagName();
 			mgr->addCallBack(tag, new CallBack_Message);

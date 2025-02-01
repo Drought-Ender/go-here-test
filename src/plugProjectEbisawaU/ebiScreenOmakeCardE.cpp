@@ -118,7 +118,7 @@ bool TOmakeCardE::doUpdateStateWait()
 
 	switch (mState) {
 	case MainMenu:
-		u32 press = mInput->mButton.mButtonDown;
+		u32 press = mInput->getButtonDown();
 		if (press & Controller::PRESS_A) {
 			PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_DECIDE, 0);
 			mExitState = false;
@@ -138,8 +138,8 @@ bool TOmakeCardE::doUpdateStateWait()
 		mMesgScroll->scroll(mInput->mMStick.mYPos);
 		f32 scroll            = mMesgScroll->getPosRate();
 		const int changeAlpha = sys->mDeltaTime * 2550.0f;
-		int alphaArrowUp      = mPaneArrowUp->getAlpha(); // register dumbness here
-		int alphaArrowDown    = mPaneArrowDown->getAlpha();
+		int alphaArrowUp      = mPaneArrowUp->getAlpha();
+		int alphaArrowDown    = mPaneArrowDown->mAlpha;
 		if (scroll <= 0.0f) {
 			alphaArrowUp -= changeAlpha;
 			alphaArrowDown += changeAlpha;
@@ -169,7 +169,7 @@ bool TOmakeCardE::doUpdateStateWait()
 		mPaneArrowDown->setAlpha(alphaArrowDown);
 		break;
 	case InZoomed:
-		if (mInput->mButton.mButtonDown & (Controller::PRESS_B | Controller::PRESS_Z)) {
+		if (mInput->getButtonDown() & (Controller::PRESS_B | Controller::PRESS_Z)) {
 			mAnimationIdle.stop();
 			mAnimationChange.playBack(sys->mDeltaTime * 60.0f, true);
 			PSSystem::spSysIF->playSystemSe(PSSE_SY_MESSAGE_EXIT, 0);

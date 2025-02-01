@@ -10,344 +10,592 @@
 
 struct Matrixf;
 
-// TODO: Implement the global namespace Vector3 functions into the class itself
+/**
+ * @brief A 3-dimensional vector template class.
+ *
+ * @tparam T The type of the vector components.
+ * @note 2D functions refer to the X and Z components, and ignores the y dimension, a flat plane.
+ */
 template <typename T>
 struct Vector3 {
 	T x, y, z;
 
-	inline Vector3() { }
+	// Constructors
+	Vector3();
+	Vector3(T value);
+	Vector3(T x, T y, T z);
+	Vector3(JGeometry::TVec3<T> vec);
+	Vector3(Vec& vec);
 
-	/**
-	 * @fabricated
-	 */
-	inline Vector3(T value)
-	    : x(value)
-	    , y(value)
-	    , z(value)
+	// Assignment Operators
+	Vector3& operator=(const Vector3& other);
+	void operator=(Vector3& other);
+	void operator=(const Vec& other);
+
+	// Conversion Operators
+	operator Vector2<T>() const;
+
+	// Arithmetic Operators
+	Vector3<T> operator*(const Vector3<T>& other) const;
+	void operator*=(Matrixf& other);
+	void operator*=(const T other);
+	void operator+=(const Vector3& other);
+	void operator-=(const Vector3& other);
+	void operator/=(const Vector3& other);
+	Vector3 operator-() const;
+
+	// Set Functions
+	void set(const Vector3& vec);
+	void set(T _x, T _y, T _z);
+	void set(T xyz);
+	void set(JGeometry::TVec3<T>& vec);
+	void set(Vec& vec);
+
+	// Utility Functions
+	void negate();
+	void negate2();
+	void addXZ(const Vector3& other);
+	void addXY(const Vector3& other);
+	void scaleXY(const Vector3& other);
+	void scale2D(T other);
+	void set2D(const Vector3& other);
+	void setZero();
+	void add(const Vector3& other);
+	void add(Vector3& a, Vector3& b);
+	void sub(const Vector3& other);
+	void sub(Vector3& a, Vector3& b);
+	void setMiddle(Vector3& a, Vector3& b);
+	static Vector3<T> sub2(const Vector3& a, const Vector3& b);
+
+	// Direction Functions
+	static T getDirectionFromTo(const Vector3& from, Vector3& to);
+	static T getFlatDirectionFromTo(Vector3& from, Vector3& to);
+	static T getFlatDirectionFromTo(const Vector3& from, Vector3& to);
+	T setDirectionFromTo(const Vector3& from, const Vector3& to);
+	void setFlatDirectionFromTo(Vector3& from, Vector3& to);
+	void toFlatDirection();
+	static f32 getAngleFromTo(const Vector3& from, const Vector3& to)
 	{
+		Vector3f diff = to;
+		getFlatDirectionFromTo(from, diff);
+		return JMAAtan2Radian(diff.x, diff.z);
 	}
 
-	inline Vector3(T x, T y, T z)
+	// Calculation Functions
+	T dot(const Vector3& other);
+	Vector3 cross(const Vector3& other);
+	void cross(const Vector3& v1, const Vector3& v2);
+	T absX();
+	T absY();
+	T absZ();
+	bool isBoundedX(T bound);
+	bool isBoundedY(T bound);
+	bool isBoundedZ(T bound);
+	void scale(T scale);
+
+	// Magnitude Functions
+	T sqrMagnitude() const;
+	T sqrMagnitude2D() const;
+	T qLength() const;
+	T qLength2D() const;
+	T qNormalise();
+
+	// Distance Functions
+	static T distance(Vector3& a, Vector3& b);
+	static T distance(const Vector3& a, const Vector3& b) { return a.distance(b); }
+	static T qDistance(const Vector3& a, const Vector3& b) { return a.qDistance(b); }
+
+	T distance(Vector3&);
+	T distance(const Vector3<T>& other) const
 	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
+		T diffX = this->x - other.x;
+		T diffY = this->y - other.y;
+		T diffZ = this->z - other.z;
+
+		return Vector3(diffX, diffY, diffZ).length();
 	}
 
-	inline Vector3(JGeometry::TVec3<T> vec) { __memcpy(this, &vec, sizeof(Vector3)); }
-
-	inline Vector3(Vec& vec)
+	T qDistance(Vector3&);
+	T qDistance(const Vector3<T>& other) const
 	{
-		x = vec.x;
-		y = vec.y;
-		z = vec.z;
+		T diffX = this->x - other.x;
+		T diffY = this->y - other.y;
+		T diffZ = this->z - other.z;
+
+		return pikmin2_sqrtf(SQUARE(diffX) + SQUARE(diffY) + SQUARE(diffZ));
 	}
 
-	/**
-	 * Calculates the direction vector from 'from' to 'to' and stores the result in 'to'.
-	 *
-	 * @param from The starting point of the direction vector.
-	 * @param to The ending point of the direction vector.
-	 */
-	static inline void getDirectionFromTo(Vector3& from, Vector3& to)
-	{
-		to -= from;
-		to.normalise();
-	}
+	T distance2D(Vector3&);
+	T sqrDistance(Vector3&);
+	T sqrDistance(const Vector3<T>& other) { return sqrDistance(other); }
+	T sqrDistanceToSphere(Vector3& them);
+	T sqrDistance2D(Vector3&);
+	T distance(JGeometry::TVec3f&);
 
-	/**
-	 * Calculates the direction vector from 'from' to 'to' and stores the result in 'to'.
-	 * The y-component of the resulting vector is set to 0.
-	 *
-	 * @param from The starting point of the direction vector.
-	 * @param to The ending point of the direction vector.
-	 */
-	static inline void getFlatDirectionFromTo(Vector3& from, Vector3& to)
-	{
-		to -= from;
-		to.y = 0.0f;
-		to.normalise();
-	}
+	// Length and Normalise Functions
+	T length() const;
+	T lengthWeird() const;
+	T normalise();
+	T length2D() const;
+	T normalise2D();
 
-	inline Vector3& operator=(const Vector3& other)
-	{
-		x = other.x;
-		y = other.y;
-		z = other.z;
-		return *this;
-	}
-
-	inline void operator=(Vector3<T>& other)
-	{
-		x = other.x;
-		y = other.y;
-		z = other.z;
-	}
-
-	inline void operator=(const Vec& other)
-	{
-		x = other.x;
-		y = other.y;
-		z = other.z;
-	}
-
-	inline operator Vector2f() const { return Vector2f(x, y); }
-
-	// /**
-	//  * @fabricated
-	//  */
-	// inline Vector3<T> operator-(const Vector3<T>& other) const {
-	// 	return Vector3<T>(x - other.x, y - other.y, z - other.z);
-	// }
-
-	/**
-	 * @fabricated
-	 */
-	inline Vector3<T> operator*(const Vector3<T>& other) const { return Vector3<T>(x * other.x, y * other.y, z * other.z); }
-
-	/**
-	 * @fabricated
-	 */
-	inline f32 magnitude() { return x * x + y * y + z * z; }
-
-	/**
-	 * @fabricated
-	 */
-	// inline JGeometry::TVec3<T> toTVec() const
-	// {
-	// 	JGeometry::TVec3<T> vec;
-	// 	vec.x = x;
-	// 	vec.y = y;
-	// 	vec.z = z;
-	// 	return vec;
-	// }
-
-	inline void set(const Vector3& vec)
-	{
-		x = vec.x;
-		y = vec.y;
-		z = vec.z;
-	}
-
-	inline void set(f32 _x, f32 _y, f32 _z)
-	{
-		x = _x;
-		y = _y;
-		z = _z;
-	}
-
-	inline void set(f32 xyz) { x = y = z = xyz; }
-
-	/**
-	 * @fabricated
-	 */
-	inline void setTVec(JGeometry::TVec3<T>& vec)
-	{
-		vec.x = x;
-		vec.y = y;
-		vec.z = z;
-	}
-
-	inline void setVec(Vec& vec)
-	{
-		vec.x = x;
-		vec.y = y;
-		vec.z = z;
-	}
-
-	inline void negate()
-	{
-		x *= -1.0f;
-		y *= -1.0f;
-		z *= -1.0f;
-	}
-
-	// 	inline Vector3& operator+(const Vector3 other) {
-	//     Vector3 newVector = *this;
-	//     x += other.x;
-	//     y += other.y;
-	//     z += other.z;
-	//     return newVector;
-	// }
-	// inline Vector3& operator*(const f32 other) {
-	//     Vector3 newVector = *this;
-	//     newVector.x *= other;
-	//     newVector.y *= other;
-	//     newVector.z *= other;
-	//     return newVector;
-	// }
-	// inline void operator*=(const f32 other) { *this = Vector3(x * other, y * other, z * other); }
-	inline void operator*=(Matrixf& other);
-	inline void operator*=(const f32 other)
-	{
-		this->x *= other;
-		this->y *= other;
-		this->z *= other;
-	}
-	inline void operator+=(const Vector3& other)
-	{
-		this->x += other.x;
-		this->y += other.y;
-		this->z += other.z;
-	}
-	inline void operator-=(const Vector3& other)
-	{
-		this->x -= other.x;
-		this->y -= other.y;
-		this->z -= other.z;
-	}
-	inline void operator/=(const Vector3& other)
-	{
-		this->x /= other.x;
-		this->y /= other.y;
-		this->z /= other.z;
-	}
-
-	inline void addXZ(const Vector3& other)
-	{
-		this->x += other.x;
-		this->z += other.z;
-	}
-
-	inline void addXY(const Vector3& other)
-	{
-		this->x += other.x;
-		this->y += other.y;
-	}
-
-	inline void scaleXY(const Vector3& other)
-	{
-		f32 newVal = this->x * other.x;
-		this->x    = newVal;
-
-		newVal  = this->y * other.y;
-		this->y = newVal;
-	}
-
-	inline T dot(const Vector3& other) { return this->x * other.x + this->y * other.y + this->z * other.z; }
-
-	inline void setZero() { this->x = this->y = this->z = 0; }
-
-	/**
-	 * Sets the direction of the vector from one point to another.
-	 *
-	 * @param from The starting point of the direction.
-	 * @param to The ending point of the direction.
-	 */
-	inline void setDirectionFromTo(Vector3& from, Vector3& to)
-	{
-		*this = to - from;
-		this->normalise();
-	}
-
-	/**
-	 * Sets the flat direction from one vector to another.
-	 * The resulting vector will have a zero y-component.
-	 *
-	 * @param from The starting vector.
-	 * @param to The target vector.
-	 */
-	inline void setFlatDirectionFromTo(Vector3& from, Vector3& to)
-	{
-		*this   = to - from;
-		this->y = 0.0f;
-		this->normalise();
-	}
-
-	/**
-	 * Sets the y component of the vector to 0 and normalizes the vector.
-	 */
-	inline void toFlatDirection()
-	{
-		this->y = 0.0f;
-		this->normalise();
-	}
-
-	// Squared magnitude
-	inline f32 sqrMagnitude() const { return this->x * this->x + this->y * this->y + this->z * this->z; }
-	// 2D magnitude
-	inline f32 sqrMagnitude2D() const { return this->x * this->x + this->z * this->z; }
-	// Quick length
-	inline f32 qLength() const { return pikmin2_sqrtf(this->sqrMagnitude()); }
-	inline f32 qLength2D() const { return pikmin2_sqrtf(this->sqrMagnitude2D()); }
-
-	inline f32 qNormalise()
-	{
-		f32 length = this->qLength();
-		if (length > 0.0f) {
-			f32 len = 1.0f / length;
-			this->x *= len;
-			this->y *= len;
-			this->z *= len;
-			return length;
-		}
-		return 0.0f;
-	}
-
-	f32 length() const;
-	f32 distance(Vector3&);
-	f32 distance2D(Vector3&);
-	f32 sqrDistance(Vector3&);
-	f32 sqrDistanceXZ(Vector3&);
-	f32 distance(JGeometry::TVec3f&);
-	f32 normalise();
-	f32 length2D() const;
-	f32 normalise2D();
-
+	// I/O Functions
 	void read(Stream&);
 	void write(Stream&);
 
+	// Static Members
 	static Vector3<T> zero;
 };
 
-// template <> struct Vector3<f32> {
-// 	static Vector3<f32> zero;
-// };
-
-// Use instead of Vector3<f32>
 typedef Vector3<f32> Vector3f;
 typedef Vector3<int> Vector3i;
 
-/**
- * @reifiedAddress{80207BA0}
- * @reifiedFile{plugProjectKandoU/itemUjamushi.cpp}
- */
 inline Vector3f operator+(const Vector3f& a, const Vector3f& b) { return Vector3f(a.x + b.x, a.y + b.y, a.z + b.z); }
 
-/**
- * @reifiedAddress{80207E70}
- * @reifiedFile{plugProjectKandoU/itemUjamushi.cpp}
- */
-inline Vector3f operator-(const Vector3f& a, const Vector3f& b) { return Vector3f(a.x - b.x, a.y - b.y, a.z - b.z); }
+// Using sub2 here fixes inline depth issues for navi_demoCheck and itemUjamushi
+// (panModokiState has an instance of needing to call sub2 directly because its quirky like that)
+inline Vector3f operator-(const Vector3f& a, const Vector3f& b) { return Vector3f::sub2(a, b); }
 
 inline Vector3f operator*(const Vector3f& a, const f32 b) { return Vector3f(a.x * b, a.y * b, a.z * b); }
-
 inline Vector3f operator/(const Vector3f& a, const f32 b) { return Vector3f(a.x / b, a.y / b, a.z / b); }
-
 inline Vector3f operator*=(const Vector3f& a, const f32 b) { return Vector3f(a.x * b, a.y * b, a.z * b); }
 
-inline f32 dot(const Vector3f& a, const Vector3f& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+inline Vector3i operator+(const Vector3i& a, const Vector3i& b) { return Vector3i(a.x + b.x, a.y + b.y, a.z + b.z); }
+inline Vector3i operator-(const Vector3i& a, const Vector3i& b) { return Vector3i(a.x - b.x, a.y - b.y, a.z - b.z); }
+inline Vector3i operator*(const Vector3i& a, const int b) { return Vector3i(a.x * b, a.y * b, a.z * b); }
+inline Vector3i operator/(const Vector3i& a, const int b) { return Vector3i(a.x / b, a.y / b, a.z / b); }
+inline Vector3i operator*=(const Vector3i& a, const int b) { return Vector3i(a.x * b, a.y * b, a.z * b); }
 
 inline bool operator==(const Vector3f& a, const Vector3f& b) { return (a.x == b.x && a.y == b.y && a.z == b.z); }
+inline bool operator!=(const Vector3f& a, const Vector3f& b) { return (a.x != b.x || a.y != b.y || a.z != b.z); }
 
-inline void weightVecXZ(Vector3f& vec, f32 weight)
+inline bool operator==(const Vector3i& a, const Vector3i& b) { return (a.x == b.x && a.y == b.y && a.z == b.z); }
+inline bool operator!=(const Vector3i& a, const Vector3i& b) { return (a.x != b.x || a.y != b.y || a.z != b.z); }
+
+template <typename T>
+inline Vector3<T>::Vector3()
 {
-	Vector3f temp = vec;
-	temp.x *= weight;
-	temp.z *= weight;
-	vec = temp;
 }
 
-inline void getScaledXZVec(Vector3f& vec, f32 x, f32 z, f32 scale)
+template <typename T>
+inline Vector3<T>::Vector3(T value)
+    : x(value)
+    , y(value)
+    , z(value)
 {
-	vec.x = x * scale;
-	vec.z = z * scale;
 }
 
-inline void getScaledXYVec(Vector3f& vec, const f32& x, const f32& z, f32 scale)
+template <typename T>
+inline Vector3<T>::Vector3(T x, T y, T z)
+    : x(x)
+    , y(y)
+    , z(z)
 {
-	vec.x = x * scale;
-	vec.y = z * scale;
+}
+
+template <typename T>
+inline Vector3<T>::Vector3(JGeometry::TVec3<T> vec)
+{
+	__memcpy(this, &vec, sizeof(Vector3));
+}
+
+template <typename T>
+inline Vector3<T>::Vector3(Vec& vec)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+}
+
+template <typename T>
+inline T Vector3<T>::getDirectionFromTo(const Vector3& from, Vector3& to)
+{
+	to -= from;
+	return to.normalise();
+}
+
+template <typename T>
+inline T Vector3<T>::getFlatDirectionFromTo(Vector3& from, Vector3& to)
+{
+	to -= from;
+	to.y = 0.0f;
+	return to.normalise();
+}
+
+template <typename T>
+inline T Vector3<T>::getFlatDirectionFromTo(const Vector3& from, Vector3& to)
+{
+	to -= from;
+	to.y = 0.0f;
+	return to.normalise();
+}
+
+template <typename T>
+inline Vector3<T>& Vector3<T>::operator=(const Vector3& other)
+{
+	x = other.x;
+	y = other.y;
+	z = other.z;
+	return *this;
+}
+
+template <typename T>
+inline void Vector3<T>::operator=(Vector3& other)
+{
+	x = other.x;
+	y = other.y;
+	z = other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::operator=(const Vec& other)
+{
+	x = other.x;
+	y = other.y;
+	z = other.z;
+}
+
+template <typename T>
+inline Vector3<T>::operator Vector2<T>() const
+{
+	return Vector2<T>(x, y);
+}
+
+template <typename T>
+inline Vector3<T> Vector3<T>::operator*(const Vector3<T>& other) const
+{
+	return Vector3<T>(x * other.x, y * other.y, z * other.z);
+}
+
+template <typename T>
+inline void Vector3<T>::set(const Vector3& vec)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+}
+
+template <typename T>
+inline void Vector3<T>::set(T _x, T _y, T _z)
+{
+	x = _x;
+	y = _y;
+	z = _z;
+}
+
+template <typename T>
+inline void Vector3<T>::set(T xyz)
+{
+	x = y = z = xyz;
+}
+
+template <typename T>
+inline void Vector3<T>::set(JGeometry::TVec3<T>& vec)
+{
+	vec.x = x;
+	vec.y = y;
+	vec.z = z;
+}
+
+template <typename T>
+inline void Vector3<T>::set(Vec& vec)
+{
+	vec.x = x;
+	vec.y = y;
+	vec.z = z;
+}
+
+template <typename T>
+inline void Vector3<T>::negate()
+{
+	x *= -1.0f;
+	y *= -1.0f;
+	z *= -1.0f;
+}
+
+template <typename T>
+inline void Vector3<T>::negate2()
+{
+	x = -x;
+	y = -y;
+	z = -z;
+}
+
+template <typename T>
+inline void Vector3<T>::operator*=(const T other)
+{
+	this->x *= other;
+	this->y *= other;
+	this->z *= other;
+}
+
+template <typename T>
+inline void Vector3<T>::operator+=(const Vector3& other)
+{
+	this->x += other.x;
+	this->y += other.y;
+	this->z += other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::operator-=(const Vector3& other)
+{
+	this->x -= other.x;
+	this->y -= other.y;
+	this->z -= other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::operator/=(const Vector3& other)
+{
+	this->x /= other.x;
+	this->y /= other.y;
+	this->z /= other.z;
+}
+
+template <typename T>
+inline Vector3<T> Vector3<T>::operator-() const
+{
+	return Vector3<T>(-x, -y, -z);
+}
+
+template <typename T>
+inline void Vector3<T>::addXZ(const Vector3& other)
+{
+	this->x += other.x;
+	this->z += other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::addXY(const Vector3& other)
+{
+	this->x += other.x;
+	this->y += other.y;
+}
+
+template <typename T>
+inline void Vector3<T>::scaleXY(const Vector3& other)
+{
+	T newVal = this->x * other.x;
+	this->x  = newVal;
+	newVal   = this->y * other.y;
+	this->y  = newVal;
+}
+
+template <typename T>
+inline void Vector3<T>::scale2D(T other)
+{
+	T newVal = this->x * other;
+	this->x  = newVal;
+	newVal   = this->z * other;
+	this->z  = newVal;
+}
+
+template <typename T>
+inline void Vector3<T>::set2D(const Vector3& other)
+{
+	x = other.x;
+	z = other.z;
+}
+
+template <typename T>
+inline T Vector3<T>::dot(const Vector3& other)
+{
+	return this->x * other.x + this->y * other.y + this->z * other.z;
+}
+
+template <typename T>
+inline Vector3<T> Vector3<T>::cross(const Vector3& other)
+{
+	Vector3 outVec;
+	outVec.x = y * other.z - z * other.y;
+	outVec.y = z * other.x - x * other.z;
+	outVec.z = x * other.y - y * other.x;
+	return outVec;
+}
+
+template <typename T>
+inline void Vector3<T>::cross(const Vector3& v1, const Vector3& v2)
+{
+	set(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.z);
+}
+
+template <typename T>
+inline void Vector3<T>::setZero()
+{
+	this->x = this->y = this->z = 0;
+}
+
+template <typename T>
+inline T Vector3<T>::setDirectionFromTo(const Vector3& from, const Vector3& to)
+{
+	*this = to - from;
+	return this->normalise();
+}
+
+template <typename T>
+inline T Vector3<T>::distance(Vector3& a, Vector3& b)
+{
+	return (a - b).length();
+}
+
+template <typename T>
+inline void Vector3<T>::add(const Vector3& other)
+{
+	x += other.x;
+	y += other.y;
+	z += other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::add(Vector3& a, Vector3& b)
+{
+	set(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+template <typename T>
+inline void Vector3<T>::sub(const Vector3& other)
+{
+	x -= other.x;
+	y -= other.y;
+	z -= other.z;
+}
+
+template <typename T>
+inline void Vector3<T>::sub(Vector3& a, Vector3& b)
+{
+	set(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+template <typename T>
+inline void Vector3<T>::setMiddle(Vector3& a, Vector3& b)
+{
+	x = (a.x + b.x) * 0.5f;
+	y = (a.y + b.y) * 0.5f;
+	z = (a.z + b.z) * 0.5f;
+}
+
+template <typename T>
+inline Vector3<T> Vector3<T>::sub2(const Vector3& a, const Vector3& b)
+{
+	return Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+template <typename T>
+inline T Vector3<T>::absX()
+{
+	return (T)absF(x);
+}
+
+template <typename T>
+inline T Vector3<T>::absY()
+{
+	return (T)absF(y);
+}
+
+template <typename T>
+inline T Vector3<T>::absZ()
+{
+	return (T)absF(z);
+}
+
+template <typename T>
+inline bool Vector3<T>::isBoundedX(T bound)
+{
+	return absX() < bound;
+}
+
+template <typename T>
+inline bool Vector3<T>::isBoundedY(T bound)
+{
+	return absY() < bound;
+}
+
+template <typename T>
+inline bool Vector3<T>::isBoundedZ(T bound)
+{
+	return absZ() < bound;
+}
+
+template <typename T>
+inline void Vector3<T>::scale(T scale)
+{
+	x *= scale;
+	y *= scale;
+	z *= scale;
+}
+
+template <typename T>
+inline void Vector3<T>::setFlatDirectionFromTo(Vector3& from, Vector3& to)
+{
+	*this   = to - from;
+	this->y = 0.0f;
+	this->normalise();
+}
+
+template <typename T>
+inline void Vector3<T>::toFlatDirection()
+{
+	this->y = 0.0f;
+	this->normalise();
+}
+
+template <typename T>
+inline T Vector3<T>::sqrMagnitude() const
+{
+	return this->x * this->x + this->y * this->y + this->z * this->z;
+}
+
+template <typename T>
+inline T Vector3<T>::sqrMagnitude2D() const
+{
+	return this->x * this->x + this->z * this->z;
+}
+
+template <typename T>
+inline T Vector3<T>::qLength() const
+{
+	return pikmin2_sqrtf(this->sqrMagnitude());
+}
+
+template <typename T>
+inline T Vector3<T>::qLength2D() const
+{
+	return pikmin2_sqrtf(this->sqrMagnitude2D());
+}
+
+template <typename T>
+inline T Vector3<T>::qNormalise()
+{
+	T length = this->qLength();
+	if (length > 0.0f) {
+		T len = 1.0f / length;
+		this->x *= len;
+		this->y *= len;
+		this->z *= len;
+		return length;
+	}
+	return 0.0f;
+}
+
+template <typename T>
+inline T Vector3<T>::qDistance(Vector3& them)
+{
+	T diffX = this->x - them.x;
+	T diffY = this->y - them.y;
+	T diffZ = this->z - them.z;
+
+	return pikmin2_sqrtf(SQUARE(diffX) + SQUARE(diffY) + SQUARE(diffZ));
+}
+
+template <typename T>
+inline T Vector3<T>::sqrDistanceToSphere(Vector3& them)
+{
+	T diffX = this->x - them.x;
+	T diffY = this->y - them.y;
+	T diffZ = this->z - them.z;
+
+	return SQUARE(diffX) + SQUARE(diffY) + SQUARE(diffZ);
 }
 
 template <>
@@ -357,6 +605,18 @@ inline f32 Vector3f::length() const
 		Vector3f vec = Vector3f(x, y, z);
 		f32 sqrLen   = SQUARE(vec.x) + SQUARE(y) + SQUARE(z);
 		return sqrtf(sqrLen);
+	} else {
+		return 0.0f;
+	}
+}
+
+template <>
+inline f32 Vector3f::lengthWeird() const
+{
+	if (sqrMagnitude() > 0.0f) {
+		Vector3f vec = Vector3f(x, y, z);
+		f32 sqrLen   = SQUARE(vec.x) + SQUARE(y) + SQUARE(z);
+		return sqrtf2(sqrLen);
 	} else {
 		return 0.0f;
 	}
@@ -404,10 +664,75 @@ inline f32 Vector3f::normalise2D()
 	return len;
 }
 
-inline f32 _lenVec(Vector3f& vec)
+template <>
+inline f32 Vector3f::distance(Vector3f& them)
 {
-	Vector2f sqr(vec.z * vec.z, vec.x * vec.x + vec.y * vec.y);
-	return _sqrtf(sqr.x + sqr.y);
+	f32 diffX = this->x - them.x;
+	f32 diffY = this->y - them.y;
+	f32 diffZ = this->z - them.z;
+
+	return Vector3f(diffX, diffY, diffZ).length();
+}
+
+template <>
+inline f32 Vector3f::distance2D(Vector3f& them)
+{
+	f32 diffX = this->x - them.x;
+	f32 diffY = this->y - them.y;
+	f32 diffZ = this->z - them.z;
+
+	return Vector3f(diffX, diffY, diffZ).length2D();
+}
+
+template <>
+inline f32 Vector3f::sqrDistance(Vector3f& them)
+{
+	f32 diffX = this->x - them.x;
+	f32 diffY = this->y - them.y;
+	f32 diffZ = this->z - them.z;
+
+	return SQUARE(diffX) + SQUARE(diffY) + SQUARE(diffZ);
+}
+
+template <>
+inline f32 Vector3f::sqrDistance2D(Vector3f& them)
+{
+	f32 diffX = this->x - them.x;
+	f32 diffZ = this->z - them.z;
+
+	return SQUARE(diffX) + SQUARE(diffZ);
+}
+
+// this is wacky and shows up in efxEnemy.cpp
+template <>
+inline f32 Vector3f::distance(JGeometry::TVec3f& them)
+{
+	f32 diffX = them.x - this->x;
+	f32 diffY = them.y - this->y;
+	f32 diffZ = them.z - this->z;
+
+	f32 X = diffX * diffX;
+	f32 Y = diffY * diffY;
+	f32 Z = diffZ * diffZ;
+
+	f32 mag = X + Y + Z;
+	if (mag <= 0.0f) {
+		return mag;
+	}
+
+	f32 root = __frsqrte(mag);
+	f32 v1   = root * root;
+	f32 v2   = 0.5f * root;
+	f32 v3   = v2 * (3.0f - mag * v1);
+	return mag * v3;
+}
+
+inline bool isWithinSphere(Vector3f& pToCheck, f32 pRadius)
+{
+	f32 distance = pToCheck.sqrMagnitude2D();
+	f32 radius   = pRadius;
+	radius *= radius;
+	return distance > radius;
 }
 
 inline f32 stickMagnitude(Vector3f& vec)
@@ -415,14 +740,6 @@ inline f32 stickMagnitude(Vector3f& vec)
 	Vector3f a = vec;
 	a.z *= a.z;
 	return _sqrtf(a.x * a.x + a.y * a.y + a.z);
-}
-
-inline f32 _length(Vector3f& vec)
-{
-	Vector3f a = vec;
-	a.y *= a.y;
-	a.z *= a.z;
-	return _sqrtf(a.y + a.x * a.x + a.z);
 }
 
 inline f32 _length2(Vector3f& vec)
@@ -433,16 +750,12 @@ inline f32 _length2(Vector3f& vec)
 	return _sqrtf(a.x + a.z * a.z + a.y);
 }
 
-inline f32 _lengthXZ(Vector3f& vec)
+inline f32 _length(Vector3f& vec)
 {
 	Vector3f a = vec;
-	return _sqrtf(a.x * a.x + a.z * a.z);
-}
-
-inline f32 _distanceBetween(Vector3f& me, Vector3f& them)
-{
-	Vector3f sep = me - them;
-	return _length(sep);
+	a.y *= a.y;
+	a.z *= a.z;
+	return _sqrtf(a.y + a.x * a.x + a.z);
 }
 
 inline f32 _normalise2(Vector3f& diff)
@@ -454,20 +767,6 @@ inline f32 _normalise2(Vector3f& diff)
 		return dist;
 	}
 	return 0.0f;
-}
-
-inline void _normalise(Vector3f& vec)
-{
-	Vector2f sqr(vec.z * vec.z, vec.x * vec.x + vec.y * vec.y);
-	f32 length = sqr.x + sqr.y;
-	__sqrtf(length, &length);
-
-	if (length > 0.0f) {
-		f32 norm = 1.0f / length;
-		vec.x *= norm;
-		vec.y *= norm;
-		vec.z *= norm;
-	}
 }
 
 inline void _normaliseScale(Vector3f& vec, f32 scale)
@@ -549,70 +848,6 @@ inline void sumZ(Vector3f vec, f32* sum)
 	*sum  = z + *sum;
 }
 
-template <>
-inline f32 Vector3f::distance(Vector3f& them)
-{
-	f32 diffX = this->x - them.x;
-	f32 diffY = this->y - them.y;
-	f32 diffZ = this->z - them.z;
-
-	return Vector3f(diffX, diffY, diffZ).length();
-}
-
-template <>
-inline f32 Vector3f::distance2D(Vector3f& them)
-{
-	f32 diffX = this->x - them.x;
-	f32 diffY = this->y - them.y;
-	f32 diffZ = this->z - them.z;
-
-	return Vector3f(diffX, diffY, diffZ).length2D();
-}
-
-template <>
-inline f32 Vector3f::sqrDistance(Vector3f& them)
-{
-	f32 diffX = this->x - them.x;
-	f32 diffY = this->y - them.y;
-	f32 diffZ = this->z - them.z;
-
-	return diffX * diffX + diffY * diffY + diffZ * diffZ;
-}
-
-template <>
-inline f32 Vector3f::sqrDistanceXZ(Vector3f& them)
-{
-	f32 diffX = this->x - them.x;
-	f32 diffZ = this->z - them.z;
-
-	return diffX * diffX + diffZ * diffZ;
-}
-
-
-// this is wacky and shows up in efxEnemy.cpp
-template <>
-inline f32 Vector3f::distance(JGeometry::TVec3f& them)
-{
-	f32 diffX = them.x - this->x;
-	f32 diffY = them.y - this->y;
-	f32 diffZ = them.z - this->z;
-
-	f32 X = diffX * diffX;
-	f32 Y = diffY * diffY;
-	f32 Z = diffZ * diffZ;
-
-	f32 mag = X + Y + Z;
-	if (mag <= 0.0f) {
-		return mag;
-	}
-
-	f32 root = __frsqrte(mag);
-	f32 v1   = root * root;
-	f32 v2   = 0.5f * root;
-	f32 v3   = v2 * (3.0f - mag * v1);
-	return mag * v3;
-}
-
 inline f32 _normaliseDistance(Vector3f& vec1, Vector3f& vec2)
 {
 	Vector3f vec = vec1 - vec2;
@@ -651,10 +886,15 @@ inline void addAccel(Vector3f& outputVec, const Vector3f& inputVec, f32 massRati
 
 inline Vector3f cross(Vector3f& vec1, Vector3f& vec2)
 {
+	return Vector3f(vec1.y * vec2.z - vec1.z * vec2.y, vec1.z * vec2.x - vec1.x * vec2.z, vec1.x * vec2.y - vec1.y * vec2.x);
+}
+
+inline Vector3f scaleAndTranslate(const Vector3f& vec1, const Vector3f& vec2, f32 scale)
+{
 	Vector3f outVec;
-	outVec.x = vec1.y * vec2.z - vec1.z * vec2.y;
-	outVec.y = vec1.z * vec2.x - vec1.x * vec2.z;
-	outVec.z = vec1.x * vec2.y - vec1.y * vec2.x;
+	outVec.x = vec1.x * scale + vec2.x;
+	outVec.y = vec1.y * scale + vec2.y;
+	outVec.z = vec1.z * scale + vec2.z;
 	return outVec;
 }
 
@@ -663,11 +903,12 @@ inline f32 sqrDistance(Vector3f& vec1, Vector3f& vec2)
 	f32 x = vec1.x - vec2.x;
 	f32 y = vec1.y - vec2.y;
 	f32 z = vec1.z - vec2.z;
+
 	return x * x + y * y + z * z;
 }
 
 #endif
 
 // I saw this constant being used a lot, if you have a better name please replace it
-#define FLOAT_DIST_MAX 128000.0
-#define FLOAT_DIST_MIN -128000.0
+#define FLOAT_DIST_MAX 128000.0f
+#define FLOAT_DIST_MIN -128000.0f

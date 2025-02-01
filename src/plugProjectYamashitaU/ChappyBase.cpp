@@ -62,7 +62,7 @@ void Obj::onInit(CreatureInitArg* initArg)
 	mLodParm.mIsCylinder = false;
 
 	SleepArg sleepArg;
-	sleepArg._00 = true;
+	sleepArg.mDoSkipSleepStart = true;
 
 	setupEffect();
 	mFsm->start(this, CHAPPY_Sleep, &sleepArg);
@@ -344,7 +344,7 @@ void Obj::flickAttackBomb()
 		downSmokeEffect.create(&argLand);
 	}
 
-	rumbleMgr->startRumble(11, effectPos, 2);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed11, effectPos, RUMBLEID_Both);
 }
 
 /**

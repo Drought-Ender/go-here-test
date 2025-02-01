@@ -9,7 +9,10 @@
 
 #define MAX_POKOINFO 5
 
+struct Color4;
+struct Graphics;
 struct CarryInfoList;
+struct CarryInfoParam;
 
 enum cCarryInfoState {
 	CINFO_Appear    = 0,
@@ -18,8 +21,8 @@ enum cCarryInfoState {
 };
 
 enum cCarryInfoUseType {
-	CINFOTYPE_Table = 0,
-	CINFOTYPE_Scale = 1,
+	CINFOTYPE_Table = 0, // used for normal carry numbers
+	CINFOTYPE_Scale = 1, // used for poko collection
 };
 
 enum cCarryInfoColors {
@@ -37,10 +40,10 @@ struct CarryInfo {
 	CarryInfo();
 
 	void disappear();
-	void draw(struct Graphics&, struct CarryInfoParam&);
-	f32 drawNumber(Graphics&, f32, f32, int, struct Color4&, f32);
-	void drawNumberPrim(Graphics&, f32, f32, int, Color4&, f32);
-	void update(const CarryInfoParam&);
+	void draw(Graphics& gfx, CarryInfoParam& param);
+	f32 drawNumber(Graphics& gfx, f32 x, f32 y, int dispNum, Color4& color, f32 scale);
+	void drawNumberPrim(Graphics& gfx, f32 x, f32 y, int digit, Color4& color, f32 scale);
+	void update(const CarryInfoParam& param);
 
 	void appear();
 
@@ -53,13 +56,27 @@ struct CarryInfo {
 };
 
 struct CarryInfoParam {
+	CarryInfoParam()
+	    : mUseType(CINFOTYPE_Table)
+	    , mPosition(Vector3f::zero)
+	    , mYOffsetMax(50.0f)
+	    , mUnused(0)
+	    , mColor(CINFOCOLOR_DownFloor)
+	    , mCurrentWeight(0)
+	    , mMaxWeight(0)
+	    , mIsTopFirst(FALSE)
+	    , mValue(0)
+	    , mCarryInfo()
+	{
+	}
+
 	u32 mUseType;         // _00, 1 means color by scale, 0 means color by coded table
 	Vector3f mPosition;   // _04
 	f32 mYOffsetMax;      // _10
-	u8 _14;               // _14
+	u8 mUnused;           // _14
 	u8 mColor;            // _15
-	s16 mValue1;          // _16
-	s16 mValue2;          // _18
+	u16 mCurrentWeight;   // _16
+	u16 mMaxWeight;       // _18
 	BOOL mIsTopFirst;     // _1C, 0 means value1 on bottom, 1 means value2 on bottom
 	int mValue;           // _20
 	CarryInfo mCarryInfo; // _24
@@ -84,10 +101,12 @@ struct PokoInfoOwner : public CarryInfoOwner, public CNode {
 		mValue    = 0;
 	}
 
-	// vtable 1 (CarryInfoOwner)
-	virtual void getCarryInfoParam(CarryInfoParam&); // _08
-	// vtable 2 (CNode)
-	virtual ~PokoInfoOwner() { } // _1C (thunked at _14) (weak)
+	virtual void getCarryInfoParam(CarryInfoParam& param); // _08
+	virtual ~PokoInfoOwner() { }                           // _1C (thunked at _14) (weak)
+
+	// unused/inlined:
+	bool update();
+	void start(CarryInfoList*, const Vector3f&, int);
 
 	// _00     = VTBL 1
 	// _04     = VTBL 2
@@ -102,10 +121,11 @@ struct PokoInfoOwner : public CarryInfoOwner, public CNode {
  * @size(0x58)
  */
 struct CarryInfoList : public InfoListBase<CarryInfoOwner, CarryInfoList> {
+
 	virtual ~CarryInfoList() { }                                                   // _08 (weak)
 	virtual void init();                                                           // _0C
 	virtual void update();                                                         // _10
-	virtual void draw(Graphics&);                                                  // _14
+	virtual void draw(Graphics& gfx);                                              // _14
 	virtual bool isFinish() { return (mParam.mCarryInfo.mState == CINFO_Hidden); } // _18 (weak)
 
 	// _00     = VTBL
@@ -122,12 +142,12 @@ struct CarryInfoMgr : public InfoMgr<CarryInfoOwner, CarryInfoList> {
 	virtual ~CarryInfoMgr();                                                                                               // _08
 	virtual void loadResource();                                                                                           // _0C
 	virtual void update();                                                                                                 // _10
-	virtual void draw(Graphics&);                                                                                          // _14
+	virtual void draw(Graphics& gfx);                                                                                      // _14
 	virtual CarryInfoList* regist(CarryInfoOwner* owner) { return InfoMgr<CarryInfoOwner, CarryInfoList>::regist(owner); } // _18 (weak)
 	virtual void scratch(CarryInfoOwner* owner) { InfoMgr<CarryInfoOwner, CarryInfoList>::scratch(owner); }                // _1C (weak)
 
-	CarryInfoList* appear(CarryInfoOwner*);
-	void appearPoko(const Vector3f&, int);
+	CarryInfoList* appear(CarryInfoOwner* owner);
+	void appearPoko(const Vector3f& pos, int value);
 	void updatePokoInfoOwners();
 
 	// _00     = VTBL

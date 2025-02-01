@@ -4,10 +4,6 @@
 #include "JSystem/JParticle/JPATexture.h"
 #include "types.h"
 
-/*
-    Generated from dpostproc
-*/
-
 #define GetTypeFromByteStream(data, type, offset) (*(type*)((data) + (offset)))
 
 /**
@@ -99,6 +95,7 @@ void JPAResourceLoader::load_jpc(const u8* p1, JPAResourceManager* manager)
 		resource->init(heap);
 		manager->registRes(resource);
 	}
+
 	int texDataOffset = GetTypeFromByteStream(p1, int, 0xC);
 	for (int texDataLength, i = 0; i < GetTypeFromByteStream(p1, u16, 0xA); i++, texDataOffset += texDataLength) {
 		const u8* texData = p1 + texDataOffset;

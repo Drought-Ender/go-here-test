@@ -23,6 +23,7 @@ struct TParse_THeader : public TParseData_aligned<4> {
 	u16 getByteOrder() const { return get()->mByteOrder; }
 	u16 getVersion() const { return get()->mVersion; }
 	u32 getBlockNum() const { return get()->mBlockNum; }
+	const THeader::Target& getTarget() const { return get()->mTarget; }
 
 	// _00-_04 = TParseData_aligned
 };
@@ -37,6 +38,7 @@ struct TParse_TBlock : public TParseData_aligned<4> {
 	const TBlock* getNext() const { return (TBlock*)((u8*)getRaw() + getSize()); }
 	u32 getSize() const { return get()->mSize; }
 	u32 getType() const { return get()->mType; }
+	const void* getContent() const { return ((char*)getRaw()) + 8; }
 
 	// _00-_04 = TParseData_aligned
 };
@@ -97,11 +99,22 @@ struct TParse_TParagraph : public TParseData_aligned<4> {
 
 struct TParse_TParagraph_data : public TParseData_aligned<4> {
 	struct TData {
-		u8 mStatus;             //_00
-		u32 mDataSize;          //_04
-		u32 _08;                // _08
-		const void* mFileCount; // _0C
-		const void* _10;        // _10
+		u8 mStatus;                //_00
+		u32 mDataSize;             //_04
+		u32 mFileCount;            // _08
+		const void* mData;         // _0C
+		const void* mDataBlockEnd; // _10
+
+		// Is this name accurate? are any of these member names accurate? are these developers sane?
+		inline bool isLoaded()
+		{
+			bool stop = false;
+			if (mData != 0 && mStatus == 0x60) {
+				stop = true;
+			}
+
+			return stop;
+		}
 	};
 
 	TParse_TParagraph_data(const void* content)

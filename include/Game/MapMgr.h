@@ -6,8 +6,9 @@
 #include "SysShape/Model.h"
 
 #include "GenericObjectMgr.h"
-#include "MapCollision.h"
+#include "Game/routeMgr.h"
 #include "Game/MoveInfo.h"
+#include "MapCollision.h"
 #include "Vector3.h"
 
 struct BoundBox;
@@ -31,20 +32,29 @@ struct WaterBox;
 // };
 
 struct MapMgr : virtual public GenericObjectMgr {
+#define BEAM_RADIUS (10.0f)
 	struct BeamCollisionArg {
-		BeamCollisionArg(f32 beamRadius, int p2, u8 p3)
+		BeamCollisionArg()
 		{
-			mBeamRadius = beamRadius;
-			_1C         = p2;
-			mHitSuccess = p3;
+			mBeamRadius = BEAM_RADIUS;
+			mIndex      = 0;
+			mHitSuccess = false;
 		}
 
-		Vector3f mPosition; // _00
-		Vector3f _0C;       // _0C
-		f32 mBeamRadius;    // _18
-		int _1C;            // _1C
-		bool mHitSuccess;   // _20
-		f32 _24;            // _24
+		inline void setup(int index, const Vector3f& position, const Vector3f& targetPosition)
+		{
+			mIndex          = index;
+			mPosition       = position;
+			mTargetPosition = targetPosition;
+			mBeamRadius     = BEAM_RADIUS;
+		}
+
+		Vector3f mPosition;       // _00
+		Vector3f mTargetPosition; // _0C
+		f32 mBeamRadius;          // _18
+		int mIndex;               // _1C
+		bool mHitSuccess;         // _20
+		f32 mTargetDistance;      // _24
 	};
 
 	static bool traceMoveDebug;
@@ -122,8 +132,18 @@ struct ShapeMapMgr : public MapMgr {
 
 	ShapeMapMgr() { }
 
-	virtual void getBoundBox2d(BoundBox2d&);                                // _18 (weak)
-	virtual void getBoundBox(BoundBox&);                                    // _1C (weak)
+	virtual void getBoundBox2d(BoundBox2d& bounds) // _18 (weak)
+	{
+		BoundBox calc;
+		mMapCollision.mDivider->getBoundBox(calc);
+		bounds.fromBoundBox(calc);
+	}
+	virtual void getBoundBox(BoundBox& bounds) // _1C (weak)
+	{
+		BoundBox calc;
+		mMapCollision.mDivider->getBoundBox(calc);
+		bounds = calc;
+	}
 	virtual bool findRayIntersection(Sys::RayIntersectInfo&);               // _20
 	virtual Sys::TriIndexList* traceMove(MoveInfo&, f32);                   // _24
 	virtual f32 getMinY(Vector3f&);                                         // _28
@@ -149,6 +169,19 @@ struct ShapeMapMgr : public MapMgr {
 };
 
 extern MapMgr* mapMgr;
+extern f32 gMapRotation;
+
+inline bool isTriangleAt(const Vector3f& position)
+{
+	Game::CurrTriInfo info;
+	info.mGetTopPolygonInfo = false;
+	info.mPosition          = position;
+	mapMgr->getCurrTri(info);
+	return info.mTriangle != nullptr;
+}
+
+inline Game::WayPoint* getWaypointAt(s16 idx) { return mapMgr->mRouteMgr->getWayPoint(idx); }
+
 } // namespace Game
 
 #endif

@@ -36,7 +36,7 @@ void Obj::onInit(CreatureInitArg* initArg)
 
 	enableEvent(0, EB_Untargetable);
 
-	_2C0 = 0.0f;
+	mGeneralTimer = 0.0f;
 	resetAttackableTimer(12800.0f);
 
 	mFsm->start(this, SARAI_Move, nullptr);
@@ -90,7 +90,7 @@ void Obj::getShadowParam(ShadowParam& shadowParam)
 		if (stateId == SARAI_Fall || stateId == SARAI_Damage || stateId == SARAI_TakeOff) {
 			shadowParam.mPosition.y -= 5.0f;
 			shadowParam.mBoundingSphere.mRadius = 100.0f + C_PROPERPARMS.mNormalFlightHeight.mValue;
-		} else if (mBounceTriangle) {
+		} else if (mFloorTriangle) {
 			shadowParam.mPosition.y -= 5.0f;
 			shadowParam.mBoundingSphere.mRadius = 50.0f;
 		} else {
@@ -204,7 +204,7 @@ void Obj::setRandTarget()
 	}
 
 	// Get the direction from the home position towards our position
-	f32 dirToSarai = JMath::atanTable_.atan2_(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
+	f32 dirToSarai = JMAAtan2Radian(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
 
 	// Randomise the angle a bit and set the target position
 	f32 rngAngle = HALF_PI + (dirToSarai + randWeightFloat(PI));
@@ -343,7 +343,7 @@ FakePiki* Obj::getAttackableTarget()
 		while (!iterator.isDone()) {
 			Piki* c = iterator.mContainer->get(iterator.mIndex);
 
-			if (c->isAlive() && c->isPikmin() && !c->isStickToMouth() && c->mSticker != this && c->mBounceTriangle) {
+			if (c->isAlive() && c->isPikmin() && !c->isStickToMouth() && c->mSticker != this && c->mFloorTriangle) {
 				f32 ang = getAngDist(c);
 				if (FABS(ang) <= maxAngle) {
 					Vector3f pos = c->getPosition();

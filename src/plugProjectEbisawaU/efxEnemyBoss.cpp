@@ -26,10 +26,9 @@ bool TDangoCrash::create(Arg* arg)
 
 		Matrixf mtx;
 		Vector3f vecDir(0.0f, 1.0f, 0.0f);
-		// Vector3f vecAng (x, y, z);
 		mtx.setTransformationMtx(vecDir, ang, Vector3f::zero);
 		for (int i = 0; i < 2; i++) {
-			mEmitters[i]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
+			mEmitters[i]->setGlobalRMatrix(mtx.mMatrix.mtxView);
 		}
 		return true;
 	} else {
@@ -76,7 +75,7 @@ void TKageMove::setGlobalPrmColor(Color4& color)
 	if (mEmitter == nullptr)
 		return;
 
-	mEmitter->setPrmColor(*(JUtility::TColor*)(&color));
+	mEmitter->setPrmColor(color);
 }
 
 /**
@@ -88,7 +87,7 @@ void TKageRun::setGlobalPrmColor(Color4& color)
 	if (mEmitter == nullptr)
 		return;
 
-	mEmitter->setPrmColor(*(JUtility::TColor*)(&color));
+	mEmitter->setPrmColor(color);
 }
 
 /**
@@ -100,7 +99,7 @@ void TKageDead1::setGlobalPrmColor(Color4& color)
 	if (mEmitter == nullptr)
 		return;
 
-	mEmitter->setPrmColor(*(JUtility::TColor*)(&color));
+	mEmitter->setPrmColor(color);
 }
 
 /**
@@ -115,78 +114,18 @@ bool TKageDead2::create(Arg* arg)
 	ArgPrmColor* argp = static_cast<ArgPrmColor*>(arg);
 
 	if (TSimple1::create(arg)) {
-		mEmitters[0]->setPrmColor(*(JUtility::TColor*)(&argp->mColor));
-		// mEmitters[0]->mColor1.setRGB(*(JUtility::TColor*)(&argp->mColor));
-		// mEmitters[0]->mColor1.a = argp->mColor.a;
+		mEmitters[0]->setPrmColorRGB(argp->mColor.r, argp->mColor.g, argp->mColor.b);
+		mEmitters[0]->mGlobalPrmClr.a = argp->mColor.a;
 		return true;
 	}
 	return false;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	mr       r30, r4
-	lis      r4, lbl_80497910@ha
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	mr       r3, r30
-	addi     r31, r4, lbl_80497910@l
-	lwz      r12, 0(r30)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r31, 0x20
-	bl       strcmp
-	cntlzw   r0, r3
-	rlwinm.  r0, r0, 0x1b, 0x18, 0x1f
-	bne      lbl_803EB71C
-	addi     r3, r31, 0
-	addi     r5, r31, 0x14
-	li       r4, 0x67
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803EB71C:
-	mr       r3, r29
-	mr       r4, r30
-	bl       create__Q23efx8TSimple1FPQ23efx3Arg
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_803EB760
-	lbz      r6, 0x12(r30)
-	li       r3, 1
-	lbz      r5, 0x11(r30)
-	lwz      r4, 8(r29)
-	lbz      r0, 0x10(r30)
-	stb      r0, 0xb8(r4)
-	stb      r5, 0xb9(r4)
-	stb      r6, 0xba(r4)
-	lbz      r0, 0x13(r30)
-	lwz      r4, 8(r29)
-	stb      r0, 0xbb(r4)
-	b        lbl_803EB764
-
-lbl_803EB760:
-	li       r3, 0
-
-lbl_803EB764:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
  * @note Address: N/A
  * @note Size: 0x18
  */
-void TOootaParticle::setGlobalDynamicsScale(f32)
+void TOootaParticle::setGlobalDynamicsScale(f32 scale)
 {
 	// UNUSED FUNCTION
 }
@@ -208,119 +147,18 @@ bool TOootaBombLeg::create(Arg* arg)
 	if (TSimple1::create(arg)) {
 		Matrixf mtx;
 		makeMtxZAxisAlongPosPos(mtx.mMatrix.mtxView, pos1, pos2);
-		f32 dist = _distanceBetween(pos2, pos1);
+		f32 dist = Vector3f::distance(pos2, pos1);
 		dist /= 100.0f;
-		mEmitters[0]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
-		mEmitters[0]->mLocalScl.y *= dist;
+		for (int i = 0; i < 1; i++) {
+			mEmitters[i]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
+			JGeometry::TVec3f localScl;
+			localScl.set(mEmitters[i]->mLocalScl);
+			localScl.y *= dist;
+			mEmitters[i]->setScaleMain(localScl);
+		}
 		return true;
 	}
 	return false;
-
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stw      r31, 0x5c(r1)
-	stw      r30, 0x58(r1)
-	stw      r29, 0x54(r1)
-	mr       r30, r4
-	mr       r29, r3
-	mr       r3, r30
-	lis      r4, lbl_80497910@ha
-	lwz      r12, 0(r30)
-	addi     r31, r4, lbl_80497910@l
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r31, 0x2c
-	bl       strcmp
-	cntlzw   r0, r3
-	rlwinm.  r0, r0, 0x1b, 0x18, 0x1f
-	bne      lbl_803EB7F0
-	addi     r3, r31, 0
-	addi     r5, r31, 0x14
-	li       r4, 0x84
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803EB7F0:
-	lfs      f0, 0x10(r30)
-	mr       r3, r29
-	mr       r4, r30
-	stfs     f0, 0x14(r1)
-	lfs      f0, 0x14(r30)
-	stfs     f0, 0x18(r1)
-	lfs      f0, 0x18(r30)
-	stfs     f0, 0x1c(r1)
-	lfs      f0, 0x1c(r30)
-	stfs     f0, 8(r1)
-	lfs      f0, 0x20(r30)
-	stfs     f0, 0xc(r1)
-	lfs      f0, 0x24(r30)
-	stfs     f0, 0x10(r1)
-	bl       create__Q23efx8TSimple1FPQ23efx3Arg
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_803EB8CC
-	addi     r3, r1, 0x20
-	addi     r4, r1, 0x14
-	addi     r5, r1, 8
-	bl       "makeMtxZAxisAlongPosPos__3efxFPA4_fR10Vector3<f>R10Vector3<f>"
-	lfs      f1, 0xc(r1)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 0x10(r1)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 8(r1)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	lfs      f0, lbl_8051FE40@sda21(r2)
-	fmuls    f2, f2, f2
-	fmadds   f1, f1, f1, f3
-	fadds    f1, f2, f1
-	fcmpo    cr0, f1, f0
-	ble      lbl_803EB894
-	ble      lbl_803EB898
-	frsqrte  f0, f1
-	fmuls    f1, f0, f1
-	b        lbl_803EB898
-
-lbl_803EB894:
-	fmr      f1, f0
-
-lbl_803EB898:
-	lfs      f0, lbl_8051FE50@sda21(r2)
-	addi     r3, r1, 0x20
-	lwz      r5, 8(r29)
-	fdivs    f31, f1, f0
-	addi     r4, r5, 0x68
-	addi     r5, r5, 0xa4
-	bl       "JPASetRMtxTVecfromMtx__FPA4_CfPA4_fPQ29JGeometry8TVec3<f>"
-	lwz      r4, 8(r29)
-	li       r3, 1
-	lfs      f1, 4(r4)
-	fmuls    f1, f1, f31
-	stfs     f1, 4(r4)
-	b        lbl_803EB8D0
-
-lbl_803EB8CC:
-	li       r3, 0
-
-lbl_803EB8D0:
-	psq_l    f31, 104(r1), 0, qr0
-	lwz      r0, 0x74(r1)
-	lfd      f31, 0x60(r1)
-	lwz      r31, 0x5c(r1)
-	lwz      r30, 0x58(r1)
-	lwz      r29, 0x54(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
 }
 
 /**
@@ -583,21 +421,22 @@ void TParticleCallBack_KchYodare::execute(JPABaseEmitter* emit, JPABaseParticle*
 	if (position.y < groundY) {
 		ptcl->mFlags |= 2;
 		position.y = groundY;
-		// if (mPosID1 < _1C) {
-		// 	Vector3f* pos = &mPosList1[mPosID1];
-		// 	*pos          = position;
-		// 	mPosID1++;
-		// }
+		if (mHitGround.mCurrPosIndex < mHitGround.mPositionNum) {
+			Vector3f* pos = &mHitGround.mPositionList[mHitGround.mCurrPosIndex];
+			*pos          = position;
+			mHitGround.mCurrPosIndex++;
+		}
 	}
-	// if (position.y < _3C) {
-	// 	ptcl->_7C |= 2;
-	// 	position.y = _3C;
-	// if (mPosID2 < _38) {
-	// 	Vector3f* pos = &mPosList2[mPosID2];
-	// 	*pos          = position;
-	// 	mPosID2++;
-	// }
-	// }
+
+	if (position.y < mGroundYPos) {
+		ptcl->mFlags |= 2;
+		position.y = mGroundYPos;
+		if (mHitWater.mCurrPosIndex < mHitWater.mPositionNum) {
+			Vector3f* pos = &mHitWater.mPositionList[mHitWater.mCurrPosIndex];
+			*pos          = position;
+			mHitWater.mCurrPosIndex++;
+		}
+	}
 }
 
 /**
@@ -614,7 +453,7 @@ bool TKchYodareBaseChaseMtx::create(Arg* arg)
 	f32 y              = argp->mGroundYPos;
 	mParticleCallBack.mHitGround.create(nullptr);
 	mParticleCallBack.mHitWater.create(nullptr);
-	mGroundYPos = y;
+	mParticleCallBack.mGroundYPos = y;
 
 	if (TSync::create(arg)) {
 		mEmitter->mParticleCallback = &mParticleCallBack;
@@ -641,10 +480,10 @@ void efx::THdamaSight::setPosNrm(Vector3f& pos, Vector3f& angle)
 {
 	if (mEmitter) {
 		Matrixf mtx;
-		angle.normalise();
-		mtx.multTranspose(angle); // setAngleMtx maybe
-
-		mtx.setTranslation(pos);
+		Vector3f fixedAngle = angle;
+		fixedAngle.normalise();
+		Vector3f vecDir(1.0f, 0.0f, 0.0f);
+		mtx.setTransformationMtx2(fixedAngle, pos);
 		mEmitter->setGlobalRTMatrix(mtx.mMatrix.mtxView);
 	}
 	/*
@@ -760,21 +599,16 @@ bool THdamaHit2W::create(efx::Arg* arg)
 	P2ASSERTLINE(453, nameCheck);
 
 	efx::ArgDir* argd = static_cast<efx::ArgDir*>(arg);
-
-	f32 x = argd->mAngle.x;
-	f32 y = argd->mAngle.y;
-	f32 z = argd->mAngle.z;
+	Vector3f angle    = argd->mAngle;
 
 	if (TSimple3::create(argd)) {
 
 		Matrixf mtx;
-		Vector3f vecDir(0.0f, 1.0f, 0.0f);
-		Vector3f vecAng(x, y, z);
-		mtx.setTransformationMtx(vecDir, vecAng,
-		                         Vector3f::zero); // not quite right for this one, needs something else to happen to vecAng first I think?
+		Vector3f vecDir(1.0f, 0.0f, 0.0f);
+		mtx.setTransformationMtx2(angle, Vector3f::zero);
 
 		for (int i = 0; i < 3; i++) {
-			mEmitters[i]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
+			mEmitters[i]->setGlobalRMatrix(mtx.mMatrix.mtxView);
 		}
 		THdamaShootA effect;
 		effect.create(argd);
@@ -922,119 +756,16 @@ bool THdamaDeadHahen1::create(efx::Arg* arg)
 	if (TSimple1::create(arg)) {
 		Matrixf mtx;
 		makeMtxZAxisAlongPosPos(mtx.mMatrix.mtxView, pos1, pos2);
-		f32 dist = _distanceBetween(pos2, pos1);
+		f32 dist = Vector3f::distance(pos2, pos1);
 		dist /= 100.0f;
 		mEmitters[0]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
-		mEmitters[0]->mLocalScl.y *= dist;
+		JGeometry::TVec3f localScl;
+		localScl.set(mEmitters[0]->mLocalScl);
+		localScl.y *= dist;
+		mEmitters[0]->setScaleMain(localScl);
 		return true;
 	}
 	return false;
-
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stw      r31, 0x5c(r1)
-	stw      r30, 0x58(r1)
-	stw      r29, 0x54(r1)
-	mr       r30, r4
-	mr       r29, r3
-	mr       r3, r30
-	lis      r4, lbl_80497910@ha
-	lwz      r12, 0(r30)
-	addi     r31, r4, lbl_80497910@l
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r31, 0x2c
-	bl       strcmp
-	cntlzw   r0, r3
-	rlwinm.  r0, r0, 0x1b, 0x18, 0x1f
-	bne      lbl_803EC7D4
-	addi     r3, r31, 0
-	addi     r5, r31, 0x14
-	li       r4, 0x1e4
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803EC7D4:
-	lfs      f0, 0x10(r30)
-	mr       r3, r29
-	mr       r4, r30
-	stfs     f0, 0x14(r1)
-	lfs      f0, 0x14(r30)
-	stfs     f0, 0x18(r1)
-	lfs      f0, 0x18(r30)
-	stfs     f0, 0x1c(r1)
-	lfs      f0, 0x1c(r30)
-	stfs     f0, 8(r1)
-	lfs      f0, 0x20(r30)
-	stfs     f0, 0xc(r1)
-	lfs      f0, 0x24(r30)
-	stfs     f0, 0x10(r1)
-	bl       create__Q23efx8TSimple1FPQ23efx3Arg
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_803EC8B0
-	addi     r3, r1, 0x20
-	addi     r4, r1, 0x14
-	addi     r5, r1, 8
-	bl       "makeMtxZAxisAlongPosPos__3efxFPA4_fR10Vector3<f>R10Vector3<f>"
-	lfs      f1, 0xc(r1)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 0x10(r1)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 8(r1)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	lfs      f0, lbl_8051FE40@sda21(r2)
-	fmuls    f2, f2, f2
-	fmadds   f1, f1, f1, f3
-	fadds    f1, f2, f1
-	fcmpo    cr0, f1, f0
-	ble      lbl_803EC878
-	ble      lbl_803EC87C
-	frsqrte  f0, f1
-	fmuls    f1, f0, f1
-	b        lbl_803EC87C
-
-lbl_803EC878:
-	fmr      f1, f0
-
-lbl_803EC87C:
-	lfs      f0, lbl_8051FE50@sda21(r2)
-	addi     r3, r1, 0x20
-	lwz      r5, 8(r29)
-	fdivs    f31, f1, f0
-	addi     r4, r5, 0x68
-	addi     r5, r5, 0xa4
-	bl       "JPASetRMtxTVecfromMtx__FPA4_CfPA4_fPQ29JGeometry8TVec3<f>"
-	lwz      r4, 8(r29)
-	li       r3, 1
-	lfs      f1, 4(r4)
-	fmuls    f1, f1, f31
-	stfs     f1, 4(r4)
-	b        lbl_803EC8B4
-
-lbl_803EC8B0:
-	li       r3, 0
-
-lbl_803EC8B4:
-	psq_l    f31, 104(r1), 0, qr0
-	lwz      r0, 0x74(r1)
-	lfd      f31, 0x60(r1)
-	lwz      r31, 0x5c(r1)
-	lwz      r30, 0x58(r1)
-	lwz      r29, 0x54(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
 }
 
 /**
@@ -1054,129 +785,18 @@ bool THdamaDeadHahen2::create(efx::Arg* arg)
 	if (TSimple2::create(arg)) {
 		Matrixf mtx;
 		makeMtxZAxisAlongPosPos(mtx.mMatrix.mtxView, pos1, pos2);
-		f32 dist = _distanceBetween(pos2, pos1);
+		f32 dist = Vector3f::distance(pos2, pos1);
 		dist /= 100.0f;
 		for (int i = 0; i < 2; i++) {
 			mEmitters[i]->setGlobalRTMatrix(mtx.mMatrix.mtxView);
-			mEmitters[i]->mLocalScl.y *= dist;
+			JGeometry::TVec3f localScl;
+			localScl.set(mEmitters[i]->mLocalScl);
+			localScl.y *= dist;
+			mEmitters[i]->setScaleMain(localScl);
 		}
 		return true;
 	}
 	return false;
-
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stw      r31, 0x5c(r1)
-	stw      r30, 0x58(r1)
-	stw      r29, 0x54(r1)
-	mr       r30, r4
-	mr       r29, r3
-	mr       r3, r30
-	lis      r4, lbl_80497910@ha
-	lwz      r12, 0(r30)
-	addi     r31, r4, lbl_80497910@l
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r31, 0x2c
-	bl       strcmp
-	cntlzw   r0, r3
-	rlwinm.  r0, r0, 0x1b, 0x18, 0x1f
-	bne      lbl_803EC948
-	addi     r3, r31, 0
-	addi     r5, r31, 0x14
-	li       r4, 0x200
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803EC948:
-	lfs      f0, 0x10(r30)
-	mr       r3, r29
-	mr       r4, r30
-	stfs     f0, 0x14(r1)
-	lfs      f0, 0x14(r30)
-	stfs     f0, 0x18(r1)
-	lfs      f0, 0x18(r30)
-	stfs     f0, 0x1c(r1)
-	lfs      f0, 0x1c(r30)
-	stfs     f0, 8(r1)
-	lfs      f0, 0x20(r30)
-	stfs     f0, 0xc(r1)
-	lfs      f0, 0x24(r30)
-	stfs     f0, 0x10(r1)
-	bl       create__Q23efx8TSimple2FPQ23efx3Arg
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_803ECA3C
-	addi     r3, r1, 0x20
-	addi     r4, r1, 0x14
-	addi     r5, r1, 8
-	bl       "makeMtxZAxisAlongPosPos__3efxFPA4_fR10Vector3<f>R10Vector3<f>"
-	lfs      f1, 0xc(r1)
-	lfs      f0, 0x18(r1)
-	lfs      f3, 0x10(r1)
-	fsubs    f4, f1, f0
-	lfs      f2, 0x1c(r1)
-	lfs      f1, 8(r1)
-	lfs      f0, 0x14(r1)
-	fsubs    f2, f3, f2
-	fmuls    f3, f4, f4
-	fsubs    f1, f1, f0
-	lfs      f0, lbl_8051FE40@sda21(r2)
-	fmuls    f2, f2, f2
-	fmadds   f1, f1, f1, f3
-	fadds    f1, f2, f1
-	fcmpo    cr0, f1, f0
-	ble      lbl_803EC9EC
-	ble      lbl_803EC9F0
-	frsqrte  f0, f1
-	fmuls    f1, f0, f1
-	b        lbl_803EC9F0
-
-lbl_803EC9EC:
-	fmr      f1, f0
-
-lbl_803EC9F0:
-	lfs      f0, lbl_8051FE50@sda21(r2)
-	mr       r31, r29
-	li       r30, 0
-	fdivs    f31, f1, f0
-
-lbl_803ECA00:
-	lwz      r5, 8(r31)
-	addi     r3, r1, 0x20
-	addi     r4, r5, 0x68
-	addi     r5, r5, 0xa4
-	bl       "JPASetRMtxTVecfromMtx__FPA4_CfPA4_fPQ29JGeometry8TVec3<f>"
-	lwz      r3, 8(r31)
-	addi     r30, r30, 1
-	cmpwi    r30, 2
-	addi     r31, r31, 4
-	lfs      f1, 4(r3)
-	fmuls    f1, f1, f31
-	stfs     f1, 4(r3)
-	blt      lbl_803ECA00
-	li       r3, 1
-	b        lbl_803ECA40
-
-lbl_803ECA3C:
-	li       r3, 0
-
-lbl_803ECA40:
-	psq_l    f31, 104(r1), 0, qr0
-	lwz      r0, 0x74(r1)
-	lfd      f31, 0x60(r1)
-	lwz      r31, 0x5c(r1)
-	lwz      r30, 0x58(r1)
-	lwz      r29, 0x54(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
 }
 
 /**

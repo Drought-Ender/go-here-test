@@ -56,7 +56,7 @@ struct Obj : public EnemyBase {
 	// _00 		= VTBL
 	// _00-_2BC	= EnemyBase
 	FSM* mFsm;                // _2BC
-	bool _2C0;                // _2C0, unknown
+	bool mLeapDirection;      // _2C0, unknown
 	f32 mStateTimer;          // _2C4, timer?
 	StateID mNextState;       // _2C8
 	Vector3f mTargetPosition; // _2CC
@@ -84,7 +84,7 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mPitterPatterMoveSpeed(this, 'fp01', "ピチピチ移動速度", 20.0f, 0.0f,
+		    , mPitterPatterMoveSpeed(this, 'fp01', "繝斐メ繝斐メ遘ｻ蜍暮溷ｺｦ", 20.0f, 0.0f,
 		                             1000.0f) // 'pichipichi movement speed'
 		{
 		}

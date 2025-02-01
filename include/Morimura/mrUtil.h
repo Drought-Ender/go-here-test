@@ -22,15 +22,15 @@ struct TOffsetMsgSet {
 
 	inline void calcOffset(int& offset, int i)
 	{
-		int calc  = pow(10.0f, i);
-		int calc2 = offset / calc;
-		_04[i]    = offset / calc;
+		int calc   = pow(10.0f, i);
+		int calc2  = offset / calc;
+		mIdList[i] = offset / calc;
 		calc2 *= calc;
 		offset -= calc2;
 	}
 
 	u64* mTagList; // _00
-	int* _04;      // _04
+	int* mIdList;  // _04
 	u64 mMsgID;    // _08
 	int mSize;     // _10
 };
@@ -95,6 +95,14 @@ struct TCounterRV : public og::Screen::CallBack_CounterRV {
 		mColor.g = g;
 		mColor.b = b;
 		mColor.a = a;
+	}
+
+	inline void start()
+	{
+		if (!_B1) {
+			mEnabled = true;
+			_B1      = true;
+		}
 	}
 
 	// _00     = VTBL
@@ -172,6 +180,13 @@ struct TMovePane {
 	bool isReachToGoal();
 	void reset();
 
+	inline void start()
+	{
+		mState   = 1;
+		mOffset  = mPanePosition;
+		mCounter = 0;
+	}
+
 	J2DPane* mPane;                   // _00
 	J2DPane* mStickPane;              // _04
 	JGeometry::TVec2f mOffset;        // _08
@@ -190,8 +205,7 @@ struct TMovePane {
 
 struct THuWhitePaneSet : public J2DPictureEx {
 	THuWhitePaneSet(J2DPane* pane)
-	    : J2DPictureEx('test', JGeometry::TBox2f(0.0f, 0.0f, pane->mBounds.f.x - pane->mBounds.i.x, pane->mBounds.f.y - pane->mBounds.i.y),
-	                   "sunh_w.bti", 0x1100000)
+	    : J2DPictureEx('test', JGeometry::TBox2f(0.0f, 0.0f, pane->getWidth(), pane->getHeight()), "sunh_w.bti", 0x1100000)
 	{
 		_1A8 = Vector2f(0.0f);
 	}
@@ -220,23 +234,23 @@ struct TIndPane : public CNode {
 
 	inline void setAngleTimer(f32 time)
 	{
-		_44 = 0;
-		_3C = -6;
-		_38 = 0.0f;
-		_34 = 0.0f;
-		_40 = (time * 360.0f) / TAU;
+		mMtxUseType  = 0;
+		mTexMtxScale = -6;
+		mMtxYOffset  = 0.0f;
+		mMtxXOffset  = 0.0f;
+		mRotation    = (time * 360.0f) / TAU;
 	}
 
 	inline void setXY(f32 x, f32 y)
 	{
-		_34 = x;
-		_38 = y;
+		mMtxXOffset = x;
+		mMtxYOffset = y;
 	}
 
 	inline void setFlag(int flag)
 	{
-		_3C = 0;
-		_44 = flag;
+		mTexMtxScale = 0;
+		mMtxUseType  = flag;
 	}
 
 	// _00     = VTBL
@@ -246,11 +260,11 @@ struct TIndPane : public CNode {
 	JUTTexture* mTexture3; // _20
 	Vector2f mMinPos;      // _24
 	Vector2f mMaxPos;      // _2C
-	f32 _34;               // _34
-	f32 _38;               // _38
-	s16 _3C;               // _3C
-	f32 _40;               // _40
-	u8 _44;                // _44
+	f32 mMtxXOffset;       // _34
+	f32 mMtxYOffset;       // _38
+	s16 mTexMtxScale;      // _3C
+	f32 mRotation;         // _40
+	u8 mMtxUseType;        // _44
 };
 
 struct TChallengeScreen : public TScreenBase {

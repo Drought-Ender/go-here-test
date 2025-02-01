@@ -9,7 +9,7 @@
 namespace efx2d {
 namespace WorldMap {
 struct ArgDirScale : public Arg {
-	ArgDirScale(Vector2f& pos, Vector2f& dir, f32 scale)
+	ArgDirScale(Vector2f pos, Vector2f dir, f32 scale)
 	    : Arg(pos)
 	{
 		mDir   = dir;
@@ -24,13 +24,14 @@ struct ArgDirScale : public Arg {
 	// _00-_08 	= Vector2f
 	// _08		= VTBL
 	Vector2f mDir; // _0C
-	f32 mScale;
+	f32 mScale;    // _14
 };
 
 struct TSimple_ArgDirScale : public TSimple1 {
 	inline TSimple_ArgDirScale(u16 effectID)
 	    : TSimple1(effectID)
 	{
+		mResMgrId = 0;
 	}
 
 	virtual bool create(Arg*); // _08
@@ -46,14 +47,13 @@ struct T2DMapFlare : public TChasePos {
 	T2DMapFlare(Vector2f* pos)
 	    : TChasePos(PID_WMap_LensFlare, pos)
 	{
-		_04 = 1;
+		mResMgrId = 1;
 	}
 
 	virtual ~T2DMapFlare() { } // _34 (weak)
 
 	// _00		= VTBL
 	// _00-_18	= TChasePos
-	// u8 _18[4]; // _18
 };
 
 struct T2DNewmap : public TSimple2 {
@@ -75,7 +75,7 @@ struct T2DOnyonKira : public TChasePosDir {
 	T2DOnyonKira(Vector2f& pos, Vector2f& pos2)
 	    : TChasePosDir(0, pos, pos2)
 	{
-		_04 = 1;
+		mResMgrId = 1;
 	}
 	// vtable 1
 	virtual bool create(Arg*); // _08
@@ -93,6 +93,7 @@ struct T2DRocketA : public TSimple_ArgDirScale {
 	inline T2DRocketA()
 	    : TSimple_ArgDirScale(PID_RocketA)
 	{
+		mResMgrId = 1;
 	}
 
 	// _00		= VTBL
@@ -103,10 +104,10 @@ struct T2DRocketA : public TSimple_ArgDirScale {
  * @size{0x28}
  */
 struct T2DRocketB : public TChasePosDir {
-	T2DRocketB(Vector2f& pos, Vector2f& pos2)
-	    : TChasePosDir(PID_WMap_RocketSparks, pos, pos2)
+	T2DRocketB(Vector2f& pos, Vector2f& dir)
+	    : TChasePosDir(PID_WMap_RocketSparks, pos, dir)
 	{
-		_04 = 1;
+		mResMgrId = 1;
 	}
 	// vtable 1
 	virtual bool create(Arg*); // _08
@@ -117,7 +118,7 @@ struct T2DRocketB : public TChasePosDir {
 
 	// _00		= VTBL
 	// _00-_1C	= TChasePosDir
-	Vector3f _1C; // _1C
+	Vector3f mScale; // _1C
 };
 
 /**
@@ -127,7 +128,7 @@ struct T2DRocketGlow : public TChasePosDir {
 	T2DRocketGlow(Vector2f& pos, Vector2f& pos2)
 	    : TChasePosDir(PID_WMap_RocketGlow, pos, pos2)
 	{
-		_04 = 1;
+		mResMgrId = 1;
 	}
 	// vtable 2
 	virtual ~T2DRocketGlow() { } // _34 (weak)
@@ -145,7 +146,7 @@ struct T2DShstar1 : public TChasePos {
 	T2DShstar1(Vector2f* pos)
 	    : TChasePos(PID_WMap_ShootingStar1, pos)
 	{
-		_04 = 1;
+		mResMgrId = 1;
 	}
 
 	virtual ~T2DShstar1() { } // _34 (weak)

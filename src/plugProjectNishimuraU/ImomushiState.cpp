@@ -160,7 +160,7 @@ void StateStay::init(EnemyBase* enemy, StateArg* stateArg)
 	imomushi->enableEvent(0, EB_Invulnerable);
 	imomushi->mIsUnderground = true;
 	imomushi->enableEvent(0, EB_BitterImmune);
-	imomushi->enableEvent(0, EB_14);
+	imomushi->enableEvent(0, EB_CullSound);
 	imomushi->disableEvent(0, EB_LifegaugeVisible);
 	imomushi->hardConstraintOn();
 	imomushi->disableEvent(0, EB_Animating);
@@ -197,7 +197,7 @@ void StateStay::cleanup(EnemyBase* enemy)
 	imomushi->disableEvent(0, EB_Invulnerable);
 	imomushi->mIsUnderground = false;
 	imomushi->disableEvent(0, EB_BitterImmune);
-	imomushi->disableEvent(0, EB_14);
+	imomushi->disableEvent(0, EB_CullSound);
 	imomushi->hardConstraintOff();
 	imomushi->enableEvent(0, EB_Animating);
 	imomushi->disableEvent(0, EB_ModelHidden);
@@ -442,8 +442,8 @@ void StateClimb::init(EnemyBase* enemy, StateArg* stateArg)
 	f32 cos           = cosf(faceDir);
 	f32 sin           = sinf(faceDir);
 
-	imomushi->_2D8 = Vector3f(sin, 0.01f, cos);
-	imomushi->_2E4 = Vector3f(-sin, 0.0f, -cos);
+	imomushi->mClimbDirection = Vector3f(sin, 0.01f, cos);
+	imomushi->mClimbRotation  = Vector3f(-sin, 0.0f, -cos);
 }
 
 /**
@@ -466,7 +466,7 @@ void StateClimb::exec(EnemyBase* enemy)
 	if (!imomushi->isFinishMotion()) {
 		imomushi->moveStickTube();
 
-		f32 val  = imomushi->_2FC;
+		f32 val  = imomushi->mClimbStartMoveRatio;
 		f32 yval = imomushi->mClimbingPosition.y;
 		if (yval > 1.0f - val) {
 			CollPart* childPart = static_cast<CollPart*>(imomushi->mStuckCollPart->mChild);

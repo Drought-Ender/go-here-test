@@ -46,8 +46,8 @@ void StateDead::exec(EnemyBase* enemy)
 	if (queen->mCurAnim->mIsPlaying != 0) {
 		if ((u32)queen->mCurAnim->mType == KEYEVENT_2) {
 			Vector3f position = queen->getPosition();
-			cameraMgr->startVibration(6, position, 2);
-			rumbleMgr->startRumble(14, position, 2);
+			cameraMgr->startVibration(VIBTYPE_LightFastShort, position, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, position, RUMBLEID_Both);
 		} else if ((u32)queen->mCurAnim->mType == KEYEVENT_END) {
 			queen->releaseJointShadow();
 			queen->kill(nullptr);
@@ -71,7 +71,7 @@ void StateSleep::init(EnemyBase* enemy, StateArg* stateArg)
 	queen->mNextState       = QUEEN_NULL;
 	queen->mIsAttackLoopBGM = false;
 	queen->mWaitTimer       = 0.0f;
-	queen->_2D0             = queen->mFlickTimer;
+	queen->mPrevHitNum      = queen->mFlickTimer;
 	queen->hardConstraintOn();
 	queen->mTargetVelocity = Vector3f(0.0f);
 	queen->startMotion(QUEENANIM_Sleep, nullptr);
@@ -135,7 +135,7 @@ void StateWait::init(EnemyBase* enemy, StateArg* stateArg)
 	queen->mNextState       = QUEEN_NULL;
 	queen->mIsAttackLoopBGM = false;
 	queen->mWaitTimer       = 0.0f;
-	queen->_2D0             = queen->mFlickTimer;
+	queen->mPrevHitNum      = queen->mFlickTimer;
 	queen->hardConstraintOn();
 	queen->mTargetVelocity = Vector3f(0.0f);
 	queen->startMotion(QUEENANIM_Wait, nullptr);
@@ -362,7 +362,7 @@ void StateRolling::exec(EnemyBase* enemy)
 		queen->mWaitTimer += sys->mDeltaTime;
 
 		Vector3f camPos = queen->getPosition();
-		cameraMgr->startVibration(15, camPos, 2);
+		cameraMgr->startVibration(VIBTYPE_MidFastShort, camPos, CAMNAVI_Both);
 
 	} else {
 		queen->mTargetVelocity = Vector3f(0.0f);
@@ -406,8 +406,8 @@ void StateRolling::exec(EnemyBase* enemy)
 					queen->createCrashFallRock();
 					Vector3f anotherPos = queen->getPosition();
 
-					cameraMgr->startVibration(27, anotherPos, 2);
-					rumbleMgr->startRumble(15, anotherPos, 2);
+					cameraMgr->startVibration(VIBTYPE_Crash, anotherPos, CAMNAVI_Both);
+					rumbleMgr->startRumble(RUMBLETYPE_Fixed15, anotherPos, RUMBLEID_Both);
 				}
 				queen->mIsRolling = false;
 				queen->mNextState = QUEEN_Rolling;
@@ -874,7 +874,7 @@ void StateRolling::cleanup(EnemyBase* enemy)
 	queen->setEmotionCaution();
 	queen->forceFinishRollingEffect();
 	queen->mFlickTimer = 0.0f;
-	queen->_2D0        = 0.0f;
+	queen->mPrevHitNum = 0.0f;
 	queen->mIsRolling  = false;
 }
 

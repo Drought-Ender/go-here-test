@@ -34,6 +34,7 @@ NaviMgr::~NaviMgr()
 {
 	animMgr = nullptr;
 	naviMgr = nullptr;
+
 	if (mBackupPSMMgr) {
 		delete mBackupPSMMgr;
 		mBackupPSMMgr = nullptr;
@@ -108,7 +109,7 @@ void NaviMgr::setupNavi(Navi* navi)
 	navi->mParms       = mNaviParms;
 	navi->mMarkerModel = new SysShape::Model(mCursorModelData, 0, 2);
 
-	navi->mCursorModel = new SysShape::Model(mMarkerModelData, 0x80000, 2);
+	navi->mCursorModel = new SysShape::Model(mMarkerModelData, J3DMODEL_ShareDL, 2);
 	navi->mCursorModel->mJ3dModel->newDifferedDisplayList(0x1000000);
 	navi->mCursorModel->mJ3dModel->calc();
 	navi->mCursorModel->mJ3dModel->calcMaterial();
@@ -130,7 +131,7 @@ Navi* NaviMgr::birth()
 		navi->mSoundObj->init(navi->mNaviIndex);
 
 		// Use president sounds for navi ID 1
-		if (playData->isStoryFlag(STORY_DebtPaid) && navi->mNaviIndex == NAVIID_Captain2) {
+		if (playData->isStoryFlag(STORY_DebtPaid) && navi->mNaviIndex == NAVIID_Louie) {
 			navi->mSoundObj->setShacho();
 		}
 	}
@@ -149,8 +150,8 @@ Navi* NaviMgr::birth()
  */
 Navi* NaviMgr::getActiveNavi()
 {
-	Navi* navi1 = getAt(NAVIID_Captain1);
-	Navi* navi2 = getAt(NAVIID_Captain2);
+	Navi* navi1 = getAt(NAVIID_Olimar);
+	Navi* navi2 = getAt(NAVIID_Louie);
 	if (!navi1 && !navi2) {
 		return nullptr;
 	}
@@ -174,10 +175,11 @@ void NaviMgr::loadResources()
 	                                              JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
 	if (parmsFile) {
 		RamStream stream(parmsFile, -1);
-		stream.resetPosition(true, 1);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 		mNaviParms->read(stream);
 		delete[] parmsFile;
 	}
+
 	load();
 }
 
@@ -195,9 +197,10 @@ void NaviMgr::load()
 	JKRArchive* arc = JKRMountArchive("/user/Kando/piki/pikis.szs", JKRArchive::EMM_Mem, sys->mSysHeap, JKRArchive::EMD_Head);
 	sys->heapStatusEnd("NaviMgr::Archive");
 
-	J3DModelData* model = J3DModelLoaderDataBase::load(arc->getResource("orima_model/orima1.bmd"), 0x20000030);
-	for (u16 j = 0; j < model->getShapeNum(); j++) {
-		model->mShapeTable.mItems[j]->setTexMtxLoadType(0x2000);
+	J3DModelData* model = J3DModelLoaderDataBase::load(arc->getResource("orima_model/orima1.bmd"),
+	                                                   J3DMLF_Material_PE_FogOff | J3DMLF_UsePostTexMtx | J3DMLF_UseImmediateMtx);
+	for (u16 i = 0; i < model->getShapeNum(); i++) {
+		model->mShapeTable.mItems[i]->setTexMtxLoadType(0x2000);
 	}
 
 	mOlimarModel = model;
@@ -207,9 +210,11 @@ void NaviMgr::load()
 	}
 	mCollData = CollPartFactory::load(texts, "naviColl.txt");
 
-	mCursorModelData = J3DModelLoaderDataBase::load(arc->getResource("cursor/cursor.bmd"), 0x240000);
-	mMarkerModelData = J3DModelLoaderDataBase::load(arc->getResource("cursor/marker.bmd"), 0x240000);
-	mMarkerModelData->newSharedDisplayList(0x40000);
+	mCursorModelData
+	    = J3DModelLoaderDataBase::load(arc->getResource("cursor/cursor.bmd"), J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL);
+	mMarkerModelData
+	    = J3DModelLoaderDataBase::load(arc->getResource("cursor/marker.bmd"), J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL);
+	mMarkerModelData->newSharedDisplayList(J3DMLF_UseSingleSharedDL);
 
 	SysShape::Model::enableMaterialAnim(mCursorModelData, 0);
 	mCursorAnims[0].attachResource(arc->getResource("cursor/wakka_orima.brk"), mCursorModelData);
@@ -239,10 +244,9 @@ void NaviMgr::loadResources_float()
 	void* file
 	    = playData->isStoryFlag(STORY_DebtPaid) ? arc->getResource("orima_model/syatyou.bmd") : arc->getResource("orima_model/orima3.bmd");
 
-	J3DModelData* model = J3DModelLoaderDataBase::load(file, 0x20000030);
-	for (u16 j = 0; j < model->getShapeNum(); j++) {
-		J3DShape* shape = model->mShapeTable.mItems[j];
-		shape->setTexMtxLoadType(0x2000);
+	J3DModelData* model = J3DModelLoaderDataBase::load(file, J3DMLF_Material_PE_FogOff | J3DMLF_UsePostTexMtx | J3DMLF_UseImmediateMtx);
+	for (u16 i = 0; i < model->getShapeNum(); i++) {
+		model->getShapeNodePointer(i)->setTexMtxLoadType(0x2000);
 	}
 
 	mLouieModel = model;
@@ -337,8 +341,8 @@ Navi* NaviMgr::getAliveOrima(int type)
 
 	// both captains alive
 	if (mDeadNavis == 0) {
-		Navi* olimar = getAt(NAVIID_Captain1);
-		Navi* louie  = getAt(NAVIID_Captain2); // or president
+		Navi* olimar = getAt(NAVIID_Olimar);
+		Navi* louie  = getAt(NAVIID_Louie); // or president
 		Navi* activeNavi;
 		Navi* inactiveNavi;
 
@@ -410,16 +414,16 @@ void NaviMgr::doEntry()
 			continue;
 		}
 		if (flag && !mArray[i].isMovieActor()) {
-			mArray[i].mLod.resetFlag(AILOD_Visible01);
+			mArray[i].mLod.resetFlag(AILOD_IsVisibleBoth);
 		} else if (mArray[i].isMovieActor()) {
-			mArray[i].mLod.setFlag(AILOD_Visible01);
+			mArray[i].mLod.setFlag(AILOD_IsVisibleBoth);
 		}
 
 		if (vs) {
 			Navi* navi = &mArray[i];
-			if ((int)navi->mNaviIndex == NAVIID_Captain2 && pikiMgr->mFlags[0] & 1) {
+			if ((int)navi->mNaviIndex == NAVIID_Louie && pikiMgr->mFlags[0] & 1) {
 				navi->mLod.resetFlag(AILOD_IsVisVP0);
-			} else if ((int)navi->mNaviIndex == NAVIID_Captain1 && pikiMgr->mFlags[0] & 2) {
+			} else if ((int)navi->mNaviIndex == NAVIID_Olimar && pikiMgr->mFlags[0] & 2) {
 				navi->mLod.resetFlag(AILOD_IsVisVP1);
 			}
 		}

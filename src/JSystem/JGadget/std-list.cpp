@@ -9,10 +9,10 @@
 // void __ct__Q27JGadget18TList_pointer_voidFRCQ27JGadget14TAllocator<void*>()
 JGadget::TList_pointer_void::TList_pointer_void(const JGadget::TVoidAllocator& allocator)
 {
-	_00         = allocator._00;
-	mChildCount = 0;
-	mNext       = &mNext;
-	mPrev       = &mNext;
+	mAllocator  = allocator;
+	mSize       = 0;
+	mNode.mNext = &mNode;
+	mNode.mPrev = &mNode;
 }
 
 /**
@@ -39,18 +39,6 @@ JGadget::TList_pointer_void::TList_pointer_void(const JGadget::TVoidAllocator& a
  */
 JGadget::TList_pointer_void::~TList_pointer_void()
 {
-	TList_object* current = static_cast<TList_object*>(mNext);
-	TList_object* next    = current->mNext;
-	while (next != current) {
-		TList_object* tempNext = static_cast<TList_object*>(mNext);
-		next->mPrev->mNext     = next->mNext;
-		tempNext->mPrev        = next->mPrev;
-
-		delete next;
-		next = tempNext;
-		mChildCount--;
-	}
-
 	/*
 	stwu     r1, -0x40(r1)
 	mflr     r0
@@ -115,8 +103,21 @@ lbl_80027540:
  * @note Address: 0x80027564
  * @note Size: 0x98
  */
-void JGadget::TList_pointer_void::insert(JGadget::TList_pointer_void::iterator, void* const&)
+JGadget::TList_pointer_void::iterator JGadget::TList_pointer_void::insert(JGadget::TList_pointer_void::iterator pos, void* const& value)
 {
+	volatile iterator iter(pos);
+	TNode_* currNode = pos.mNode;
+	TNode_* prevNode = currNode->mPrev;
+	TNode_* newNode  = CreateNode_(currNode, prevNode, value);
+	if (!newNode) {
+		return iterator(&mNode);
+	}
+
+	currNode->mPrev = newNode;
+	prevNode->mNext = newNode;
+	mSize++;
+	return iterator(newNode);
+
 	/*
 	.loc_0x0:
 	  stwu      r1, -0x30(r1)
@@ -181,14 +182,23 @@ void JGadget::TList_pointer_void::insert(JGadget::TList_pointer_void::iterator, 
  * @note Address: 0x800275FC
  * @note Size: 0x70
  */
-void JGadget::TList_pointer_void::erase(JGadget::TList_pointer_void::iterator it)
+JGadget::TList_pointer_void::iterator JGadget::TList_pointer_void::erase(JGadget::TList_pointer_void::iterator it)
 {
-	// what the FUCK
-	TList_object** element   = reinterpret_cast<TList_object**>(it.mElement);
-	TList_object* next       = (*element)->mNext;
-	(*element)->mPrev->mNext = next;
-	next->mPrev              = (*element)->mPrev;
-	delete *element;
+	return TList::erase(it);
+	// TNode_** element = reinterpret_cast<TNode_**>(it.mNode);
+	// TNode_* next     = (*element)->mNext;
+	// TNode_* prev     = (*element)->mPrev;
+
+	// // Update the next and previous elements to skip over the element being erased
+	// prev->mNext = next;
+	// next->mPrev = prev;
+
+	// // Delete the element
+	// delete *element;
+
+	// mSize--;
+
+	// mNode.mNext = next;
 	/*
 .loc_0x0:
   stwu      r1, -0x20(r1)

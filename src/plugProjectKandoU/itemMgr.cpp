@@ -73,8 +73,7 @@ void BaseItem::doAnimation()
 {
 	if (mAnimator.mAnimMgr) {
 		mAnimator.animate(mAnimSpeed * sys->mDeltaTime);
-		SysShape::Model* model                                        = mModel;
-		model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = (J3DMtxCalcAnmBase*)mAnimator.getCalc();
+		mAnimator.setModelCalc(mModel, 0);
 		do_doAnimation();
 	}
 	if (mCaptureMatrix == nullptr) {
@@ -175,7 +174,7 @@ void BaseItem::do_updateLOD()
 	do_setLODParm(parm);
 	updateLOD(parm);
 	if (isMovieActor()) {
-		mLod.setFlag(AILOD_IsVisible | AILOD_IsVisVP0 | AILOD_IsVisVP1);
+		mLod.setFlag(AILOD_IsVisibleBoth);
 	}
 }
 
@@ -201,17 +200,17 @@ void BaseItem::move(f32 step)
 	Sys::Sphere moveSphere(pos, collRad);
 
 	MoveInfo info(&moveSphere, &mVelocity, 1.0f);
-	info.mInfoOrigin = this;
+	info.mMovingCreature = this;
 
 	mapMgr->traceMove(info, step);
-	Sys::Triangle* mapTri = info.mBounceTriangle;
+	Sys::Triangle* mapTri = info.mFloorTriangle;
 	platMgr->traceMove(info, step);
 
 	if (!mCollTriangle) {
 		if (!mapTri) {
-			if (info.mBounceTriangle) {
-				bounceCallback(info.mBounceTriangle);
-				mCollTriangle = info.mBounceTriangle;
+			if (info.mFloorTriangle) {
+				bounceCallback(info.mFloorTriangle);
+				mCollTriangle = info.mFloorTriangle;
 			} else {
 				mCollTriangle = nullptr;
 			}
@@ -231,11 +230,11 @@ void BaseItem::move(f32 step)
  * @note Address: 0x801CC80C
  * @note Size: 0x7C
  */
-void BaseItem::movieStartAnimation(u32 p1)
+void BaseItem::movieStartAnimation(u32 animId)
 {
 	if (mAnimator.mAnimMgr) {
 		getCreatureName();
-		mAnimator.startAnim(p1, nullptr);
+		mAnimator.startAnim(animId, nullptr);
 		mAnimSpeed = 30.0f;
 	} else {
 		getCreatureName();
@@ -587,7 +586,7 @@ PlatAttacher* BaseItemMgr::loadPlatAttacher(JKRFileLoader* loader, char* path)
 		JUT_PANICLINE(1028, "platAttacher %s not found !\n", path);
 	} else {
 		RamStream stream(data, -1);
-		stream.resetPosition(false, -1);
+		stream.setMode(STREAM_MODE_BINARY, -1);
 		attacher->read(stream);
 		return attacher;
 	}
@@ -674,7 +673,7 @@ void TNodeItemMgr::killAll()
 	     node                        = (TObjectNode<BaseItem>*)mNodeObjectMgr.mNode.mChild) {
 		node->mContents->getCreatureName();
 		BaseItem* creature = node->mContents;
-		CreatureKillArg arg(CKILL_Unk1);
+		CreatureKillArg arg(CKILL_DontCountAsDeath);
 		creature->kill(&arg);
 		if (creature->mSoundObj != nullptr && PSSystem::SingletonBase<PSM::ObjMgr>::sInstance) {
 			PSSystem::SingletonBase<PSM::ObjMgr>::sInstance->remove(creature->mSoundObj);
@@ -689,7 +688,7 @@ void TNodeItemMgr::killAll()
  */
 ItemMgr::ItemMgr()
 {
-	mName = "アイテムマネージャ"; // "Item Manager"
+	mName = "繧｢繧､繝�繝繝槭ロ繝ｼ繧ｸ繝｣"; // "Item Manager"
 }
 
 /**

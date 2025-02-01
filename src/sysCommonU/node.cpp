@@ -21,18 +21,11 @@ void Node::displayInfo(int whitespaceAmt)
 
 	OSReport("[%s]\n", mName);
 
-	Node* next = mParent;
-	if (next) {
-		next = (Node*)(((u8*)next) - 12);
-	}
-
-	while (next) {
-		next->mNext->displayInfo(whitespaceAmt + 1);
-
-		next = next->mChild;
-		if (next) {
-			next = (Node*)(((u8*)next) - 12);
-		}
+	JSUTreeIterator<CoreNode> iterator;
+	for (iterator = mTree.getFirstChild(); iterator != mTree.getEndChild();) {
+		Node* child = static_cast<Node*>(iterator.getObject());
+		child->displayInfo(whitespaceAmt + 1);
+		iterator++;
 	}
 }
 
@@ -42,18 +35,11 @@ void Node::displayInfo(int whitespaceAmt)
  */
 void Node::update()
 {
-	Node* next = mParent;
-	if (next) {
-		next = (Node*)(((u8*)next) - 12);
-	}
-
-	while (next) {
-		next->mNext->update();
-
-		next = next->mChild;
-		if (next) {
-			next = (Node*)(((u8*)next) - 12);
-		}
+	JSUTreeIterator<CoreNode> iterator;
+	for (iterator = mTree.getFirstChild(); iterator != mTree.getEndChild();) {
+		Node* child = static_cast<Node*>(iterator.getObject());
+		child->update();
+		iterator++;
 	}
 }
 
@@ -63,18 +49,11 @@ void Node::update()
  */
 void Node::draw(Graphics& gfx)
 {
-	Node* next = mParent;
-	if (next) {
-		next = (Node*)(((u8*)next) - 12);
-	}
-
-	while (next) {
-		next->mNext->draw(gfx);
-
-		next = next->mChild;
-		if (next) {
-			next = (Node*)(((u8*)next) - 12);
-		}
+	JSUTreeIterator<CoreNode> iterator;
+	for (iterator = mTree.getFirstChild(); iterator != mTree.getEndChild();) {
+		Node* child = static_cast<Node*>(iterator.getObject());
+		child->draw(gfx);
+		iterator++;
 	}
 }
 
@@ -202,6 +181,14 @@ void CNode::concat(CNode* newEnd)
 CNode::~CNode() { }
 
 /**
+ * @brief Deletes the current node from its parent's child list.
+ *
+ * This function removes the current node from its parent's child list.
+ * If there are other nodes before or after the current node, pointers are updated to maintain the linked list structure.
+ * If the current node is the only child of its parent, the parent's child pointer is updated to the next node, if any.
+ *
+ * @note This function assumes that the current node has a valid parent.
+ *
  * @note Address: 0x804115D0
  * @note Size: 0x98
  */

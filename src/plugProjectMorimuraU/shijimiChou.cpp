@@ -299,7 +299,7 @@ void Obj::doSimulation(f32 simSpeed)
 	}
 
 	EnemyBase::doSimulation(simSpeed);
-	if (isEvent(0, EB_Bittered) && (mPosition.y < mMapMinY + 2.0f || mBounceTriangle)) {
+	if (isEvent(0, EB_Bittered) && (mPosition.y < mMapMinY + 2.0f || mFloorTriangle)) {
 		if (gameSystem && gameSystem->isZukanMode()) {
 			mGoalPosition.y = mZukanGoalHeight;
 		} else {
@@ -316,25 +316,25 @@ void Obj::doSimulation(f32 simSpeed)
 void Obj::changeMaterial()
 {
 	if (mSpecType == SHIJIMITYPE_Yellow) {
-		mMaterial->mTevBlock->setTevColor(0, mMatColorY0);
-		mMaterial->mTevBlock->setTevKColor(0, mMatKColorY);
+		mMaterial->getTevBlock()->setTevColor(0, mMatColorY0);
+		mMaterial->getTevBlock()->setTevKColor(0, mMatKColorY);
 	} else if (mSpecType == SHIJIMITYPE_Red) {
-		mMaterial->mTevBlock->setTevColor(0, mMatColorR0);
-		mMaterial->mTevBlock->setTevKColor(0, mMatKColorR);
+		mMaterial->getTevBlock()->setTevColor(0, mMatColorR0);
+		mMaterial->getTevBlock()->setTevKColor(0, mMatKColorR);
 	} else {
-		mMaterial->mTevBlock->setTevColor(0, mMatColorB0);
-		mMaterial->mTevBlock->setTevKColor(0, mMatKColorB);
+		mMaterial->getTevBlock()->setTevColor(0, mMatColorB0);
+		mMaterial->getTevBlock()->setTevKColor(0, mMatKColorB);
 	}
 
 	J3DModel* j3dModel      = mModel->mJ3dModel;
 	J3DModelData* modelData = j3dModel->getModelData();
 	j3dModel->calcMaterial();
 
-	for (u16 i = 0; i < modelData->mMaterialTable.mMaterialNum; i++) {
-		J3DMatPacket* packet  = &j3dModel->mMatPackets[i];
-		j3dSys.mMatPacket     = packet;
-		J3DMaterial* material = modelData->mMaterialTable.mMaterials[i];
-		material->diff(packet->mShapePacket->mDiffFlag);
+	for (u16 i = 0; i < modelData->getMaterialNum(); i++) {
+		J3DMatPacket* packet = j3dModel->getMatPacket(i);
+		j3dSys.setMatPacket(packet);
+		J3DMaterial* material = modelData->getMaterialNodePointer(i);
+		material->diff(packet->getShapePacket()->mDiffFlag);
 	}
 }
 
@@ -376,9 +376,10 @@ void Obj::wallCallback(const MoveInfo& moveInfo)
 		if (getStateID() == SHIJIMICHOU_Fall) {
 			mIsFallVertical = true;
 		} else {
-			mGoalPosition.x = 100.0f * moveInfo.mReflectPosition.x + mPosition.x;
-			mGoalPosition.y = mPosition.y;
-			mGoalPosition.z = 100.0f * moveInfo.mReflectPosition.z + mPosition.z;
+			Vector3f pos    = mPosition;
+			mGoalPosition.x = 100.0f * moveInfo.mWallNormal.x + pos.x;
+			mGoalPosition.y = pos.y;
+			mGoalPosition.z = 100.0f * moveInfo.mWallNormal.z + pos.z;
 		}
 	}
 	/*
@@ -924,18 +925,16 @@ bool Obj::checkRestOn()
 	Sys::Sphere collSphere;
 	static_cast<CollPart*>(mSpawningEnemy->mCollTree->mPart->mChild)->getSphere(collSphere);
 
+	f32 rad = collSphere.mRadius;
+
+	Vector3f positionSep = mPosition;
+	positionSep.sub(collSphere.mPosition);
+
+	f32 dist             = positionSep.sqrMagnitude();
 	mRestEnemyCollSphere = collSphere;
-	f32 rad              = collSphere.mRadius;
-	f32 adjRad           = 1.2f * rad;
-	adjRad *= adjRad;
-	f32 dist = Vector3f(mPosition - collSphere.mPosition).sqrMagnitude();
-	if (dist < adjRad) {
-		mTargetVelocity.x *= 0.0f;
-		mTargetVelocity.y *= 0.0f;
-		mTargetVelocity.z *= 0.0f;
-		mCurrentVelocity.x *= 0.0f;
-		mCurrentVelocity.y *= 0.0f;
-		mCurrentVelocity.z *= 0.0f;
+	if (dist < SQUARE(1.2f * rad)) {
+		mTargetVelocity *= 0.0f;
+		mCurrentVelocity *= 0.0f;
 		hardConstraintOn();
 
 		if (dist > SQUARE(rad)) {
@@ -944,6 +943,28 @@ bool Obj::checkRestOn()
 
 			mPosition += collSphere.mPosition;
 			// more float math
+		}
+
+		f32 xRotVelocity = PI * ((collSphere.mPosition.y + collSphere.mRadius) - mPosition.y) / (-collSphere.mRadius * 2.0f);
+
+		if (collSphere.mPosition.y + collSphere.mRadius < mPosition.y) {
+			xRotVelocity = 0.0f;
+		}
+
+		if (collSphere.mPosition.y - collSphere.mRadius > mPosition.y) {
+			xRotVelocity = PI;
+		}
+
+		mRotation.x += 0.3f * (xRotVelocity - mRotation.x);
+
+		if (dist < SQUARE(rad) && FABS(xRotVelocity - mRotation.x) < 0.01f) {
+			if (mRotation.x > TAU) {
+				mRotation.x -= TAU;
+			}
+
+			if (mRotation.x < 0.0f) {
+				mRotation.x += TAU;
+			}
 
 			return true;
 		}
@@ -1732,7 +1753,7 @@ lbl_8038BEDC:
  */
 bool Obj::isFallEnd()
 {
-	if (mPosition.y < 10.0f + mMapMinY || mBounceTriangle) {
+	if (mPosition.y < 10.0f + mMapMinY || mFloorTriangle) {
 		mEfxDown->fade();
 		return true;
 	}

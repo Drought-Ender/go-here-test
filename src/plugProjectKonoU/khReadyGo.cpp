@@ -8,8 +8,9 @@
 #include "efx2d/T2DGo.h"
 #include "Game/GameSystem.h"
 #include "JSystem/J2D/J2DAnmLoader.h"
+#include "Screen/Game2DMgr.h"
 
-static const char pad[] = { "\0\0\0\0\0\0\0\0" };
+static const u32 padding[] = { 0, 0, 0 };
 static void _Print(char* format, ...) { OSReport(format, __FILE__); }
 
 namespace kh {
@@ -27,7 +28,7 @@ bool ObjReadyGo::doUpdateFadein()
 
 	DispReadyGo* disp = static_cast<DispReadyGo*>(getDispMember());
 
-	if (disp->mGameType == 0) {
+	if (disp->mGameType == DispReadyGo::TYPE_2PBattle) {
 		PSSystem::spSysIF->playSystemSe(PSSE_READYGO_BATTLE_COME, 0);
 	} else {
 		PSSystem::spSysIF->playSystemSe(PSSE_READYGO_CHALLENGE_COME, 0);
@@ -70,10 +71,10 @@ void ObjReadyGo::doCreate(JKRArchive* arc)
 
 	getOwner()->setColorBG(0, 0, 0, 160);
 
-	if (disp->mGameType == 0) {
-		PSStart2DStream(0xc0011022);
+	if (disp->mGameType == DispReadyGo::TYPE_2PBattle) {
+		PSStart2DStream(P2_STREAM_SOUND_ID(PSSTR_READY_GO_2P));
 	} else {
-		PSStart2DStream(0xc0011023);
+		PSStart2DStream(P2_STREAM_SOUND_ID(PSSTR_READY_GO_CHALLENGE));
 	}
 }
 
@@ -147,14 +148,14 @@ bool ObjReadyGo::updateAnimation()
 
 	// Update animations for each screen
 	for (int i = 0; i < mScreenNum; i++) {
-		mAnim1[i]->mCurrentFrame = mAnimTime1[i];
-		mAnim2[i]->mCurrentFrame = mAnimTime2[i];
+		mAnim1[i]->setFrame(mAnimTime1[i]);
+		mAnim2[i]->setFrame(mAnimTime2[i]);
 		mScreen[i]->animation();
 		mAnimTime1[i] += msVal.mAnimSpeed;
 		mAnimTime2[i] += msVal.mAnimSpeed;
 
 		// Check if the animation is complete
-		if (mAnimTime1[i] >= mAnim1[i]->mFrameLength - 2 || mAnimTime2[i] >= mAnim2[i]->mFrameLength - 2) {
+		if (mAnimTime1[i] >= mAnim1[i]->getFrameMax() - 2 || mAnimTime2[i] >= mAnim2[i]->getFrameMax() - 2) {
 			done = true;
 		}
 
@@ -166,7 +167,7 @@ bool ObjReadyGo::updateAnimation()
 			             getPaneCenterY(mScreen[i]->search('NALL')) + msVal.mEfxOffsetY);
 			efx2d::Arg arg = vec;
 
-			if (disp->mGameType == 0) {
+			if (disp->mGameType == DispReadyGo::TYPE_2PBattle) {
 				efx2d::T2DGoBatl efx;
 				efx.create(&arg);
 			} else {
@@ -178,7 +179,7 @@ bool ObjReadyGo::updateAnimation()
 		// Set the status of the display member to 1 and start the main BGM if necessary
 		if (mAnimTime1[i] >= goalTime2) {
 			mIsAnimComplete = true;
-			disp->mStatus   = 1;
+			disp->mStatus   = ::Screen::Game2DMgr::CHECK2D_ReadyGo_Finished;
 		}
 	}
 

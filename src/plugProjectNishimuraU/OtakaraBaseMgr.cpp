@@ -14,7 +14,7 @@ static const char otakaraBaseMgrName[] = "246-OtakaraBaseMgr";
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "オタカラムシマネージャ"; // otakara manager
+	mName = "繧ｪ繧ｿ繧ｫ繝ｩ繝繧ｷ繝槭ロ繝ｼ繧ｸ繝｣"; // otakara manager
 }
 
 /**
@@ -74,12 +74,12 @@ void Mgr::loadAnimData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 	P2ASSERTLINE(136, model);
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "mat_body")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x04020000);
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(J3DMDF_TexCoord1 | J3DMDF_DiffTexCoordScale);
 		}
 	}
 

@@ -7,12 +7,12 @@
 #include "types.h"
 
 struct MemoryCardMgrCommandBase {
-	inline MemoryCardMgrCommandBase(int val)
-	    : _00(val)
+	inline MemoryCardMgrCommandBase(int flags)
+	    : mFlag(flags)
 	{
 	}
 
-	int _00; // _00
+	int mFlag; // _00
 	// _04 = VTBL
 
 	virtual u32 getClassSize() = 0; // _08
@@ -73,6 +73,7 @@ struct MemoryCardMgr {
 
 	inline bool isSaveValid() { return mIsCard || checkStatus() != INSIDESTATUS_Unk11; }
 	inline bool isSaveInvalid() { return !mIsCard && checkStatus() != INSIDESTATUS_Unk11; }
+	inline bool isErrorNotOccured() { return (checkStatus() == 2); }
 
 	void cardProc(void*);
 	bool cardFormat(ECardSlot);

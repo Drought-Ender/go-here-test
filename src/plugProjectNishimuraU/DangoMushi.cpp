@@ -11,9 +11,6 @@
 #include "Dolphin/rand.h"
 #include "PSSystem/PSMainSide_ObjSound.h"
 
-#define DANGO_FALLING_ROCK_COUNT (10)
-#define DANGO_FALLING_EGG_COUNT  (1)
-
 namespace Game {
 namespace DangoMushi {
 
@@ -110,9 +107,7 @@ void Obj::doAnimationUpdateAnimator()
 	f32 delta = sys->mDeltaTime;
 	f32 speed = EnemyAnimatorBase::defaultAnimSpeed * delta;
 	static_cast<EnemyBlendAnimatorBase*>(mAnimator)->animate(&func, delta * 60.0f, speed, speed);
-	SysShape::Model* model = mModel;
-	model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc
-	    = (J3DMtxCalcAnmBase*)(static_cast<EnemyBlendAnimatorBase*>(mAnimator)->mAnimator.getCalc());
+	static_cast<EnemyBlendAnimatorBase*>(mAnimator)->mAnimator.setModelCalc(mModel, 0);
 }
 
 /**
@@ -123,14 +118,16 @@ void Obj::changeMaterial()
 {
 	J3DModelData* modelData;
 	J3DModel* model = mModel->mJ3dModel;
-	modelData       = model->mModelData;
+
+	modelData = model->mModelData;
 	model->calcMaterial();
 	mMatLoopAnimator->animate(30.0f);
-	for (u16 i = 0; i < modelData->mMaterialTable.mMaterialNum; i++) {
-		J3DMatPacket* packet  = &model->mMatPackets[i];
-		j3dSys.mMatPacket     = packet;
-		J3DMaterial* material = modelData->mMaterialTable.mMaterials[i];
-		material->diff(packet->mShapePacket->mDiffFlag);
+
+	for (u16 i = 0; i < modelData->getMaterialNum(); i++) {
+		J3DMatPacket* packet = model->getMatPacket(i);
+		j3dSys.setMatPacket(packet);
+		J3DMaterial* material = modelData->getMaterialNodePointer(i);
+		material->diff(packet->getShapePacket()->mDiffFlag);
 	}
 }
 
@@ -231,7 +228,7 @@ void Obj::collisionCallback(CollEvent& evt)
 	if (!isEvent(0, EB_Bittered) && evt.mCollidingCreature) {
 
 		// if rolling and we hit a piki, crush it.
-		if (mIsRolling && evt.mCollidingCreature->mBounceTriangle) {
+		if (mIsRolling && evt.mCollidingCreature->mFloorTriangle) {
 			InteractPress press(this, C_GENERALPARMS.mAttackDamage(), nullptr);
 			evt.mCollidingCreature->stimulate(press);
 
@@ -257,8 +254,8 @@ void Obj::wallCallback(const MoveInfo& mvInfo)
 		f32 speed         = velocity.normalise();
 
 		// if we're rolling fast enough and hit the wall at a 30 degree angle or more (90 degree = head-on), crash
-		if (speed > 100.0f && dot(velocity, mvInfo.mReflectPosition) < -0.5f) {
-			createBodyWallCrashEffect(mvInfo.mReflectPosition);
+		if (speed > 100.0f && velocity.dot(mvInfo.mWallNormal) < -0.5f) {
+			createBodyWallCrashEffect(mvInfo.mWallNormal);
 			mFsm->transit(this, DANGOMUSHI_Turn, nullptr);
 		}
 	}
@@ -403,12 +400,12 @@ void Obj::rollingMove()
 
 	turnToTarget2(targetPos, C_PROPERPARMS.mRollingTurnAccel(), C_PROPERPARMS.mRollingTurnSpeed());
 
-	f32 rollSpeed = C_PROPERPARMS.mRollingMoveSpeed();
-	f32 x         = (f32)sin(getFaceDir());
+	f32 moveSpeed = getMoveSpeed();
+	f32 x         = dolsinf(getFaceDir());
 	f32 y         = getTargetVelocity().y;
-	f32 z         = (f32)cos(getFaceDir());
+	f32 z         = dolcosf(getFaceDir());
 
-	mTargetVelocity = Vector3f(rollSpeed * x, y, rollSpeed * z);
+	mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 	if (mWallTriangle) {
 		Vector3f vel(mCurrentVelocity);
@@ -621,6 +618,9 @@ lbl_802FD358:
 	blr
 	*/
 }
+
+#define DANGO_FALLING_ROCK_COUNT (10)
+#define DANGO_FALLING_EGG_COUNT  (1)
 
 /**
  * @note Address: 0x802FD38C
@@ -935,8 +935,8 @@ bool Obj::flickHandCollision()
 			armPos += zVec;
 
 			CurrTriInfo info;
-			info.mPosition        = armPos;
-			info.mUpdateOnNewMaxY = 0;
+			info.mPosition          = armPos;
+			info.mGetTopPolygonInfo = 0;
 			mapMgr->getCurrTri(info);
 
 			if (!info.mTriangle || info.mMinY > armPos.y) {
@@ -1224,7 +1224,7 @@ void Obj::startBlendAnimation(int animIdx, bool blendAnim)
 		SysShape::AnimInfo* animInfo = anim.mAnimInfo;
 		f32 f1;
 		if (animInfo) {
-			f1 = (f32)animInfo->mAnm->mFrameLength;
+			f1 = (f32)animInfo->mAnm->mTotalFrameCount;
 		} else {
 			f1 = 0.0f;
 		}
@@ -1275,7 +1275,7 @@ void Obj::endBlendAnimation()
 void Obj::startBossFlickBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_Flick);
 }
 
@@ -1286,7 +1286,7 @@ void Obj::startBossFlickBGM()
 void Obj::startBossAttackLoopBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_AttackLong);
 }
 
@@ -1297,7 +1297,7 @@ void Obj::startBossAttackLoopBGM()
 void Obj::finishBossAttackLoopBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 }
 
@@ -1308,7 +1308,7 @@ void Obj::finishBossAttackLoopBGM()
 void Obj::updateBossBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	if (mStuckPikminCount) {
 		soundObj->postPikiAttack(true);
@@ -1324,7 +1324,7 @@ void Obj::updateBossBGM()
 void Obj::resetBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(false);
 }
 
@@ -1335,7 +1335,7 @@ void Obj::resetBossAppearBGM()
 void Obj::setBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(true);
 }
 

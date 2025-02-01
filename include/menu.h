@@ -6,6 +6,13 @@
 #include "IDelegate.h"
 
 struct Menu {
+	enum State {
+		Inactive = 0,
+		FadeIn   = 1,
+		Active   = 2,
+		FadeOut  = 3,
+	};
+
 	/**
 	 * @struct Menu::KeyEvent
 	 * @brief Represents a key event in the menu.
@@ -15,7 +22,15 @@ struct Menu {
 		 * @enum cTypeFlag
 		 * @brief Flags for the key event type.
 		 */
-		enum cTypeFlag { UNK0 = 16, UNK1 = 32 };
+		enum cTypeFlag {
+			U0                            = 0,
+			U1                            = 1,
+			U2                            = 2,
+			U3                            = 4,
+			U4                            = 8,
+			INVOKE_ACTION_ON_BUTTON_PRESS = 16,
+			U6                            = 32,
+		};
 
 		/**
 		 * @brief Constructs a KeyEvent object.
@@ -25,10 +40,12 @@ struct Menu {
 		 */
 		KeyEvent(cTypeFlag type, u32 param, IDelegate1<Menu&>* action);
 
-		int mType; // _00
-		int _04;
-		IDelegate1<Menu&>* mAction;
-		JSUPtrLink mLink;
+		inline void invokeMenuAction(Menu* menu) { mAction->invoke(*menu); }
+
+		int mType;                  // _00
+		int mButton;                // _04
+		IDelegate1<Menu&>* mAction; // _08
+		JSULink<KeyEvent> mLink;    // _0C
 	};
 
 	/**
@@ -40,7 +57,11 @@ struct Menu {
 		 * @enum cTypeFlag
 		 * @brief Flags for the menu item type.
 		 */
-		enum cTypeFlag { UNK0 = 0, UNK1 = 1 };
+		enum cTypeFlag {
+			UNK0 = 0,
+			UNK1 = 1,
+			UNK2 = 2,
+		};
 
 		/**
 		 * @brief Constructs a MenuItem object.
@@ -67,15 +88,15 @@ struct Menu {
 		 * @param menu A pointer to the Menu object.
 		 * @param param The parameter of the menu item.
 		 */
-		void checkEvents(Menu* menu, int param);
+		bool checkEvents(Menu* menu, int param);
 
-		int _00;           // _00
-		bool mIsActive;    // _04
-		char* mName;       // _08
-		int mSectionFlags; // _0C
-		int mType;         // _10
-		JSUPtrList mList;  // _14
-		JSUPtrLink mLink;  // _20
+		Menu* mParentMenu;            // _00
+		bool mIsActive;               // _04
+		char* mName;                  // _08
+		int mSectionFlags;            // _0C
+		int mType;                    // _10
+		JSUList<KeyEvent> mEventList; // _14
+		JSULink<MenuItem> mItemLink;  // _20
 	};
 
 	/**
@@ -107,7 +128,7 @@ struct Menu {
 	 * @brief Updates the menu.
 	 * @param flag A boolean indicating whether the menu should be updated or not.
 	 */
-	void doUpdate(bool flag);
+	Menu* doUpdate(bool flag);
 
 	/**
 	 * @brief Sets the position of the menu.
@@ -120,29 +141,33 @@ struct Menu {
 		mPositionY = y;
 	}
 
-	JUTGamePad* mControl;   // _00
-	JUTFont* mFont;         // _04
-	bool mFlag;             // _08
-	int _0C;                // _0C
-	Menu* mSelf;            // _10
-	Menu* _14;              // _14
-	JSUPtrList mItemList;   // _18
-	MenuItem* mCurrentItem; // _24
-	MenuItem* mLastItem;    // _28
-	int _2C;                // _2C
-	int mItemCount;         // _30
-	int mState;             // _34
-	f32 mTimer;             // _38
-	f32 mTimer2;            // _3C
-	int mPositionX;         // _40
-	int mPositionY;         // _44
-	int _48;                // _48
-	int _4C;                // _4C
-	int _50;                // _50
-	int _54;                // _54
-	bool mIsInitialised;    // _58
-	bool mIsUpdated;        // _59
-	int _5C;
+	// unused/inlined:
+	void open();
+	void close();
+
+	JUTGamePad* mControl;                     // _00
+	JUTFont* mFont;                           // _04
+	bool mFlag;                               // _08
+	Menu* mPreviousMenu;                      // _0C
+	Menu* mActiveMenu;                        // _10
+	Menu* mCurrentItemParent;                 // _14
+	JSUList<MenuItem> mItemList;              // _18
+	MenuItem* mCurrentItem;                   // _24
+	MenuItem* mLastItem;                      // _28
+	int _2C;                                  // _2C
+	int mItemCount;                           // _30
+	int mState;                               // _34
+	f32 mTimer;                               // _38
+	f32 mTimer2;                              // _3C
+	int mPositionX;                           // _40
+	int mPositionY;                           // _44
+	int _48;                                  // _48
+	IDelegate1<Menu&>* mOnInitialiseCallback; // _4C
+	IDelegate1<Menu&>* mOnInactiveCallback;   // _50
+	IDelegate1<Menu&>* mOnUpdateCallback;     // _54
+	bool mIsInitialised;                      // _58
+	bool mIsUpdated;                          // _59
+	int mButtonValue;                         // _5C
 };
 
 #endif

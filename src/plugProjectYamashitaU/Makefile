@@ -3,7 +3,7 @@ YAMASHITA_FILES:=\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/pelplant.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/pelplantState.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/enemyInteractBattle.o\
-	$(BUILD_DIR)/asm/plugProjectYamashitaU/generalEnemyMgr.o\
+	$(BUILD_DIR)/src/plugProjectYamashitaU/generalEnemyMgr.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/kochappyAnimator.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/kochappy.o\
 	$(BUILD_DIR)/asm/plugProjectYamashitaU/kochappyState.o\
@@ -13,8 +13,8 @@ YAMASHITA_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectYamashitaU/chappyState.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/chappyAnimator.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/chappyMgr.o\
-	$(BUILD_DIR)/asm/plugProjectYamashitaU/lifeGaugeMgr.o\
-	$(BUILD_DIR)/asm/plugProjectYamashitaU/carryInfoMgr.o\
+	$(BUILD_DIR)/src/plugProjectYamashitaU/lifeGaugeMgr.o\
+	$(BUILD_DIR)/src/plugProjectYamashitaU/carryInfoMgr.o\
 	$(BUILD_DIR)/asm/plugProjectYamashitaU/gameLightMgr.o\
 	$(BUILD_DIR)/asm/plugProjectYamashitaU/vtxAnm.o\
 	$(BUILD_DIR)/src/plugProjectYamashitaU/enemyInfo.o\

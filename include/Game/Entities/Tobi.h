@@ -95,15 +95,15 @@ struct Obj : public EnemyBase {
 	// _00 		= VTBL
 	// _00-_2BC	= EnemyBase
 	FSM* mFsm;                 // _2BC
-	u8 _2C0;                   // _2C0
+	u8 mCanSearchBridge;       // _2C0
 	bool mIsUnderground;       // _2C1
 	u16 mAppearCheck;          // _2C2
 	StateID mNextState;        // _2C4
 	MouthSlots mMouthSlots;    // _2C8
 	Vector3f mTargetPosition;  // _2D0
 	ItemBridge::Item* mBridge; // _2DC
-	f32 _2E0;                  // _2E0
-	f32 _2E4;                  // _2E4
+	f32 mBridgeGoalRandOffsX;  // _2E0
+	f32 mBridgeTargetMaxWidth; // _2E4
 	                           // _2E8 = PelletView
 };
 
@@ -128,11 +128,11 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mTakeOffHealthRatio(this, 'fp01', "—£—¤ƒ‰ƒCƒt", 0.5f, 0.0f, 1.0f)  // 'takeoff life'
-		    , mLandHealthRatio(this, 'fp02', "’…—¤ƒ‰ƒCƒt", 0.7f, 0.0f, 1.0f)     // 'landing life'
-		    , mFlightHeight(this, 'fp03', "”òsƒIƒtƒZƒbƒg", 60.0f, 0.0f, 300.0f) // 'flight offset'
-		    , mPoisonDamage(this, 'fp11', "”’ƒsƒNƒ~ƒ“", 300.0f, 0.0f, 10000.0f)  // 'white pikmin'
-		    , mBridgeDamage(this, 'fp12', "‹´H‚¢ƒpƒ[", 75.0f, 0.0f, 100.0f)   // 'bridge eating power'
+		    , mTakeOffHealthRatio(this, 'fp01', "é›¢é™¸ãƒ©ã‚¤ãƒ•", 0.5f, 0.0f, 1.0f)  // 'takeoff life'
+		    , mLandHealthRatio(this, 'fp02', "ç€é™¸ãƒ©ã‚¤ãƒ•", 0.7f, 0.0f, 1.0f)     // 'landing life'
+		    , mFlightHeight(this, 'fp03', "é£›è¡Œã‚ªãƒ•ã‚»ãƒƒãƒˆ", 60.0f, 0.0f, 300.0f) // 'flight offset'
+		    , mPoisonDamage(this, 'fp11', "ç™½ãƒ”ã‚¯ãƒŸãƒ³", 300.0f, 0.0f, 10000.0f)  // 'white pikmin'
+		    , mBridgeDamage(this, 'fp12', "æ©‹é£Ÿã„ãƒ‘ãƒ¯ãƒ¼", 75.0f, 0.0f, 100.0f)   // 'bridge eating power'
 		{
 		}
 

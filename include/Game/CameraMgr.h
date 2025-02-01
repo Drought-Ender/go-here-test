@@ -11,11 +11,106 @@
 struct Viewport;
 
 namespace Game {
-struct CameraArg;
 struct Navi;
 
+enum DemoCameraType {
+	CAMDEMO_NearLow = 0,
+	CAMDEMO_Test    = 1, // never used but has code
+};
+
+enum CamNaviID {
+	CAMNAVI_Olimar = 0,
+	CAMNAVI_Louie  = 1,
+	CAMNAVI_Both   = 2,
+};
+
+enum CamSelAngle {
+	CAMANGLE_Behind   = 0, // low angle (behind navi)
+	CAMANGLE_Overhead = 1, // high angle (overhead)
+};
+
+enum CamZoomLevel {
+	CAMZOOM_Near = 0, // fully zoomed in
+	CAMZOOM_Mid  = 1, // middle zoom
+	CAMZOOM_Far  = 2, // fully zoomed out
+};
+
+enum CameraFlags {
+	CAMFLAGS_ChangeZoomLevel = 0x1,  // i.e. R has been pressed
+	CAMFLAGS_ChangeSelAngle  = 0x2,  // i.e. Z has been pressed
+	CAMFLAGS_CenterBehind    = 0x4,  // i.e. L has been pressed
+	CAMFLAGS_SmoothFollow    = 0x8,  // i.e. L is being held
+	CAMFLAGS_StartZoomCam    = 0x10, // start zoom cam (held R/starting demo)
+	CAMFLAGS_InZoomCam       = 0x20, // continue zoom cam (holding R/in demo)
+	CAMFLAGS_EndZoomCam      = 0x40, // end zoom cam (stopped holding R/ended demo)
+};
+
+enum CamChangePlayer {
+	CAMCHANGE_None       = 0,
+	CAMCHANGE_IsChanging = 1,
+};
+
+// StrengthSpeedDuration
+enum VibrationType {
+	//////// Strength LIGHT ////////
+	// Speed SLOW
+	VIBTYPE_LightSlowShort = 0, // duration short (light, slow)
+	VIBTYPE_LightSlowMid   = 1, // duration mid   (light, slow)
+	VIBTYPE_LightSlowLong  = 2, // duration long  (light, slow)
+
+	// Speed MID
+	VIBTYPE_LightMidShort = 3, // duration short (light, mid)
+	VIBTYPE_LightMidMid   = 4, // duration mid   (light, mid)
+	VIBTYPE_LightMidLong  = 5, // duration long  (light, mid)
+
+	// Speed FAST
+	VIBTYPE_LightFastShort = 6,                     // duration short (light, fast)
+	VIBTYPE_LightFastMid   = 7,                     // duration mid   (light, fast)
+	VIBTYPE_LightFastLong  = 8,                     // duration long  (light, fast)
+	VIBTYPE_LIGHT          = VIBTYPE_LightFastLong, // cutoff for light vibration
+
+	//////// Strength MID ////////
+	// Speed SLOW
+	VIBTYPE_MidSlowShort = 9,  // duration short (mid, slow)
+	VIBTYPE_MidSlowMid   = 10, // duration mid   (mid, slow)
+	VIBTYPE_MidSlowLong  = 11, // duration long  (mid, slow)
+
+	// Speed MID
+	VIBTYPE_MidMidShort = 12, // duration short (mid, mid)
+	VIBTYPE_MidMidMid   = 13, // duration mid   (mid, mid)
+	VIBTYPE_MidMidLong  = 14, // duration long  (mid, mid)
+
+	// Speed FAST
+	VIBTYPE_MidFastShort = 15,                  // duration short (mid, fast)
+	VIBTYPE_MidFastMid   = 16,                  // duration mid   (mid, fast)
+	VIBTYPE_MidFastLong  = 17,                  // duration long  (mid, fast)
+	VIBTYPE_MID          = VIBTYPE_MidFastLong, // cutoff for light vibration
+
+	//////// Strength HARD ////////
+	// Speed SLOW
+	VIBTYPE_HardSlowShort = 18, // duration short (hard, slow)
+	VIBTYPE_HardSlowMid   = 19, // duration mid   (hard, slow)
+	VIBTYPE_HardSlowLong  = 20, // duration long  (hard, slow)
+
+	// Speed MID
+	VIBTYPE_HardMidShort = 21, // duration short (hard, mid)
+	VIBTYPE_HardMidMid   = 22, // duration mid   (hard, mid)
+	VIBTYPE_HardMidLong  = 23, // duration long  (hard, mid)
+
+	// Speed FAST
+	VIBTYPE_HardFastShort = 24,                   // duration short (hard, fast)
+	VIBTYPE_HardFastMid   = 25,                   // duration mid   (hard, fast)
+	VIBTYPE_HardFastLong  = 26,                   // duration long  (hard, fast)
+	VIBTYPE_HARD          = VIBTYPE_HardFastLong, // cutoff for light vibration
+
+	// special set vibration parameters
+	VIBTYPE_Crash      = 27, // 'crash' effects (rocks hitting the ground, crawbster falling/crashing, empress crashing)
+	VIBTYPE_Boom       = 28, // for mum flicks and groink deaths?
+	VIBTYPE_NaviDamage = 29, // just for navis taking damage
+};
+
 struct CameraArg {
-	u32 state;
+	u32 mState; // _00
 };
 
 struct CameraData {
@@ -36,67 +131,67 @@ struct CameraData {
 struct CameraParms : public Parameters {
 	CameraParms()
 	    : Parameters(nullptr, "CameraParms")
-	    , mNearLowDist(this, 'cnld', "Near(Low)‹——£", 600.0f, 10.0f, 5000.0f)          // 'near(low) distance'
-	    , mNearLowAngle(this, 'cnla', "Near(Low)ƒAƒ“ƒOƒ‹", 20.0f, 0.0f, 90.0f)         // 'near(low) angle'
-	    , mNearLowFOV(this, 'cnlf', "Near(Low)‚e‚n‚u", 10.0f, 1.0f, 60.0f)             // 'near(low) fov'
-	    , mNearLowOffset(this, 'cnlo', "Near(Low)ƒIƒtƒZƒbƒg", 25.0f, 10.0f, 500.0f)    // 'near(low) offset'
-	    , mNearLowWeight(this, 'cnlw', "Near(Low)ƒEƒFƒCƒg", 1000.0f, 10.0f, 5000.0f)   // 'near(low) weight'
+	    , mNearLowDist(this, 'cnld', "Near(Low)è·é›¢", 600.0f, 10.0f, 5000.0f)          // 'near(low) distance'
+	    , mNearLowAngle(this, 'cnla', "Near(Low)ã‚¢ãƒ³ã‚°ãƒ«", 20.0f, 0.0f, 90.0f)         // 'near(low) angle'
+	    , mNearLowFOV(this, 'cnlf', "Near(Low)ï¼¦ï¼¯ï¼¶", 10.0f, 1.0f, 60.0f)             // 'near(low) fov'
+	    , mNearLowOffset(this, 'cnlo', "Near(Low)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 25.0f, 10.0f, 500.0f)    // 'near(low) offset'
+	    , mNearLowWeight(this, 'cnlw', "Near(Low)ã‚¦ã‚§ã‚¤ãƒˆ", 1000.0f, 10.0f, 5000.0f)   // 'near(low) weight'
 	    , mNearLowDetached(this, 'nldt', "Near(Low)Detached", 17.5f, 0.0f, 1000.0f)    // 'near(low) detached'
 	    , mNearLowNear(this, 'nlnc', "Near(Low)Near", 1.0f, 1.0f, 12800.0f)            // 'near(low) near'
 	    , mNearLowFar(this, 'nlfc', "Near(Low)Far", 12800.0f, 1.0f, 12800.0f)          // 'near(low) far'
-	    , mMidLowDist(this, 'cmld', "Mid(Low)‹——£", 600.0f, 10.0f, 5000.0f)            // 'mid(low) distance'
-	    , mMidLowAngle(this, 'cmla', "Mid(Low)ƒAƒ“ƒOƒ‹", 21.0f, 0.0f, 90.0f)           // 'mid(low) angle'
-	    , mMidLowFOV(this, 'cmlf', "Mid(Low)‚e‚n‚u", 23.0f, 1.0f, 60.0f)               // 'mid(low) fov'
-	    , mMidLowOffset(this, 'cmlo', "Mid(Low)ƒIƒtƒZƒbƒg", 38.0f, 10.0f, 500.0f)      // 'mid(low) offset'
-	    , mMidLowWeight(this, 'cmlw', "Mid(Low)ƒEƒFƒCƒg", 500.0f, 10.0f, 5000.0f)      // 'mid(low) weight'
+	    , mMidLowDist(this, 'cmld', "Mid(Low)è·é›¢", 600.0f, 10.0f, 5000.0f)            // 'mid(low) distance'
+	    , mMidLowAngle(this, 'cmla', "Mid(Low)ã‚¢ãƒ³ã‚°ãƒ«", 21.0f, 0.0f, 90.0f)           // 'mid(low) angle'
+	    , mMidLowFOV(this, 'cmlf', "Mid(Low)ï¼¦ï¼¯ï¼¶", 23.0f, 1.0f, 60.0f)               // 'mid(low) fov'
+	    , mMidLowOffset(this, 'cmlo', "Mid(Low)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 38.0f, 10.0f, 500.0f)      // 'mid(low) offset'
+	    , mMidLowWeight(this, 'cmlw', "Mid(Low)ã‚¦ã‚§ã‚¤ãƒˆ", 500.0f, 10.0f, 5000.0f)      // 'mid(low) weight'
 	    , mMidLowDetached(this, 'mldt', "Mid(Low)Detached", 55.0f, 0.0f, 1000.0f)      // 'mid(low) detached'
 	    , mMidLowNear(this, 'mlnc', "Mid(Low)Near", 1.0f, 1.0f, 12800.0f)              // 'mid(low) near'
 	    , mMidLowFar(this, 'mlfc', "Mid(Low)Far", 12800.0f, 1.0f, 12800.0f)            // 'mid(low) far'
-	    , mFarLowDist(this, 'cfld', "Far(Low)‹——£", 900.0f, 10.0f, 5000.0f)            // 'far(low) distance'
-	    , mFarLowAngle(this, 'cfla', "Far(Low)ƒAƒ“ƒOƒ‹", 25.0f, 0.0f, 90.0f)           // 'far(low) angle'
-	    , mFarLowFOV(this, 'cflf', "Far(Low)‚e‚n‚u", 26.0f, 1.0f, 60.0f)               // 'far(low) fov'
-	    , mFarLowOffset(this, 'cflo', "Far(Low)ƒIƒtƒZƒbƒg", 33.0f, 10.0f, 500.0f)      // 'far(low) offset'
-	    , mFarLowWeight(this, 'cflw', "Far(Low)ƒEƒFƒCƒg", 400.0f, 10.0f, 5000.0f)      // 'far(low) weight'
+	    , mFarLowDist(this, 'cfld', "Far(Low)è·é›¢", 900.0f, 10.0f, 5000.0f)            // 'far(low) distance'
+	    , mFarLowAngle(this, 'cfla', "Far(Low)ã‚¢ãƒ³ã‚°ãƒ«", 25.0f, 0.0f, 90.0f)           // 'far(low) angle'
+	    , mFarLowFOV(this, 'cflf', "Far(Low)ï¼¦ï¼¯ï¼¶", 26.0f, 1.0f, 60.0f)               // 'far(low) fov'
+	    , mFarLowOffset(this, 'cflo', "Far(Low)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 33.0f, 10.0f, 500.0f)      // 'far(low) offset'
+	    , mFarLowWeight(this, 'cflw', "Far(Low)ã‚¦ã‚§ã‚¤ãƒˆ", 400.0f, 10.0f, 5000.0f)      // 'far(low) weight'
 	    , mFarLowDetached(this, 'fldt', "Far(Low)Detached", 130.0f, 0.0f, 1000.0f)     // 'far(low) detached'
 	    , mFarLowNear(this, 'flnc', "Far(Low)Near", 1.0f, 1.0f, 12800.0f)              // 'far(low) near'
 	    , mFarLowFar(this, 'flfc', "Far(Low)Far", 12800.0f, 1.0f, 12800.0f)            // 'far(low) far'
-	    , mNearHighDist(this, 'cnhd', "Near(High)‹——£", 900.0f, 10.0f, 5000.0f)        // 'near(high) distance'
-	    , mNearHighAngle(this, 'cnha', "Near(High)ƒAƒ“ƒOƒ‹", 60.0f, 0.0f, 90.0f)       // 'near(high) angle'
-	    , mNearHighFOV(this, 'cnhf', "Near(High)‚e‚n‚u", 10.0f, 1.0f, 60.0f)           // 'near(high) fov'
-	    , mNearHighOffset(this, 'cnho', "Near(High)ƒIƒtƒZƒbƒg", 40.0f, 10.0f, 500.0f)  // 'near(high) offset'
-	    , mNearHighWeight(this, 'cnhw', "Near(High)ƒEƒFƒCƒg", 1000.0f, 10.0f, 5000.0f) // 'near(high) weight'
+	    , mNearHighDist(this, 'cnhd', "Near(High)è·é›¢", 900.0f, 10.0f, 5000.0f)        // 'near(high) distance'
+	    , mNearHighAngle(this, 'cnha', "Near(High)ã‚¢ãƒ³ã‚°ãƒ«", 60.0f, 0.0f, 90.0f)       // 'near(high) angle'
+	    , mNearHighFOV(this, 'cnhf', "Near(High)ï¼¦ï¼¯ï¼¶", 10.0f, 1.0f, 60.0f)           // 'near(high) fov'
+	    , mNearHighOffset(this, 'cnho', "Near(High)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 40.0f, 10.0f, 500.0f)  // 'near(high) offset'
+	    , mNearHighWeight(this, 'cnhw', "Near(High)ã‚¦ã‚§ã‚¤ãƒˆ", 1000.0f, 10.0f, 5000.0f) // 'near(high) weight'
 	    , mNearHighDetached(this, 'nhdt', "Near(High)Detached", 27.5f, 0.0f, 1000.0f)  // 'near(high) detached'
 	    , mNearHighNear(this, 'nhnc', "Near(High)Near", 1.0f, 1.0f, 12800.0f)          // 'near(high) near'
 	    , mNearHighFar(this, 'nhfc', "Near(High)Far", 12800.0f, 1.0f, 12800.0f)        // 'near(high) far'
-	    , mMidHighDist(this, 'cmhd', "Mid(High)‹——£", 900.0f, 10.0f, 5000.0f)          // 'mid(high) distance'
-	    , mMidHighAngle(this, 'cmha', "Mid(High)ƒAƒ“ƒOƒ‹", 60.0f, 0.0f, 90.0f)         // 'mid(high) angle'
-	    , mMidHighFOV(this, 'cmhf', "Mid(High)‚e‚n‚u", 20.0f, 1.0f, 60.0f)             // 'mid(high) fov'
-	    , mMidHighOffset(this, 'cmho', "Mid(High)ƒIƒtƒZƒbƒg", 70.0f, 10.0f, 500.0f)    // 'mid(high) offset'
-	    , mMidHighWeight(this, 'cmhw', "Mid(High)ƒEƒFƒCƒg", 500.0f, 10.0f, 5000.0f)    // 'mid(high) weight'
+	    , mMidHighDist(this, 'cmhd', "Mid(High)è·é›¢", 900.0f, 10.0f, 5000.0f)          // 'mid(high) distance'
+	    , mMidHighAngle(this, 'cmha', "Mid(High)ã‚¢ãƒ³ã‚°ãƒ«", 60.0f, 0.0f, 90.0f)         // 'mid(high) angle'
+	    , mMidHighFOV(this, 'cmhf', "Mid(High)ï¼¦ï¼¯ï¼¶", 20.0f, 1.0f, 60.0f)             // 'mid(high) fov'
+	    , mMidHighOffset(this, 'cmho', "Mid(High)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 70.0f, 10.0f, 500.0f)    // 'mid(high) offset'
+	    , mMidHighWeight(this, 'cmhw', "Mid(High)ã‚¦ã‚§ã‚¤ãƒˆ", 500.0f, 10.0f, 5000.0f)    // 'mid(high) weight'
 	    , mMidHighDetached(this, 'mhdt', "Mid(High)Detached", 75.0f, 0.0f, 1000.0f)    // 'mid(high) detached'
 	    , mMidHighNear(this, 'mhnc', "Mid(High)Near", 1.0f, 1.0f, 12800.0f)            // 'mid(high) near'
 	    , mMidHighFar(this, 'mhfc', "Mid(High)Far", 12800.0f, 1.0f, 12800.0f)          // 'mid(high) far'
-	    , mFarHighDist(this, 'cfhd', "Far(High)‹——£", 1200.0f, 10.0f, 5000.0f)         // 'far(high) distance'
-	    , mFarHighAngle(this, 'cfha', "Far(High)ƒAƒ“ƒOƒ‹", 60.0f, 0.0f, 90.0f)         // 'far(high) angle'
-	    , mFarHighFOV(this, 'cfhf', "Far(High)‚e‚n‚u", 30.0f, 1.0f, 60.0f)             // 'far(high) fov'
-	    , mFarHighOffset(this, 'cfho', "Far(High)ƒIƒtƒZƒbƒg", 100.0f, 10.0f, 500.0f)   // 'far(high) offset'
-	    , mFarHighWeight(this, 'cfhw', "Far(High)ƒEƒFƒCƒg", 200.0f, 10.0f, 5000.0f)    // 'far(high) weight'
+	    , mFarHighDist(this, 'cfhd', "Far(High)è·é›¢", 1200.0f, 10.0f, 5000.0f)         // 'far(high) distance'
+	    , mFarHighAngle(this, 'cfha', "Far(High)ã‚¢ãƒ³ã‚°ãƒ«", 60.0f, 0.0f, 90.0f)         // 'far(high) angle'
+	    , mFarHighFOV(this, 'cfhf', "Far(High)ï¼¦ï¼¯ï¼¶", 30.0f, 1.0f, 60.0f)             // 'far(high) fov'
+	    , mFarHighOffset(this, 'cfho', "Far(High)ã‚ªãƒ•ã‚»ãƒƒãƒˆ", 100.0f, 10.0f, 500.0f)   // 'far(high) offset'
+	    , mFarHighWeight(this, 'cfhw', "Far(High)ã‚¦ã‚§ã‚¤ãƒˆ", 200.0f, 10.0f, 5000.0f)    // 'far(high) weight'
 	    , mFarHighDetached(this, 'fhdt', "Far(High)Detached", 165.0f, 0.0f, 1000.0f)   // 'far(high) detached'
 	    , mFarHighNear(this, 'fhnc', "Far(High)Near", 1.0f, 1.0f, 12800.0f)            // 'far(high) near'
 	    , mFarHighFar(this, 'fhfc', "Far(High)Far", 12800.0f, 1.0f, 12800.0f)          // 'far(high) far'
-	    , mZoomDist(this, 'zmdt', "ZOOM ‹——£", 250.0f, 10.0f, 5000.0f)                 // 'ZOOM distance'
-	    , mZoomAngle(this, 'zman', "ZOOM ƒAƒ“ƒOƒ‹", 12.0f, 0.0f, 90.0f)                // 'ZOOM angle'
-	    , mZoomFOV(this, 'zmfv', "ZOOM ‚e‚n‚u", 35.0f, 1.0f, 60.0f)                    // 'ZOOM fov'
-	    , mCollRadius(this, 'clcr', "ƒRƒŠƒWƒ‡ƒ“”¼Œa", 300.0f, 0.0f, 500.0f)            // 'collision radius'
-	    , mCollInterpSpeed(this, 'clms', "ƒRƒŠƒWƒ‡ƒ“•âŠÔ‘¬“x", 0.005f, 0.001f, 1.0f)   // 'collision interpolation speed'
-	    , mCollCorrHeight(this, 'clmh', "ƒRƒŠƒWƒ‡ƒ“•â³‚", 5.0f, 0.0f, 100.0f)        // 'collision correction height'
-	    , mNoCollHeight(this, 'clnh', "ƒRƒŠƒWƒ‡ƒ“–³‚µ‚", 25.0f, 0.0f, 500.0f)         // 'no collision height'
-	    , mSettingChangeSpeed(this, 'cpmd', "Ý’è•ÏX‘¬“x", 0.1f, 0.0f, 1.0f)          // 'setting change speed'
-	    , mRotSpeed(this, 'cmmt', "‰ñ“]‘¬“x", 0.2f, 0.0f, 1.0f)                        // 'rotation speed'
-	    , mRotFollowTime(this, 'cmft', "‰ñ“]’Ç]ŽžŠÔ", 0.6f, 0.0f, 3.0f)               // 'rotation follow time'
-	    , mRotAccel(this, 'cmta', "‰ñ“]‰Á‘¬“x", 0.005f, 0.0f, 1.0f)                    // 'rotation acceleration'
-	    , mMaxRotSpeed(this, 'cmtm', "‰ñ“]Å‚‘¬“x", 0.9f, 0.0f, 5.0f)                 // 'max rotation speed'
-	    , mRotDampRate(this, 'cmtb', "‰ñ“]Œ¸Š—¦", 0.85f, 0.0f, 1.0f)                  // 'rotation damping rate'
+	    , mZoomDist(this, 'zmdt', "ZOOM è·é›¢", 250.0f, 10.0f, 5000.0f)                 // 'ZOOM distance'
+	    , mZoomAngle(this, 'zman', "ZOOM ã‚¢ãƒ³ã‚°ãƒ«", 12.0f, 0.0f, 90.0f)                // 'ZOOM angle'
+	    , mZoomFOV(this, 'zmfv', "ZOOM ï¼¦ï¼¯ï¼¶", 35.0f, 1.0f, 60.0f)                    // 'ZOOM fov'
+	    , mCollRadius(this, 'clcr', "ã‚³ãƒªã‚¸ãƒ§ãƒ³åŠå¾„", 300.0f, 0.0f, 500.0f)            // 'collision radius'
+	    , mCollInterpSpeed(this, 'clms', "ã‚³ãƒªã‚¸ãƒ§ãƒ³è£œé–“é€Ÿåº¦", 0.005f, 0.001f, 1.0f)   // 'collision interpolation speed'
+	    , mCollCorrHeight(this, 'clmh', "ã‚³ãƒªã‚¸ãƒ§ãƒ³è£œæ­£é«˜", 5.0f, 0.0f, 100.0f)        // 'collision correction height'
+	    , mNoCollHeight(this, 'clnh', "ã‚³ãƒªã‚¸ãƒ§ãƒ³ç„¡ã—é«˜", 25.0f, 0.0f, 500.0f)         // 'no collision height'
+	    , mSettingChangeSpeed(this, 'cpmd', "è¨­å®šå¤‰æ›´é€Ÿåº¦", 0.1f, 0.0f, 1.0f)          // 'setting change speed'
+	    , mRotSpeed(this, 'cmmt', "å›žè»¢é€Ÿåº¦", 0.2f, 0.0f, 1.0f)                        // 'rotation speed'
+	    , mRotFollowTime(this, 'cmft', "å›žè»¢è¿½å¾“æ™‚é–“", 0.6f, 0.0f, 3.0f)               // 'rotation follow time'
+	    , mRotAccel(this, 'cmta', "å›žè»¢åŠ é€Ÿåº¦", 0.005f, 0.0f, 1.0f)                    // 'rotation acceleration'
+	    , mMaxRotSpeed(this, 'cmtm', "å›žè»¢æœ€é«˜é€Ÿåº¦", 0.9f, 0.0f, 5.0f)                 // 'max rotation speed'
+	    , mRotDampRate(this, 'cmtb', "å›žè»¢æ¸›è¡°çŽ‡", 0.85f, 0.0f, 1.0f)                  // 'rotation damping rate'
 	{
 	}
 
@@ -216,38 +311,19 @@ struct PlayCamera : public LookAtCamera {
 	PlayCamera(Navi* target);
 
 	virtual ~PlayCamera() { }                                         // _08 (weak)
-	virtual Vector3f getLookAtPosition_() { return mLookAtPosition; } // _58 (weak)
 	virtual bool isSpecialCamera();                                   // _70
 	virtual void updateMatrix();                                      // _74
 	virtual void doUpdate();                                          // _78
-	virtual void startVibration(int) { }                              // _7C (weak)
 	virtual void init();                                              // _80
-
-	inline f32 adjustAngle(f32 in, f32 out)
-	{
-		CameraParms* parms = mCameraParms;
-
-		if (in >= out) {
-			f32 x = in - out;
-			if (TAU - x < x) {
-				in -= TAU;
-			}
-		} else {
-			f32 x = out - in;
-			if (TAU - x < x) {
-				in += TAU;
-			}
-		}
-
-		mCameraAngleCurrent += parms->mRotSpeed.mValue * (in - out);
-	}
+	virtual void startVibration(int) { }                              // _7C (weak)
+	virtual Vector3f getLookAtPosition_() { return mLookAtPosition; } // _58 (weak)
 
 	void setCameraParms(CameraParms* parms);
 	void setVibrationParms(VibrationParms* parms);
 	void setCameraAngle(f32 angle);
 	void getCameraData(CameraData& data);
 	void setCameraData(CameraData& data);
-	void changePlayerMode(bool updateDir);
+	void changePlayerMode(bool doCenterCameraBehind);
 	void noUpdate();
 	bool isVibration();
 	void startVibration(int type, f32 strength);
@@ -262,12 +338,12 @@ struct PlayCamera : public LookAtCamera {
 	void setSmoothThetaSpeed();
 	void changeTargetTheta();
 	void changeTargetAtPosition();
-	void updateParms(int flag);
+	void updateParms(int flags);
 	void updateVibration(int id);
 	void otherVibFinished(int id);
 	bool isModCameraFinished();
-	void setCollisionCameraTargetPhi(int);
-	f32 getCollisionCameraTargetPhi(f32, f32);
+	void setCollisionCameraTargetPhi(int flags);
+	f32 getCollisionCameraTargetPhi(f32 angle, f32 dist);
 
 	// _00 		= VTBL
 	// _00-_198	= LookAtCamera
@@ -292,15 +368,15 @@ struct PlayCamera : public LookAtCamera {
 	f32 mHoldRTimer;                 // _1E0
 	Vector3f mGoalPosition;          // _1E4
 	bool mVibrateEnabled[3];         // _1F0
-	f32 mVibrateSpeedParm[3];        // _1F4, vibration azimuth short speed?
+	f32 mVibrateSpeed[3];            // _1F4
 	f32 mVibrateRollAngle[3];        // _200
 	f32 mVibrateAngle[3];            // _20C
 	f32 mVibrateTimer[3];            // _218
-	f32 mVibrateTimeParm[3];         // _224, vibration azimuth short time?
-	f32 mVibrateScaleParm[3];        // _230
-	f32 mVibrateAzimuthParm[3];      // _23C, vibration azimuth short vib?
-	u8 mCanInput;                    // _248
-	u8 _249;                         // _249
+	f32 mVibrateDuration[3];         // _224
+	f32 mVibrateScale[3];            // _230
+	f32 mVibrateStrength[3];         // _23C
+	bool mCanInput;                  // _248
+	bool mIsCollisionCamActive;      // _249
 	CameraParms* mCameraParms;       // _24C
 	VibrationParms* mVibrationParms; // _250
 };
@@ -311,8 +387,7 @@ struct PlayCamera : public LookAtCamera {
 struct CameraMgr : public CNode {
 	CameraMgr();
 
-	virtual ~CameraMgr() {}; // _08
-	// virtual void _10() = 0;       // _10
+	virtual ~CameraMgr() { } // _08
 
 	void loadResource();
 	void setViewport(Viewport* vp, int id);
@@ -325,11 +400,11 @@ struct CameraMgr : public CNode {
 	void controllerUnLock(int camID);
 	void startDemoCamera(int camID, int type);
 	void finishDemoCamera(int camID);
-	void changePlayerMode(int state, IDelegate1<CameraArg*>* delegate);
+	void changePlayerMode(int naviID, IDelegate1<CameraArg*>* delegate);
 	bool isChangePlayer();
 	void setZukanCamera(LookAtCamera* cam);
 	bool isCameraUpdateOn();
-	bool isStartAndEnd(int* data, int type);
+	bool isStartAndEnd(int* data, int camID);
 	bool isVibrationStart(int type, int camID);
 	void readCameraParms(char* path);
 	void readParameter(Stream& stream);

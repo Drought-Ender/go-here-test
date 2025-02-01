@@ -9,9 +9,9 @@
 struct JUTGamePadRecordBase {
 	JUTGamePadRecordBase();
 
-	virtual ~JUTGamePadRecordBase();            // _08
-	virtual void getStatus(PADStatus* pad) = 0; // _0C
-	virtual void virtual_10()              = 0; // _10
+	virtual ~JUTGamePadRecordBase();             // _08
+	virtual void getStatus(PADStatus* pad)  = 0; // _0C
+	virtual void virtual_10(PADStatus* pad) = 0; // _10
 
 	// _00 = VTBL
 	bool mIsActive; // _04
@@ -64,10 +64,16 @@ struct JUTGamePad : public JKRDisposer {
 		CSTICK_DOWN  = 0x40000,
 		CSTICK_UP    = 0x80000,
 
+		PRESS_DPAD = (PRESS_DPAD_LEFT | PRESS_DPAD_RIGHT | PRESS_DPAD_DOWN | PRESS_DPAD_UP),
+
 		PRESS_LEFT  = (PRESS_DPAD_LEFT | ANALOG_LEFT),
 		PRESS_RIGHT = (PRESS_DPAD_RIGHT | ANALOG_RIGHT),
 		PRESS_DOWN  = (PRESS_DPAD_DOWN | ANALOG_DOWN),
-		PRESS_UP    = (PRESS_DPAD_UP | ANALOG_UP)
+		PRESS_UP    = (PRESS_DPAD_UP | ANALOG_UP),
+
+		PRESS_ABX     = (PRESS_A | PRESS_B | PRESS_X),
+		PRESS_ABXY    = (PRESS_A | PRESS_B | PRESS_X | PRESS_Y),
+		PRESS_ABXYLRZ = (PRESS_A | PRESS_B | PRESS_X | PRESS_Y | PRESS_L | PRESS_R | PRESS_Z),
 	};
 
 	struct CButton {
@@ -87,11 +93,11 @@ struct JUTGamePad : public JKRDisposer {
 		f32 mAnalogL;     // _10
 		f32 mAnalogR;     // _14
 		u32 mRepeat;      // _18
-		u32 _1C;          // _1C
-		u32 _20;          // _20
-		u32 _24;          // _24
-		u32 _28;          // _28
-		u32 _2C;          // _2C
+		u32 mRepeatCount; // _1C
+		u32 mRepeatStart; // _20
+		u32 mRepeatMask;  // _24
+		u32 mRepeatDelay; // _28
+		u32 mRepeatRate;  // _2C
 	};
 
 	struct CRumble {
@@ -105,7 +111,7 @@ struct JUTGamePad : public JKRDisposer {
 
 		void clear(JUTGamePad* pad);
 		static void setEnabled(u32);
-		void stopMotor(int, bool);
+		static void stopMotor(int, bool);
 		void update(s16);
 
 		// unused/inlined:
@@ -121,24 +127,25 @@ struct JUTGamePad : public JKRDisposer {
 
 		static bool isEnabled(u32 mask) { return mEnabled & mask; }
 		static bool isEnabledPort(int port) { return isEnabled(sChannelMask[port]); }
+		static bool isEnabledPort(int port, u32 mask) { return (sChannelMask[port] & mask) != 0; }
 
 		static u8 mStatus[4];
 		static u32 mEnabled;
 		static u32 sChannelMask[4];
 
-		u32 _00; // _00
-		u32 _04; // _04
-		u8* _08; // _08
-		u32 _0C; // _0C
-		u8* _10; // _10
+		u32 mFrame;      // _00
+		u32 mLength;     // _04
+		u8* mData;       // _08
+		u32 mFrameCount; // _0C
+		u8* _10;         // _10
 	};
 
 	struct CStick {
 		CStick() { clear(); }
 
 		void clear();
-		u32 getButton(u32);
-		u32 update(s8, s8, EStickMode, EWhichStick, u32);
+		u32 getButton(u32 buttons);
+		u32 update(s8 x_val, s8 y_val, JUTGamePad::EStickMode mode, JUTGamePad::EWhichStick stick, u32 buttons);
 
 		static f32 sPressPoint;
 		static f32 sReleasePoint;
@@ -147,8 +154,8 @@ struct JUTGamePad : public JKRDisposer {
 		f32 mYPos;     // _04
 		f32 mStickMag; // _08
 		s16 mAngle;    // _0C
-		u8 _0E;        // _0E
-		u8 _0F;        // _0F
+		s8 _0E;        // _0E
+		s8 _0F;        // _0F
 	};
 
 	struct C3ButtonReset {
@@ -160,7 +167,7 @@ struct JUTGamePad : public JKRDisposer {
 		static u32 sResetMaskPattern;
 		static Callback sCallback;
 		static u32 sCallbackArg;
-		static s64 sThreshold;
+		static OSTime sThreshold;
 		static bool sResetSwitchPushing;
 		static bool sResetOccurred;
 		static EPadPort sResetOccurredPort;
@@ -199,15 +206,15 @@ struct JUTGamePad : public JKRDisposer {
 	void removeButtonRepeat(u32);
 	void clearButtonRepeat(bool);
 
-	static JUTGamePad* getGamePad(int);
+	static JUTGamePad* getGamePad(s32);
 
 	inline bool isConnected() const { return (mPortNum >= 0 && mPortNum < 4); }
 	inline bool isButtonDown(u32 buttons) { return mButton.mButtonDown & buttons; }
-	inline bool isButton(u32 buttons) { return mButton.mButton & buttons; }
+	inline bool isButtonHeld(u32 buttons) { return mButton.mButton & buttons; }
 
 	inline bool isMoveLeft()
 	{
-		if (isButton(PRESS_DPAD_LEFT) || mMStick.mXPos < -0.5f) {
+		if (isButtonHeld(PRESS_DPAD_LEFT) || mMStick.mXPos < -0.5f) {
 			return true;
 		} else {
 			return false;
@@ -215,7 +222,7 @@ struct JUTGamePad : public JKRDisposer {
 	}
 	inline bool isMoveRight()
 	{
-		if (isButton(PRESS_DPAD_RIGHT) || mMStick.mXPos > 0.5f) {
+		if (isButtonHeld(PRESS_DPAD_RIGHT) || mMStick.mXPos > 0.5f) {
 			return true;
 		} else {
 			return false;
@@ -223,7 +230,7 @@ struct JUTGamePad : public JKRDisposer {
 	}
 	inline bool isMoveUp()
 	{
-		if (isButton(PRESS_DPAD_UP) || mMStick.mYPos > 0.5f) {
+		if (isButtonHeld(PRESS_DPAD_UP) || mMStick.mYPos > 0.5f) {
 			return true;
 		} else {
 			return false;
@@ -231,7 +238,7 @@ struct JUTGamePad : public JKRDisposer {
 	}
 	inline bool isMoveDown()
 	{
-		if (isButton(PRESS_DPAD_DOWN) || mMStick.mYPos < -0.5f) {
+		if (isButtonHeld(PRESS_DPAD_DOWN) || mMStick.mYPos < -0.5f) {
 			return true;
 		} else {
 			return false;
@@ -284,6 +291,8 @@ struct JUTGamePad : public JKRDisposer {
 		C3ButtonReset::sCallbackArg = (u32)param_0;
 	}
 
+	inline bool isAnyInput() const { return mButton.mButton != 0 || mMStick.mStickMag != 0 || mSStick.mStickMag != 0; }
+
 	void initList();
 	static void init();
 	static u32 read();
@@ -333,19 +342,19 @@ struct JUTGamePadLongPress {
 	u32 getMaskPattern() const { return mMaskPattern; }
 	u32 getPattern() const { return mPattern; }
 
-	static JSUPtrList sPatternList;
+	static JSUList<JUTGamePadLongPress> sPatternList;
 
-	u8 _00[0x10];       // _00, unknown
-	bool mIsValid;      // _10
-	bool _11;           // _11
-	u32 mPattern;       // _14
-	u32 mMaskPattern;   // _18
-	u32 _1C;            // _1C
-	u8 _20[4];          // _20
-	OSTime mTimer[4];   // _28
-	u8 _48[4];          // _48
-	Callback mCallback; // _4C
-	u32 _50;            // _50
+	u8 _00[0x10];           // _00, unknown
+	bool mIsValid;          // _10
+	bool _11;               // _11
+	u32 mPattern;           // _14
+	u32 mMaskPattern;       // _18
+	u32 _1C;                // _1C
+	u8 mLongPressStatus[4]; // _20
+	OSTime mTimer[4];       // _28
+	u8 _48[4];              // _48
+	Callback mCallback;     // _4C
+	u32 _50;                // _50
 };
 
 // entirely unused/inlined
