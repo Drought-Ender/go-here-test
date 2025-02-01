@@ -4,6 +4,9 @@
 
 // Adapted from https://github.com/woodfrog/FibonacciHeap/tree/master
 
+// MIT License 
+// Copyright (c) 2018 Jiacheng Chen
+
 namespace Drought {
 template <typename T>
 struct FibonacciNode {
