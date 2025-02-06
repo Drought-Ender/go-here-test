@@ -555,11 +555,7 @@ void GoHereMapMenu::RenderPath(Graphics& gfx)
 			graf->lineTo(point);
 			previousPos = currPos;
 		}
-	} else {
-		// No path, draw a red line to the destination
-		Vector3f goHerePtr = GetTargetPosition3D();
-		graf->lineTo(GetPositionOnTex(goHerePtr));
-	}
+	} 
 
 	Vector2f goHerePtr = GetTargetPosition2D();
 	graf->lineTo(goHerePtr);
