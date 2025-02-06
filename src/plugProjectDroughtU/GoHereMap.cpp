@@ -17,8 +17,6 @@ const char* cRedArrowPath  = "/user/Drought/GoHere/arrow_red.bti";
 namespace Drought {
 
 namespace Screen {
-
-// sets whether you can rotate the map with shoulder L/R
 const bool cAllowMapRotation = false;
 
 void GoHereMapMenu::doCreate(JKRArchive* rarc)
@@ -58,10 +56,6 @@ void GoHereMapMenu::doCreate(JKRArchive* rarc)
 	mAButton         = new JUTTexture(mAButtonTex);
 }
 
-/// @brief Converts a position on the map texture to its 3D coordinates
-/// @param x Map-Object's x position on the radar map
-/// @param y Map-Object's y position on the radar map
-/// @return The position on the game map
 Vector3f GoHereMapMenu::GetPositionFromTex(const Vector2f& pos)
 {
 	Vector3f inPos = Vector3f(pos.x, pos.y, 0.0f);
@@ -89,9 +83,6 @@ Vector3f GoHereMapMenu::GetPositionFromTex(const Vector2f& pos)
 	return finalPosition;
 }
 
-/// @brief Converts a position on the game map to a point on the radar map
-/// @param pos The point on the radar map
-/// @return Object's position on the radar map
 Vector2f GoHereMapMenu::GetPositionOnTex(const Vector3f& pos)
 {
 	Vector2f mapPosition(0.0f, 0.0f);
@@ -195,25 +186,50 @@ void GoHereMapMenu::setupTextureDraw(Graphics& gfx)
 	GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 	GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_POS_XYZ, GX_F32, 0);
 
-	GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_SET);
+	GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
 
 	GXSetNumTexGens(1);
-	GXSetTexCoordGen2(GX_TEXCOORD0, GX_TG_MTX3X4, GX_TG_TEXCOORD0, 0x3c, 0, 0x7d);
+	GXSetTexCoordGen2(GX_TEXCOORD0, GX_TG_MTX3X4, GX_TG_TEXCOORD0, 0x3c, GX_FALSE, 0x7d);
 
 	GXSetNumTevStages(1);
 	GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+	GXSetTevOp(GX_TEVSTAGE0, GX_MODULATE);
 
 	GXLoadPosMtxImm(gfx.mPerspGraph.mPosMtx, 0);
+
+	GXSetNumChans(1);
+	GXSetChanCtrl(GX_COLOR0A0, GX_FALSE, GX_SRC_VTX, GX_SRC_VTX, 1, GX_DF_CLAMP, GX_AF_NONE);
+
+	GXSetCullMode(GX_CULL_BACK);
+	GXSetZMode(GX_FALSE, GX_NEVER, GX_FALSE);
 }
 
 void GoHereMapMenu::doDraw(Graphics& gfx)
 {
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
-
 	drawMap(gfx);
+
+	Graphics gfx2;
+	mIconScreen->hide();
+	mIconScreen->draw(gfx2, *graf);
+	mIconScreen->show();
+
+	{
+		J2DGrafContext tmpGraf = *graf;
+		mMapTexPane->drawSelf(0.0f, 0.0f, &tmpGraf.mPosMtx);
+	}
+
+	graf->setPort();
+	GXSetZCompLoc(GX_TRUE);
+	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
+
 	RenderPath(gfx);
 
-	mIconScreen->draw(gfx, *graf);
+	Graphics gfx3;
+	JUtility::TColor clear(0xff, 0xff, 0xff, 0x00);
+	mMapTexPane->setWhite(clear);
+	mIconScreen->draw(gfx3, *graf);
+	mMapTexPane->setWhite(TCOLOR_WHITE_U8);
 
 	setupTextureDraw(gfx);
 	drawArrow(gfx);
@@ -225,7 +241,6 @@ void GoHereMapMenu::doDraw(Graphics& gfx)
 
 	graf->setPort();
 	mIconScreen2->draw(gfx, *graf);
-
 	graf->setPort();
 	drawYaji(gfx);
 }
@@ -436,7 +451,7 @@ void GoHereMapMenu::execPathfinding()
 	}
 }
 
-bool checkSegment(const Vector3f& p0, const Vector3f& p1, f32 stepHeight, int maxDepth)
+static bool checkSegment(const Vector3f& p0, const Vector3f& p1, f32 stepHeight, int maxDepth)
 {
 	// Check the height difference
 	f32 dy = p1.y - p0.y;
@@ -459,11 +474,12 @@ bool checkSegment(const Vector3f& p0, const Vector3f& p1, f32 stepHeight, int ma
 
 bool GoHereMapMenu::validateDestinationReachable()
 {
-	// Get final destination waypoint
+	// If no path exists, we can't do this
 	if (!mPath.hasPath()) {
 		return false;
 	}
 
+	// If the destination index is invalid, we can't do this
 	Game::WayPoint* finalWp = Game::getWaypointAt(mDestinationIndex);
 	if (!finalWp) {
 		return false;
@@ -549,23 +565,6 @@ void GoHereMapMenu::RenderPath(Graphics& gfx)
 	graf->lineTo(goHerePtr);
 
 	graf->setLineWidth(oldWidth);
-
-	// {
-	// 	for (u16 i = 0; i < Game::mapMgr->mRouteMgr->mCount; i++) {
-	// 		Game::WayPoint* wp      = Game::getWaypointAt(i);
-	// 		Vector3f wpPos          = wp->getPosition();
-	// 		JGeometry::TVec2f point = GetPositionOnTex(wpPos);
-
-	// 		JGeometry::TBox2f box;
-	// 		const f32 sz = 5.0f;
-	// 		box.set(point.x - (sz / 2.0f), point.y - (sz / 2.0f), point.x + sz, point.y + sz);
-
-	// 		JUtility::TColor col = wp->isFlag(Game::WPF_Closed) ? 0xFF0000FF : 0xFFFFFFFF;
-	// 		graf->setColor(col);
-	// 		graf->setLineWidth(4.0f);
-	// 		graf->drawFrame(box);
-	// 	}
-	// }
 
 	graf->setPort();
 	GXSetZCompLoc(GX_TRUE);

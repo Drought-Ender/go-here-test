@@ -1,5 +1,5 @@
 Pikmin 2  
-[![Build Status]][actions] [![Code Progress]][progress] [![Data Progress]][progress] [![Linked Progress]][progress] [![Discord Badge]][discord]
+[![Build Status]][actions] [![Code Progress]][progress] [![Data Progress]][progress] [![Linked Progress]][progress]
 =============
 
 [Build Status]: https://github.com/projectPiki/pikmin2/actions/workflows/build.yml/badge.svg
@@ -8,15 +8,9 @@ Pikmin 2
 [Data Progress]: https://decomp.dev/projectPiki/pikmin2.svg?mode=shield&measure=data&label=Data&category=all
 [Linked Progress]: https://decomp.dev/projectPiki/pikmin2.svg?mode=shield&measure=complete_code&label=Linked%20Code&category=all
 [Discord Badge]: https://img.shields.io/discord/933849697485983765?color=%237289DA&logo=discord&logoColor=%23FFFFFF
-[discord]: https://discord.gg/CWKqYMePX8
 [progress]: https://decomp.dev/projectPiki/pikmin2
 
-A work-in-progress decompilation of Pikmin 2.
-
-Supported versions:
-
-- `GPVE01`: USA Retail
-- `GPVE01_D17`: USA Demo 17
+A mod of Pikmin 2 that adds the go-here functionality found in Pikmin 3.
 
 Index
 -----
@@ -25,17 +19,14 @@ Index
   - [Windows](#windows)
   - [macOS](#macos)
   - [Linux](#linux)
-- [Building](#building)
-- [Diffing](#diffing)
-- [Modding](#modding)
+- [Installation](#installation)
 
 Dependencies
 ------------
 
 ### Windows
 
-On Windows, it's **highly recommended** to use native tooling. WSL or msys2 are **not** required.  
-When running under WSL, [objdiff](#diffing) is unable to get filesystem notifications for automatic rebuilds.
+On Windows, it's **highly recommended** to use native tooling. WSL or msys2 are **not** required.
 
 - Install [Python](https://www.python.org/downloads/) and add it to `%PATH%`.
   - Also available from the [Windows Store](https://apps.microsoft.com/store/detail/python-311/9NRWMJP3717K).
@@ -68,7 +59,7 @@ sudo xattr -rd com.apple.quarantine '/Applications/Wine Crossover.app'
 - For non-x86(_64) platforms: Install wine from your package manager.
   - For x86(_64), [wibo](https://github.com/decompals/wibo), a minimal 32-bit Windows binary wrapper, will be automatically downloaded and used.
 
-Building
+Installation
 --------
 
 - Clone the repository:
@@ -82,43 +73,18 @@ Building
   - Go to the `Filesystem` tab and right-click `Disc` -> `Extract System Data`.
 ![Dolphin filesystem extract](assets/dolphin-extract.png)
   - After extraction, the following file should exist: `orig/GPVE01/sys/main.dol`.
+  - Copy the contents of `assets/Drought` to your games `files/user/` folder, so the directory: `files/user/Drought` should exist.
+
 - Configure:
-
-  ```sh
-  python configure.py
-  ```
-
-  To use the demo version, add `--version GPVE01_D17`. Add `--help` to see all available options.
-- Build:
-
-  ```sh
-  ninja
-  ```
-
-Diffing
--------
-
-Once the initial build succeeds, an `objdiff.json` should exist in the project root.
-
-Download the latest release from [encounter/objdiff](https://github.com/encounter/objdiff). Under project settings, set `Project directory`. The configuration should be loaded automatically.
-
-Select an object from the left sidebar to begin diffing. Changes to the project will rebuild automatically: changes to source files, headers, `configure.py`, `splits.txt` or `symbols.txt`.
-
-![objdiff project configuration](assets/objdiff.png)
-
-Modding
--------
-
-To enable modding, run `configure.py` with the `--non-matching` flag:
 
 ```sh
 python configure.py --non-matching
 ```
 
-This:
+- Build:
 
-- Disables final hash verification.
-- Builds all assembly files in `asm`.
-- Builds all source files marked as `Equivalent` in `configure.py`.
+```sh
+ninja
+```
 
-Once built with `ninja`, the new DOL will exist at `build/GPVE01/main.dol`.
+Once built with `ninja`, the new DOL will exist at `build/GPVE01/main.dol`. Copy this to your extracted games `sys/` folder, overwriting the old one. You are now ready to play, test, and develop the mod.

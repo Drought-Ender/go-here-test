@@ -109,7 +109,7 @@ public:
 	static u16 findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, bool isDesperate, Path& outPath);
 
 private:
-	static f32 calculateHeuristic(Game::WayPoint* from, Game::WayPoint* to);
+	static inline f32 calculateHeuristic(Game::WayPoint* from, Game::WayPoint* to);
 	static void reconstructPath(PathNode* endNode, Path& outPath);
 	static void cleanup(NodeList& openList, NodeList& closedList);
 };

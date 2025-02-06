@@ -8,11 +8,6 @@
 
 namespace Game {
 
-/* setting this to true will have the navi still
- * attempt to route through water if it
- * has non-blue pikmin */
-const bool cTryRouteWater = false;
-
 bool AreAllPikisBlue(Game::Navi* navi);
 
 struct NaviGoHereStateArg : public StateArg {
@@ -39,9 +34,9 @@ struct NaviGoHereState : public NaviState {
 	virtual void collisionCallback(Navi*, CollEvent&);
 	virtual bool callable() { return true; }
 
-	bool handleControlStick(Navi*); // True if update should stop
-	void navigateToWayPoint(Navi*, Game::WayPoint*);
+	bool handleControlStick(Navi*);   // True if update should stop
 	bool navigateToFinalPoint(Navi*); // True if target reached, false if not
+	void navigateToWayPoint(Navi*, Game::WayPoint*);
 	void changeState(Navi* player, bool isWanted);
 
 	inline Game::WayPoint* getCurrentWaypoint()

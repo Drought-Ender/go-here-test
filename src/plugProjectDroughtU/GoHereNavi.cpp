@@ -299,17 +299,16 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 {
 	Graphics* gfx = sys->getGfx();
 
-	Vector3f playerPos     = player->getPosition();
-	Vector3f targetPos     = target->mPosition;
-	Vector3f flatTargetPos = targetPos;
-	f32 distanceToTarget   = Vector3f::getFlatDirectionFromTo(playerPos, flatTargetPos);
+	Vector3f playerPos = player->getPosition();
+	Vector3f targetPos = target->mPosition;
 
-	// Compute the primary direction from the player to the target.
+	Vector3f dirToTarget = targetPos;
+	f32 distanceToTarget = Vector3f::getFlatDirectionFromTo(playerPos, dirToTarget);
+
 	Vector3f primaryDir = targetPos - playerPos;
 	primaryDir.normalise();
 
-	// Start out with the blended direction equal to the primary direction.
-	Vector3f blendedDir = primaryDir;
+	Vector3f blendedDir;
 
 	// If there is a next waypoint in the route, blend in its direction.
 	if (mActiveRouteNodeIndex + 1 < mPath.mLength) {
@@ -325,9 +324,11 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 		float t = clamp(1.0f - (distanceToTarget / target->mRadius), 0.0f, 1.0f);
 
 		// Linearly blend the two directions:
-		Vector3f blended = (primaryDir * (1.0f - t)) + nextDir * t;
-		blended.normalise();
-		blendedDir = blended;
+		blendedDir = (primaryDir * (1.0f - t)) + nextDir * t;
+		blendedDir.normalise();
+	} else {
+		// There's no next waypoint, so just use the primary direction.
+		blendedDir = primaryDir;
 	}
 
 	Vector3f finalPos = targetPos + blendedDir;
@@ -418,8 +419,14 @@ void Navi::doDirectDraw(Graphics& gfx)
 		return;
 	}
 
-	// Vector3f pos = getPosition() + Vector3f(0.0f, 5.0f, 0.0f);
-	// gfx.drawSphere(pos, 25.0f);
+	Game::NaviGoHereState* state = (Game::NaviGoHereState*)getCurrState();
+
+	PerspPrintfInfo info;
+	Vector3f pos(mPosition.x, 15.0f + mPosition.y, mPosition.z);
+
+	info.mColorA = Color4(0xC8, 0xC8, 0xFF, 0xC8);
+	info.mColorB = Color4(0x64, 0x64, 0xFF, 0xC8);
+	gfx.perspPrintf(info, pos, "[%d/%d] t[%1.1f]", state->mActiveRouteNodeIndex, state->mPath.mLength, state->mTimeoutTimer);
 }
 
 bool Navi::canSwap()

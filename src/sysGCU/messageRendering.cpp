@@ -2749,7 +2749,7 @@ void TRenderingProcessor::setTextBoxInfo(J2DPane* pane)
 	JUtility::TColor gradcolor = text->mGradientColor;
 	JUtility::TColor something = JUtility::TColor(255, 255, 255, 255);
 	JUtility::TColor black     = JUtility::TColor(255, 255, 255, 255);
-	black     = text->getBlack();
+	black                      = text->getBlack();
 	JUtility::TColor white     = text->getWhite();
 
 	mBaseAlphaModifier = (f32)text->mColorAlpha / 255.0f;
@@ -2770,35 +2770,33 @@ void TRenderingProcessor::setTextBoxInfo(J2DPane* pane)
 	mFontWidth  = text->mFontSize.x / mMainFont->getWidth();
 	mFontHeight = text->mFontSize.y / mMainFont->getHeight();
 
-
-	switch((text->mFlags) >> 2 & 3) {
-		case 1:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x40;
-			break;
-		case 0:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x20;
-			break;
-		case 2:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x10;
-			break;
+	switch ((text->mFlags) >> 2 & 3) {
+	case 1:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x40;
+		break;
+	case 0:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x20;
+		break;
+	case 2:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x10;
+		break;
 	}
-	switch ((text->mFlags) & 3)
-	{
-		case 1:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x400;
-			break;
-		case 0:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x200;
-			break;
-		case 2:
-			mFlags.typeView &= ~0x700;
-			mFlags.typeView |= 0x100;
-			break;
+	switch ((text->mFlags) & 3) {
+	case 1:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x400;
+		break;
+	case 0:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x200;
+		break;
+	case 2:
+		mFlags.typeView &= ~0x700;
+		mFlags.typeView |= 0x100;
+		break;
 	}
 	/*
 stwu     r1, -0x90(r1)
