@@ -149,7 +149,7 @@ PathNode* NodeMap::get(s16 key)
 f32 WaypointPathfinder::calculateHeuristic(Game::WayPoint* from, Game::WayPoint* to)
 {
 	Vector3f diff = to->mPosition - from->mPosition;
-	diff.y *= 1000.0f; // Weight Y axis more heavily
+	diff.y *= 2500.0f; // Weight Y axis more heavily
 	return diff.length();
 }
 

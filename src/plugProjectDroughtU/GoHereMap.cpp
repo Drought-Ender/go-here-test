@@ -296,7 +296,7 @@ void GoHereMapMenu::PathfindUpdate()
 
 	case PATHFIND_IN_PROGRESS:
 		if (HasMapInputChanged()) {
-			cooldown       = 0.25f;
+			cooldown       = 0.1f;
 			mPathfindState = PATHFIND_WAITING;
 			break;
 		}
@@ -368,19 +368,11 @@ void GoHereMapMenu::initPathfinding()
 
 	Game::WayPoint* startWP = nullptr;
 	if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg)) {
-		if (searchArg.mWp1->isFlag(Game::WPF_Closed)) {
-			startWP = searchArg.mWp2;
-		} else {
-			startWP = searchArg.mWp1;
-		}
+		startWP = searchArg.mWp1->isFlag(Game::WPF_Closed) ? searchArg.mWp2 : searchArg.mWp1;
 	} else {
 		searchArg.mLinks = nullptr;
 		if (Game::mapMgr->mRouteMgr->getNearestEdge(searchArg)) {
-			if (searchArg.mWp1->isFlag(Game::WPF_Closed)) {
-				startWP = searchArg.mWp2;
-			} else {
-				startWP = searchArg.mWp1;
-			}
+			startWP = searchArg.mWp1->isFlag(Game::WPF_Closed) ? searchArg.mWp2 : searchArg.mWp1;
 		}
 	}
 
@@ -427,12 +419,84 @@ void GoHereMapMenu::execPathfinding()
 		return;
 	}
 
-	// We have a path, we're done
-	mPath.reverse();
-	mFoundPath     = true;
-	mPathfindState = PATHFIND_FINISHED;
-	OnPathfindDone();
-	return;
+	mDesperatePathfind = false;
+
+	// We aren't just done, we need to check if the final destination is reachable
+	if (validateDestinationReachable()) {
+		// We have a path, let's reverse it so we can follow it
+		mPath.reverse();
+		mFoundPath     = true;
+		mPathfindState = PATHFIND_FINISHED;
+		OnPathfindDone();
+	} else {
+		mPath.clear();
+		mFoundPath     = false;
+		mPathfindState = PATHFIND_FINISHED;
+		OnPathfindDone();
+	}
+}
+
+bool checkSegment(const Vector3f& p0, const Vector3f& p1, f32 stepHeight, int maxDepth)
+{
+	// Check the height difference
+	f32 dy = p1.y - p0.y;
+	if (dy <= stepHeight) {
+		return true;
+	}
+
+	// Bail out if we've recursed too far
+	if (maxDepth <= 0) {
+		return false;
+	}
+
+	// Check the midpoint
+	Vector3f mid = Vector3f::middle(p0, p1);
+	mid.y        = Game::mapMgr->getMinY(mid);
+
+	// Check the two halves
+	return checkSegment(p0, mid, stepHeight, maxDepth - 1) && checkSegment(mid, p1, stepHeight, maxDepth - 1);
+}
+
+bool GoHereMapMenu::validateDestinationReachable()
+{
+	// Get final destination waypoint
+	if (!mPath.hasPath()) {
+		return false;
+	}
+
+	Game::WayPoint* finalWp = Game::getWaypointAt(mDestinationIndex);
+	if (!finalWp) {
+		return false;
+	}
+
+	const f32 cMaxStepHeight     = 3.0f; // How high can we step up?
+	const int cMaxRecursionDepth = 4;    // How many subdivisions can we check?
+
+	// Get the starting and target positions and adjust their y-values to the terrain's minimum.
+	Vector3f startPos = finalWp->getPosition();
+	startPos.y        = Game::mapMgr->getMinY(startPos);
+
+	// If the distance from the waypoint to the player is less than 10
+	Vector3f playerPosition = Game::naviMgr->getActiveNavi()->getPosition();
+	if (startPos.sqrDistance(playerPosition) < SQUARE(25.0f)) {
+		// If the waypoint is more than cMaxStepHeight above the player, we can't do this
+		if (startPos.y - playerPosition.y > cMaxStepHeight) {
+			return false;
+		}
+	}
+
+	// Get target position and adjust y.
+	Vector3f targetPos = GetTargetPosition3D();
+	targetPos.y        = Game::mapMgr->getMinY(targetPos);
+
+	// Use adaptive sampling to check the vertical difference
+	// If the height is too different between the points, recursively subdivide
+	if (!checkSegment(startPos, targetPos, cMaxStepHeight, cMaxRecursionDepth)) {
+		return false;
+	}
+
+	// The difference in Y wasn't too big, so we can do this
+	return true;
 }
 
 // draw the path of the Go-Here route on the 2D map

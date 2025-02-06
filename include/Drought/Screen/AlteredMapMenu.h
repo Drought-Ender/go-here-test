@@ -50,6 +50,7 @@ struct GoHereMapMenu : public og::newScreen::ObjSMenuMap {
 
 	void initPathfinding();
 	void execPathfinding();
+	bool validateDestinationReachable();
 
 	enum PathfindState {
 		PATHFIND_INACTIVE    = -1,

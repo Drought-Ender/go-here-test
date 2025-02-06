@@ -81,6 +81,24 @@ struct Vector3 {
 		return JMAAtan2Radian(diff.x, diff.z);
 	}
 
+	static Vector3 interpolate(const Vector3& a, const Vector3& b, T t)
+	{
+		Vector3 result;
+		result.x = a.x + (b.x - a.x) * t;
+		result.y = a.y + (b.y - a.y) * t;
+		result.z = a.z + (b.z - a.z) * t;
+		return result;
+	}
+
+	static Vector3 middle(const Vector3& a, const Vector3& b)
+	{
+		Vector3 result;
+		result.x = (a.x + b.x) * 0.5f;
+		result.y = (a.y + b.y) * 0.5f;
+		result.z = (a.z + b.z) * 0.5f;
+		return result;
+	}
+
 	// Calculation Functions
 	T dot(const Vector3& other);
 	Vector3 cross(const Vector3& other);

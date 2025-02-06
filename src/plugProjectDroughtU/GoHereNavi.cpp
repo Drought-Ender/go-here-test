@@ -346,8 +346,7 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 		player->mFaceDir = roundAng(player->mFaceDir);
 
 		// Set the target velocity in the blended direction (scaled by move speed).
-		player->mTargetVelocity = blendedDir;
-		player->mTargetVelocity *= player->getMoveSpeed();
+		player->mTargetVelocity = blendedDir * player->getMoveSpeed();
 		return;
 	}
 
