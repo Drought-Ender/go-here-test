@@ -535,7 +535,7 @@ void GoHereMapMenu::RenderPath(Graphics& gfx)
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
-	if (!mCanStartPathfind || mPath.hasPath()) {
+	if (!mCanStartPathfind || !mPath.hasPath()) {
 		graf->setColor(failureCol);
 	} else {
 		graf->setColor(successCol);
