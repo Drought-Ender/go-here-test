@@ -415,6 +415,9 @@ void NaviGoHereState::changeState(Navi* player, bool isWanted)
 
 void Navi::doDirectDraw(Graphics& gfx)
 {
+	return;
+	
+	// debug
 	if (getStateID() != NSID_GoHere) {
 		return;
 	}
