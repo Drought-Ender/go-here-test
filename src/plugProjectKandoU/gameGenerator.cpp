@@ -8,7 +8,6 @@
 #include "JSystem/JUtility/JUTException.h"
 #include "nans.h"
 #include "Parameters.h"
-#include "types.h"
 
 u32 GeneratorCurrentVersion = 'v0.3';
 
@@ -18,7 +17,7 @@ static const int unusedArray[] = { 0, 0, 0 };
  * @note Address: N/A
  * @note Size: 0xE4
  */
-void _Print(char* name, ...) { OSReport("generator"); }
+static void _Print(char* name, ...) { OSReport("generator"); }
 
 namespace Game {
 GenObjectFactoryFactory* GenObjectFactory::factory;
@@ -155,18 +154,15 @@ Generator::Generator()
 {
 	mObject      = nullptr;
 	mId          = '____';
-	mReservedNum = 0;
+	mReservedNum = Reserved_Null;
 	mNameId.setID('    ');
 	mVersion.setID(GeneratorCurrentVersion);
 	strcpy(mGenObjName, "unset");
-	mNextGenerator        = 0;
-	mPrevGenerator        = 0;
-	mCreature             = nullptr;
-	_7C                   = 0;
-	mChild                = nullptr;
-	mParent               = nullptr;
-	mPrev                 = nullptr;
-	mNext                 = nullptr;
+	mNextGenerator = 0;
+	mPrevGenerator = 0;
+	mCreature      = nullptr;
+	mUnusedVal     = 0;
+	clearRelations();
 	mIsInactive           = TRUE;
 	mDayLimit             = -1;
 	mDeathCount           = 0;
@@ -231,8 +227,8 @@ bool Generator::loadCreature(Stream& input)
 	if (mCreature) {
 		mCreature->mGenerator = this;
 		u8 flag               = 0;
-		if (mReservedNum & 0x8) {
-			flag |= 0x1;
+		if (isReservedFlag(Reserved_doTrackPosition)) {
+			flag |= CREATURE_SAVE_FLAG_POSITION;
 		}
 		mCreature->load(input, flag);
 	} else {
@@ -269,7 +265,7 @@ void Generator::saveCreature(Stream& output)
 {
 	if (mCreature) {
 		u8 conversion = 0;
-		if (mReservedNum & 8) {
+		if (isReservedFlag(Reserved_doTrackPosition)) {
 			conversion |= CREATURE_SAVE_FLAG_POSITION;
 		}
 
@@ -292,23 +288,23 @@ void Generator::saveCreature(Stream& output)
 void Generator::generate()
 {
 	if (isExpired()) {
-		_7C       = 0;
-		mCreature = nullptr;
+		mUnusedVal = 0;
+		mCreature  = nullptr;
 		return;
 	}
 
 	if (ramMode == RM_Disc) {
-		_7C         = 0;
+		mUnusedVal  = 0;
 		mDeathCount = 0;
 		mDayNum     = gameSystem->mTimeMgr->mDayCount;
-	} else if ((mReservedNum & 4) == 0) {
-		_7C = 0;
+	} else if (!isReservedFlag(Reserved_doTrackDeath)) {
+		mUnusedVal = 0;
 		return;
 	}
 
 	mCreature = nullptr;
 	if (mObject) {
-		if (ramMode != RM_Disc && (mReservedNum & 4) != 0
+		if (ramMode != RM_Disc && isReservedFlag(Reserved_doTrackDeath)
 		    && (int)gameSystem->mTimeMgr->mDayCount >= (int)(mDayNum + mDaysTillResurrection)) {
 			mDayNum     = gameSystem->mTimeMgr->mDayCount;
 			mDeathCount = 0;
@@ -432,6 +428,9 @@ void Generator::read(Stream& input)
  */
 void Generator::write(Stream& output)
 {
+	// Note that the entire functionality of outputting Generators as text is unused code
+	// Only binary is ever used by the actual game
+
 	output.textWriteTab(output.mTabCount);
 	ID32 id(GeneratorCurrentVersion);
 	id.write(output);
@@ -443,23 +442,24 @@ void Generator::write(Stream& output)
 
 	output.textWriteTab(output.mTabCount);
 	output.writeShort(mDaysTillResurrection);
-	output.textWriteText("\t# ïúäàì˙êî\r\n"); // 'resurrection days'
+	output.textWriteText("\t# Âæ©Ê¥ªÊó•Êï∞\r\n"); // 'resurrection days'
 
 	if (ramMode == RM_Disc) {
-		// generator files as stored on disc
+		// write the generator's name when working with plain text
 		output.textWriteTab(output.mTabCount);
 		for (int i = 0; i < 32; i++) {
 			output.writeByte(mGenObjName[i]);
 		}
 		output.textWriteText("\t# <%s>\r\n", mGenObjName);
 	} else {
-		// gencache?
+		// binary skips writing the name, but does write additional values to keep track of its alive status
 		output.writeByte('\0');
 		output.writeShort(mDeathCount);
 		output.writeShort(mDayNum);
 		output.writeShort(mDayLimit);
 	}
 
+	// Store position as shorts in binary mode, as floats in text mode
 	if (ramMode != RM_Disc) {
 		output.writeShort((s16)mPosition.x + mOffset.x);
 		output.writeShort((s16)mPosition.y + mOffset.y);
@@ -477,6 +477,7 @@ void Generator::write(Stream& output)
 		output.writeFloat(mOffset.z);
 		output.textWriteText("\t# offset\r\n");
 	}
+
 	if (mObject) {
 		mObject->write(output);
 	} else {
@@ -492,25 +493,22 @@ void Generator::write(Stream& output)
  */
 GeneratorMgr::GeneratorMgr()
     : CNode("genMgr")
-    , _34()
-    , mVersionID()
-    , _50()
 {
 	mParentMgr      = nullptr;
 	mChildMgr       = nullptr;
 	mNextMgr        = nullptr;
-	_6D             = 0;
+	mUnusedFlag2    = 0;
 	mStartPos       = Vector3f(0.0f);
 	mStartDir       = 0.0f;
 	mGeneratorCount = 0;
 	mGenerator      = nullptr;
-	_34.setID('v0.1');
+	mAltVersionID.setID('v0.1');
 	mVersionID.setID('v0.0');
 	if (!GenObjectFactory::factory) {
-		GenObjectFactory::factory = new GenObjectFactoryFactory();
+		GenObjectFactory::factory = new GenObjectFactoryFactory;
 	}
-	_6C   = 0;
-	mName = "GeneratorMgr";
+	mUnusedFlag = 0;
+	mName       = "GeneratorMgr";
 }
 
 /**

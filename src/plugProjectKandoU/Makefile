@@ -7,11 +7,11 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectKandoU/navi.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/piki.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/baseGameSection.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/singleGameSection.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/singleGameSection.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/cellPyramid.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/naviMgr.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/pikiMgr.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/mapMgr.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/pikiMgr.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/mapMgr.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/baseHIOSection.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/naviWhistle.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/pelletMgr.o\
@@ -60,7 +60,7 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/src/plugProjectKandoU/interactNavi.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/itemPikihead.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/itemPlant.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/itemRock.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/itemRock.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/aiBreakRock.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/aiCrop.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/registItem.o\
@@ -69,7 +69,7 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/src/plugProjectKandoU/itemBigFountain.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/itemBridge.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/pikiContainer.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/gameGeneratorCache.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/gameGeneratorCache.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/itemTreasure.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/itemDownFloor.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/kandoLib.o\
@@ -80,7 +80,7 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/src/plugProjectKandoU/pelletOtakara.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/genPellet.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/pelletItem.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/mapMgrTraceMove.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/mapMgrTraceMove.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/efxModelObjects.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/itemUjamushi.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/aiWeed.o\
@@ -88,8 +88,8 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/asm/plugProjectKandoU/itemWeed.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/aiBridge.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/aiTeki.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/singleGS_MainGame.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/singleGS_CaveGame.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_MainGame.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_CaveGame.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_MainResult.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/singleGS_CaveResult.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_WorldMap.o\
@@ -98,7 +98,7 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/src/plugProjectKandoU/baseHIOparms.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/radarInfo.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_Movie.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/navi_demoCheck.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/navi_demoCheck.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/singleGS_Zukan.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/gameResultTexMgr.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/gamePelletList.o\
@@ -128,7 +128,7 @@ KANDO_FILES:=\
 	$(BUILD_DIR)/src/plugProjectKandoU/baseGameSectionDraw.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_Load.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/singleGS_DayEnd.o\
-	$(BUILD_DIR)/asm/plugProjectKandoU/baseGameSectionKantei.o\
+	$(BUILD_DIR)/src/plugProjectKandoU/baseGameSectionKantei.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/sweepPrune.o\
 	$(BUILD_DIR)/asm/plugProjectKandoU/texCaster.o\
 	$(BUILD_DIR)/src/plugProjectKandoU/vsCoinOtakaraName.o\

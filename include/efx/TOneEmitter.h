@@ -27,13 +27,13 @@ struct TOneEmitter : public TBase, public JPAEmitterCallBack {
 	virtual void startDemoDrawOff()             // _34 (weak)
 	{
 		if (mEmitter) {
-			mEmitter->setFlag(JPAEMIT_IsDemoOn);
+			mEmitter->setFlag(JPAEMIT_StopDraw);
 		}
 	}
 	virtual void endDemoDrawOn() // _38 (weak)
 	{
 		if (mEmitter) {
-			mEmitter->resetFlag(JPAEMIT_IsDemoOn);
+			mEmitter->resetFlag(JPAEMIT_StopDraw);
 		}
 	}
 	virtual ~TOneEmitter() { } // _3C (weak)
@@ -71,15 +71,17 @@ struct TOneEmitterChasePos : public TBase, public JPAEmitterCallBack {
 		if (mEmitter == nullptr) {
 			return;
 		}
-		mEmitter->mFlags |= 4;
+
+		mEmitter->setFlag(JPAEMIT_StopDraw);
 	} // _34 (weak)
 	virtual void endDemoDrawOn()
 	{
 		if (mEmitter == nullptr) {
 			return;
 		}
-		mEmitter->mFlags &= ~4;
-	}                                  // _38 (weak)
+
+		mEmitter->resetFlag(JPAEMIT_StopDraw);
+	} // _38 (weak)
 	virtual ~TOneEmitterChasePos() { } // _3C (weak)
 
 	void add(ContextChasePos*);
@@ -96,10 +98,10 @@ struct TOneEmitterSimple : public TBase, public JPAEmitterCallBack {
 	inline TOneEmitterSimple(u16 effectID) // something like this, may need reordering
 	    : mEmitter(nullptr)
 	    , mEffectID(effectID)
-	    , _14(0)
+	    , mCurrPosIndex(0)
 	{
-		_18 = 10;
-		_10 = new Vector3f[_18];
+		mPositionNum  = 10;
+		mPositionList = new Vector3f[mPositionNum];
 	}
 
 	// vtable 1 (TBase)
@@ -123,13 +125,13 @@ struct TOneEmitterSimple : public TBase, public JPAEmitterCallBack {
 	virtual void startDemoDrawOff()             // _34 (weak)
 	{
 		if (mEmitter) {
-			mEmitter->mFlags |= 0x4;
+			mEmitter->setFlag(JPAEMIT_StopDraw);
 		}
 	}
 	virtual void endDemoDrawOn() // _38 (weak)
 	{
 		if (mEmitter) {
-			mEmitter->mFlags &= ~0x4;
+			mEmitter->resetFlag(JPAEMIT_StopDraw);
 		}
 	}
 	virtual ~TOneEmitterSimple() { } // _3C (weak)
@@ -138,9 +140,9 @@ struct TOneEmitterSimple : public TBase, public JPAEmitterCallBack {
 	// _04-_08	= JPAEmitterCallBack
 	JPABaseEmitter* mEmitter; // _08
 	u16 mEffectID;            // _0C
-	Vector3f* _10;            // _10
-	int _14;                  // _14
-	int _18;                  // _18, vector count?
+	Vector3f* mPositionList;  // _10
+	int mCurrPosIndex;        // _14
+	int mPositionNum;         // _18
 };
 } // namespace efx
 

@@ -5,6 +5,7 @@
 #include "og/Screen/StickAnimMgr.h"
 #include "og/Screen/anime.h"
 #include "og/Sound.h"
+#include "Game/Piki.h"
 #include "System.h"
 #include "Controller.h"
 #include "trig.h"
@@ -32,22 +33,10 @@ void ObjContena::setStartPos()
  */
 ObjContena::ObjContena(char const* name)
 {
-	mInOnionCount   = 100;
-	mCurrField      = 1000;
-	mInSquadCount   = 0;
-	mMaxPikiOnField = 20;
-	mInParty2       = 50;
-	mOnMapCount     = 60;
-	mMaxPikiCount   = 200;
-	mOnyonID        = -1;
-	_D8             = 0;
-	_DC             = 0;
-	_E0             = 0;
-	_E4             = 0;
-	mName           = name;
-	mDisp           = nullptr;
-	mContena        = nullptr;
-	mController     = nullptr;
+	mName       = name;
+	mDisp       = nullptr;
+	mContena    = nullptr;
+	mController = nullptr;
 
 	for (int i = 0; i < 10; i++) {
 		mAnimList[i] = nullptr;
@@ -69,7 +58,7 @@ ObjContena::ObjContena(char const* name)
 	mYAnalog            = 0.0f;
 	mSpotX              = 0.0f;
 	mSpotY              = 0.0f;
-	_104                = 1.0f;
+	mSpotScale          = 1.0f;
 	mPaneSpot           = nullptr;
 	mTimer              = 0.0f;
 	mDoDraw             = false;
@@ -135,38 +124,28 @@ void ObjContena::doCreate(JKRArchive* arc)
 		mDisp = new og::Screen::DispMemberContena;
 
 	} else {
-		JUT_PANICLINE(242, "ERR! in ObjContena CreateŽ¸”sI\n");
+		JUT_PANICLINE(242, "ERR! in ObjContena Createå¤±æ•—ï¼\n");
 	}
 	og::Screen::DispMemberContena* disp2 = mDisp;
-	mOnyonID                             = disp2->mOnyonID;
-	mInOnionCount                        = disp2->mInOnion;
-	mCurrField                           = disp2->mCurrInMap;
-	mInSquadCount                        = disp2->mNewInPartyNum;
-	mMaxPikiOnField                      = disp2->mMaxPikiField;
-	mInParty2                            = disp2->mInParty2;
-	mOnMapCount                          = disp2->mOnMapMinusWild;
-	mMaxPikiCount                        = disp2->mMaxPikiMinusWild;
-	_D8                                  = disp2->mInTransfer;
-	_DC                                  = disp2->_2C;
-	_E0                                  = disp2->mState;
-	_E4                                  = disp2->mResult;
-	mDisp->mState                        = 0;
-	mContena                             = new og::Screen::ContenaCounter(mDisp);
 
-	switch (mDisp->mOnyonID) {
-	case 0:
+	mDataContena               = disp2->mDataContena;
+	mDisp->mDataContena.mState = 0;
+	mContena                   = new og::Screen::ContenaCounter(mDisp);
+
+	switch (mDisp->mDataContena.mOnyonID) {
+	case Game::Blue:
 		mContena->setblo("contena_b.blo", arc);
 		break;
-	case 1:
+	case Game::Red:
 		mContena->setblo("contena_r.blo", arc);
 		break;
-	case 2:
+	case Game::Yellow:
 		mContena->setblo("contena_y.blo", arc);
 		break;
-	case 3:
+	case Game::Purple:
 		mContena->setblo("contena_bl.blo", arc);
 		break;
-	case 4:
+	case Game::White:
 		mContena->setblo("contena_w.blo", arc);
 		break;
 	default:
@@ -183,16 +162,10 @@ void ObjContena::doCreate(JKRArchive* arc)
 	mSpotX = mPaneSpot->mOffset.x;
 	mSpotY = mPaneSpot->mOffset.y;
 	og::Screen::setCallBackMessage(mContena);
-	mAnimList[0] = nullptr;
-	mAnimList[1] = nullptr;
-	mAnimList[2] = nullptr;
-	mAnimList[3] = nullptr;
-	mAnimList[4] = nullptr;
-	mAnimList[5] = nullptr;
-	mAnimList[6] = nullptr;
-	mAnimList[7] = nullptr;
-	mAnimList[8] = nullptr;
-	mAnimList[9] = nullptr;
+
+	for (int i = 0; i < 10; i++) {
+		mAnimList[i] = nullptr;
+	};
 
 	if (mContena->search('sh_color')) {
 		og::Screen::setCallBackMessage(mContena);
@@ -235,7 +208,7 @@ void ObjContena::doCreate(JKRArchive* arc)
 
 	mPikiPaneNum = 0;
 
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < MAX_PIKI_COUNT; i++) {
 		u64 tag = 'Piki_00' + (i % 10) + (i / 10) % 10 * 256;
 		if (!mContena->search(tag))
 			break;
@@ -260,8 +233,8 @@ void ObjContena::doCreate(JKRArchive* arc)
 	mScaleMgr3 = new og::Screen::ScaleMgr;
 	mScaleMgr4 = new og::Screen::ScaleMgr;
 
-	int type = mDisp->mOnyonID;
-	if (type == 3 || type == 4) {
+	int type = mDisp->mDataContena.mOnyonID;
+	if (type == Game::Purple || type == Game::White) {
 		J2DPane* pane1 = og::Screen::TagSearch(mContena, 'P1_1');
 		J2DPane* pane2 = og::Screen::TagSearch(mContena, 'P1_2');
 		if (mPayedDebt) {
@@ -280,7 +253,13 @@ void ObjContena::doCreate(JKRArchive* arc)
  */
 void ObjContena::tairetuOnOff()
 {
-	// UNUSED FUNCTION
+	for (int i = 0; i < mPikiPaneNum; i++) {
+		if (i + 1 <= mDisp->mDataContena.mInSquadCount) {
+			mPikiPaneList[i]->show();
+		} else {
+			mPikiPaneList[i]->hide();
+		}
+	}
 }
 
 /**
@@ -345,18 +324,20 @@ void ObjContena::setStickUpDown()
 void ObjContena::putinPiki(bool soundType)
 {
 	og::Screen::DispMemberContena* disp = mDisp;
-	if (disp->mCurrInMap <= disp->mInOnion && mState == 1) {
-		if (!soundType) {
+	if (disp->mDataContena.mCurrField <= disp->mDataContena.mInOnionCount) {
+		if (mState == 1) {
+			if (!soundType) {
+				ogSound->setError();
+			}
+		} else {
 			ogSound->setError();
+			changeMessage(1);
+			setStickDown();
 		}
-	} else {
-		ogSound->setError();
-		changeMessage(1);
-		setStickDown();
 		return;
 	}
 
-	if (disp->mNewInPartyNum == 0) {
+	if (disp->mDataContena.mInSquadCount == 0) {
 		if (mState == 4) {
 			if (!soundType) {
 				ogSound->setError();
@@ -368,12 +349,12 @@ void ObjContena::putinPiki(bool soundType)
 		}
 	} else {
 		changeMessage(0);
-		disp->mInOnion++;
-		disp->mNewInPartyNum--;
-		disp->mInParty2--;
-		disp->mOnMapMinusWild--;
-		disp->mResult++;
-		disp->mInTransfer = (u16)abs(disp->mResult); // should be just abs
+		disp->mDataContena.mInOnionCount++;
+		disp->mDataContena.mInSquadCount--;
+		disp->mDataContena.mInParty2--;
+		disp->mDataContena.mOnMapCount--;
+		disp->mDataContena.mResult++;
+		disp->mDataContena.mInTransfer = (u16)abs(disp->mDataContena.mResult); // should be just abs
 		setStickUpDown();
 		if (mTimer1 <= 0.0f) {
 			mScaleArrow1->up();
@@ -383,188 +364,6 @@ void ObjContena::putinPiki(bool soundType)
 		mScaleMgr4->down(0.05f, 35.0f, 0.8f);
 		ogSound->setPlusMinus(soundType);
 	}
-
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	mr       r30, r4
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	lwz      r31, 0x38(r3)
-	lwz      r3, 0x10(r31)
-	lwz      r0, 0xc(r31)
-	cmplw    r3, r0
-	bgt      lbl_80320BA4
-	lwz      r0, 0xa4(r29)
-	cmpwi    r0, 1
-	bne      lbl_80320B38
-	clrlwi.  r0, r30, 0x18
-	bne      lbl_80320D4C
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	b        lbl_80320D4C
-
-lbl_80320B38:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 1
-	beq      lbl_80320B80
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 1
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320B80:
-	lwz      r3, 0x118(r29)
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickDown__Q32og6Screen12StickAnimMgrFv
-	b        lbl_80320D4C
-
-lbl_80320BA4:
-	lwz      r0, 0x14(r31)
-	cmplwi   r0, 0
-	bne      lbl_80320C3C
-	lwz      r0, 0xa4(r29)
-	cmpwi    r0, 4
-	bne      lbl_80320BD0
-	clrlwi.  r0, r30, 0x18
-	bne      lbl_80320D4C
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	b        lbl_80320D4C
-
-lbl_80320BD0:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 4
-	beq      lbl_80320C18
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 4
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320C18:
-	lwz      r3, 0x118(r29)
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickDown__Q32og6Screen12StickAnimMgrFv
-	b        lbl_80320D4C
-
-lbl_80320C3C:
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 0
-	beq      lbl_80320C7C
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 0
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320C7C:
-	lwz      r3, 0xc(r31)
-	addi     r0, r3, 1
-	stw      r0, 0xc(r31)
-	lwz      r3, 0x14(r31)
-	addi     r0, r3, -1
-	stw      r0, 0x14(r31)
-	lwz      r3, 0x1c(r31)
-	addi     r0, r3, -1
-	stw      r0, 0x1c(r31)
-	lwz      r3, 0x20(r31)
-	addi     r0, r3, -1
-	stw      r0, 0x20(r31)
-	lha      r3, 0x34(r31)
-	addi     r0, r3, 1
-	sth      r0, 0x34(r31)
-	lha      r3, 0x34(r31)
-	bl       abs
-	clrlwi   r0, r3, 0x10
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0x28(r31)
-	lwz      r3, 0x118(r29)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickUpDown__Q32og6Screen12StickAnimMgrFv
-	lfs      f1, 0x140(r29)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fcmpo    cr0, f1, f0
-	cror     2, 0, 2
-	bne      lbl_80320D14
-	lwz      r3, 0x120(r29)
-	bl       up__Q32og6Screen8ScaleMgrFv
-	lis      r3, msVal__Q32og9newScreen10ObjContena@ha
-	addi     r3, r3, msVal__Q32og9newScreen10ObjContena@l
-	lfs      f0, 0x38(r3)
-	stfs     f0, 0x140(r29)
-
-lbl_80320D14:
-	lwz      r3, 0x15c(r29)
-	lfs      f1, lbl_8051DC9C@sda21(r2)
-	lfs      f2, lbl_8051DCA0@sda21(r2)
-	lfs      f3, lbl_8051DCA4@sda21(r2)
-	lfs      f4, lbl_8051DC8C@sda21(r2)
-	bl       up__Q32og6Screen8ScaleMgrFffff
-	lwz      r3, 0x168(r29)
-	lfs      f1, lbl_8051DCA8@sda21(r2)
-	lfs      f2, lbl_8051DCAC@sda21(r2)
-	lfs      f3, lbl_8051DCA4@sda21(r2)
-	bl       down__Q32og6Screen8ScaleMgrFfff
-	lwz      r3, ogSound__2og@sda21(r13)
-	mr       r4, r30
-	bl       setPlusMinus__Q22og5SoundFb
-
-lbl_80320D4C:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -574,7 +373,7 @@ lbl_80320D4C:
 void ObjContena::takeoutPiki(bool soundType)
 {
 	og::Screen::DispMemberContena* disp = mDisp;
-	if (disp->mNewInPartyNum < disp->mMaxPikiField) {
+	if (disp->mDataContena.mInSquadCount < disp->mDataContena.mMaxPikiOnField) {
 	} else if (mState == 2) {
 		if (!soundType) {
 			ogSound->setError();
@@ -587,7 +386,7 @@ void ObjContena::takeoutPiki(bool soundType)
 		return;
 	}
 
-	if (disp->mInOnion == 0) {
+	if (disp->mDataContena.mInOnionCount == 0) {
 		if (mState == 3) {
 			if (!soundType) {
 				ogSound->setError();
@@ -599,12 +398,12 @@ void ObjContena::takeoutPiki(bool soundType)
 			setStickUp();
 			return;
 		}
-	} else if (disp->mOnMapMinusWild < disp->mMaxPikiMinusWild) {
+	} else if (disp->mDataContena.mOnMapCount < disp->mDataContena.mMaxPikiCount) {
 	} else if (mState == 5) {
 		if (!soundType) {
 			ogSound->setError();
-			return;
 		}
+		return;
 	} else {
 		ogSound->setError();
 		changeMessage(5);
@@ -613,12 +412,12 @@ void ObjContena::takeoutPiki(bool soundType)
 	}
 
 	changeMessage(0);
-	disp->mInOnion--;
-	disp->mNewInPartyNum++;
-	disp->mInParty2++;
-	disp->mOnMapMinusWild++;
-	disp->mResult--;
-	disp->mInTransfer = (u16)abs(disp->mResult);
+	disp->mDataContena.mInOnionCount--;
+	disp->mDataContena.mInSquadCount++;
+	disp->mDataContena.mInParty2++;
+	disp->mDataContena.mOnMapCount++;
+	disp->mDataContena.mResult--;
+	disp->mDataContena.mInTransfer = (u16)abs(disp->mDataContena.mResult);
 	setStickUpDown();
 	if (mTimer2 <= 0.0f) {
 		mScaleArrow2->up();
@@ -627,232 +426,6 @@ void ObjContena::takeoutPiki(bool soundType)
 	mScaleMgr4->up(0.1f, 30.0f, 0.8f, 0.0f);
 	mScaleMgr3->down(0.05f, 35.0f, 0.8f);
 	ogSound->setPlusMinus(soundType);
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	mr       r30, r4
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	lwz      r31, 0x38(r3)
-	lwz      r3, 0x14(r31)
-	lwz      r0, 0x18(r31)
-	cmplw    r3, r0
-	blt      lbl_80320E28
-	lwz      r0, 0xa4(r29)
-	cmpwi    r0, 2
-	bne      lbl_80320DBC
-	clrlwi.  r0, r30, 0x18
-	bne      lbl_8032106C
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	b        lbl_8032106C
-
-lbl_80320DBC:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 2
-	beq      lbl_80320E04
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 2
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320E04:
-	lwz      r3, 0x118(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickUp__Q32og6Screen12StickAnimMgrFv
-	b        lbl_8032106C
-
-lbl_80320E28:
-	lwz      r0, 0xc(r31)
-	cmplwi   r0, 0
-	bne      lbl_80320EC0
-	lwz      r0, 0xa4(r29)
-	cmpwi    r0, 3
-	bne      lbl_80320E54
-	clrlwi.  r0, r30, 0x18
-	bne      lbl_8032106C
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	b        lbl_8032106C
-
-lbl_80320E54:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 3
-	beq      lbl_80320E9C
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 3
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320E9C:
-	lwz      r3, 0x118(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickUp__Q32og6Screen12StickAnimMgrFv
-	b        lbl_8032106C
-
-lbl_80320EC0:
-	lwz      r3, 0x20(r31)
-	lwz      r0, 0x24(r31)
-	cmplw    r3, r0
-	blt      lbl_80320F5C
-	lwz      r0, 0xa4(r29)
-	cmpwi    r0, 5
-	bne      lbl_80320EF0
-	clrlwi.  r0, r30, 0x18
-	bne      lbl_8032106C
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	b        lbl_8032106C
-
-lbl_80320EF0:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setError__Q22og5SoundFv
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 5
-	beq      lbl_80320F38
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 5
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320F38:
-	lwz      r3, 0x118(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickUp__Q32og6Screen12StickAnimMgrFv
-	b        lbl_8032106C
-
-lbl_80320F5C:
-	lwz      r0, 0xa4(r29)
-	cmplwi   r0, 0
-	beq      lbl_80320F9C
-	slwi     r0, r0, 2
-	lfs      f1, lbl_8051DC90@sda21(r2)
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       out__Q32og6Screen8AlphaMgrFf
-	li       r0, 0
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0xa4(r29)
-	lwz      r0, 0xa4(r29)
-	slwi     r0, r0, 2
-	add      r3, r29, r0
-	lwz      r3, 0x74(r3)
-	bl       in__Q32og6Screen8AlphaMgrFf
-
-lbl_80320F9C:
-	lwz      r3, 0xc(r31)
-	addi     r0, r3, -1
-	stw      r0, 0xc(r31)
-	lwz      r3, 0x14(r31)
-	addi     r0, r3, 1
-	stw      r0, 0x14(r31)
-	lwz      r3, 0x1c(r31)
-	addi     r0, r3, 1
-	stw      r0, 0x1c(r31)
-	lwz      r3, 0x20(r31)
-	addi     r0, r3, 1
-	stw      r0, 0x20(r31)
-	lha      r3, 0x34(r31)
-	addi     r0, r3, -1
-	sth      r0, 0x34(r31)
-	lha      r3, 0x34(r31)
-	bl       abs
-	clrlwi   r0, r3, 0x10
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	stw      r0, 0x28(r31)
-	lwz      r3, 0x118(r29)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x11c(r29)
-	lfs      f1, lbl_8051DC98@sda21(r2)
-	bl       in__Q32og6Screen8AlphaMgrFf
-	lwz      r3, 0x114(r29)
-	bl       stickUpDown__Q32og6Screen12StickAnimMgrFv
-	lfs      f1, 0x144(r29)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fcmpo    cr0, f1, f0
-	cror     2, 0, 2
-	bne      lbl_80321034
-	lwz      r3, 0x124(r29)
-	bl       up__Q32og6Screen8ScaleMgrFv
-	lis      r3, msVal__Q32og9newScreen10ObjContena@ha
-	addi     r3, r3, msVal__Q32og9newScreen10ObjContena@l
-	lfs      f0, 0x38(r3)
-	stfs     f0, 0x144(r29)
-
-lbl_80321034:
-	lwz      r3, 0x168(r29)
-	lfs      f1, lbl_8051DC9C@sda21(r2)
-	lfs      f2, lbl_8051DCA0@sda21(r2)
-	lfs      f3, lbl_8051DCA4@sda21(r2)
-	lfs      f4, lbl_8051DC8C@sda21(r2)
-	bl       up__Q32og6Screen8ScaleMgrFffff
-	lwz      r3, 0x15c(r29)
-	lfs      f1, lbl_8051DCA8@sda21(r2)
-	lfs      f2, lbl_8051DCAC@sda21(r2)
-	lfs      f3, lbl_8051DCA4@sda21(r2)
-	bl       down__Q32og6Screen8ScaleMgrFfff
-	lwz      r3, ogSound__2og@sda21(r13)
-	mr       r4, r30
-	bl       setPlusMinus__Q22og5SoundFb
-
-lbl_8032106C:
-	lwz      r0, 0x24(r1)
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -861,11 +434,10 @@ lbl_8032106C:
  */
 bool ObjContena::moveContena()
 {
-	bool ret                            = false;
-	og::Screen::DispMemberContena* disp = mDisp;
-	int* onyontype                      = &disp->mOnyonID;
-	JUT_ASSERTLINE(603, onyontype, "DataContena is not found!\n");
-	JUT_ASSERTLINE(607, *onyontype != -1, "Contena Type error!\n");
+	bool ret                      = false;
+	og::Screen::DataContena* data = &mDisp->mDataContena;
+	JUT_ASSERTLINE(603, data, "DataContena is not found!\n");
+	JUT_ASSERTLINE(607, data->mOnyonID != -1, "Contena Type error!\n");
 
 	if (mTimer1 > 0.0f) {
 		mTimer1 -= sys->mDeltaTime;
@@ -874,43 +446,31 @@ bool ObjContena::moveContena()
 		mTimer2 -= sys->mDeltaTime;
 	}
 
-	if (!disp->mState) {
-		disp->mState = 1;
+	if (!data->mState) {
+		data->mState = 1;
 	} else {
-		if (mController->mButton.mButtonDown & Controller::PRESS_B) {
-			disp                    = mDisp;
-			disp->mOnyonID          = mOnyonID;
-			disp->mInOnion          = mInOnionCount;
-			disp->mCurrInMap        = mCurrField;
-			disp->mNewInPartyNum    = mInSquadCount;
-			disp->mMaxPikiField     = mMaxPikiOnField;
-			disp->mInParty2         = mInParty2;
-			disp->mOnMapMinusWild   = mOnMapCount;
-			disp->mMaxPikiMinusWild = mMaxPikiCount;
-			disp->mInTransfer       = _D8;
-			disp->_2C               = _DC;
-			disp->mInTransfer       = _E0;
-			disp->mResult           = _E4;
-			disp->mState            = 2;
-			mDispState              = 3;
-			disp->mResult           = 0;
-			disp->mInTransfer       = 0;
-			if ((*onyontype == 3 || *onyontype) && disp->_2C) {
+		if (mController->getButtonDown() & Controller::PRESS_B) {
+			mDisp->mDataContena = mDataContena;
+			data->mState        = 2;
+			mDispState          = 3;
+			data->mResult       = 0;
+			data->mInTransfer   = 0;
+			if ((data->mOnyonID == Game::Purple || data->mOnyonID == Game::White) && data->mExitSoundType) {
 				ogSound->setCancel();
 			} else {
 				ogSound->setClose();
 			}
 			ret = true;
-		} else if (mController->mButton.mButtonDown & Controller::PRESS_A) {
-			disp->mState = 2;
+		} else if (mController->getButtonDown() & Controller::PRESS_A) {
+			data->mState = 2;
 			mDispState   = 4;
 			ogSound->setDecide();
 			ret = true;
 		}
 	}
 
-	if (disp->mState == 1) {
-		if (mController->mButton.mButtonDown & Controller::PRESS_UP) {
+	if (data->mState == 1) {
+		if (mController->getButton() & Controller::PRESS_UP) {
 			switch (mScreenState) {
 			case 0:
 				mScreenState = 1;
@@ -925,9 +485,11 @@ bool ObjContena::moveContena()
 			case 2:
 				putinPiki(true);
 				break;
+			default:
+				mScreenState = 0;
+				break;
 			}
-			mScreenState = 0;
-		} else if (mController->getButtonDown() & Controller::PRESS_DOWN) {
+		} else if (mController->getButton() & Controller::PRESS_DOWN) {
 			switch (mScreenState) {
 			case 0:
 				mScreenState = 3;
@@ -942,268 +504,15 @@ bool ObjContena::moveContena()
 			case 4:
 				takeoutPiki(true);
 				break;
+			default:
+				mScreenState = 0;
+				break;
 			}
-			mScreenState = 0;
 		} else {
 			mScreenState = 0;
 		}
 	}
 	return ret;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	lis      r4, lbl_8048EFE0@ha
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	li       r31, 0
-	stw      r30, 0x18(r1)
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	stw      r28, 0x10(r1)
-	addi     r28, r4, lbl_8048EFE0@l
-	lwz      r3, 0x38(r3)
-	addic.   r30, r3, 8
-	bne      lbl_803210D4
-	addi     r3, r28, 0
-	addi     r5, r28, 0xd8
-	li       r4, 0x25b
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803210D4:
-	lwz      r0, 0(r30)
-	cmpwi    r0, -1
-	bne      lbl_803210F4
-	addi     r3, r28, 0
-	addi     r5, r28, 0xf4
-	li       r4, 0x25f
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_803210F4:
-	lfs      f1, 0x140(r29)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_80321114
-	lwz      r3, sys@sda21(r13)
-	lfs      f0, 0x54(r3)
-	fsubs    f0, f1, f0
-	stfs     f0, 0x140(r29)
-
-lbl_80321114:
-	lfs      f1, 0x144(r29)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_80321134
-	lwz      r3, sys@sda21(r13)
-	lfs      f0, 0x54(r3)
-	fsubs    f0, f1, f0
-	stfs     f0, 0x144(r29)
-
-lbl_80321134:
-	lwz      r0, 0x28(r30)
-	cmpwi    r0, 0
-	bne      lbl_8032114C
-	li       r0, 1
-	stw      r0, 0x28(r30)
-	b        lbl_8032123C
-
-lbl_8032114C:
-	lwz      r3, 0x48(r29)
-	lwz      r3, 0x1c(r3)
-	rlwinm.  r0, r3, 0, 0x16, 0x16
-	beq      lbl_80321218
-	lwz      r6, 0x38(r29)
-	li       r4, 2
-	lwz      r5, 0xb8(r29)
-	li       r3, 3
-	li       r0, 0
-	stw      r5, 8(r6)
-	lwz      r5, 0xbc(r29)
-	stw      r5, 0xc(r6)
-	lwz      r5, 0xc0(r29)
-	stw      r5, 0x10(r6)
-	lwz      r5, 0xc4(r29)
-	stw      r5, 0x14(r6)
-	lwz      r5, 0xc8(r29)
-	stw      r5, 0x18(r6)
-	lwz      r5, 0xcc(r29)
-	stw      r5, 0x1c(r6)
-	lwz      r5, 0xd0(r29)
-	stw      r5, 0x20(r6)
-	lwz      r5, 0xd4(r29)
-	stw      r5, 0x24(r6)
-	lwz      r5, 0xd8(r29)
-	stw      r5, 0x28(r6)
-	lbz      r5, 0xdc(r29)
-	stb      r5, 0x2c(r6)
-	lwz      r5, 0xe0(r29)
-	stw      r5, 0x30(r6)
-	lha      r5, 0xe4(r29)
-	sth      r5, 0x34(r6)
-	stw      r4, 0x28(r30)
-	stw      r3, 0xe8(r29)
-	sth      r0, 0x2c(r30)
-	stw      r0, 0x20(r30)
-	lwz      r0, 0(r30)
-	cmpwi    r0, 3
-	beq      lbl_803211F0
-	cmpwi    r0, 4
-	bne      lbl_80321208
-
-lbl_803211F0:
-	lbz      r0, 0x24(r30)
-	cmplwi   r0, 0
-	beq      lbl_80321208
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setCancel__Q22og5SoundFv
-	b        lbl_80321210
-
-lbl_80321208:
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setClose__Q22og5SoundFv
-
-lbl_80321210:
-	li       r31, 1
-	b        lbl_8032123C
-
-lbl_80321218:
-	rlwinm.  r0, r3, 0, 0x17, 0x17
-	beq      lbl_8032123C
-	li       r3, 2
-	li       r0, 4
-	stw      r3, 0x28(r30)
-	stw      r0, 0xe8(r29)
-	lwz      r3, ogSound__2og@sda21(r13)
-	bl       setDecide__Q22og5SoundFv
-	li       r31, 1
-
-lbl_8032123C:
-	lwz      r0, 0x28(r30)
-	cmpwi    r0, 1
-	bne      lbl_803213A0
-	lwz      r4, 0x48(r29)
-	lis      r3, 0x08000008@ha
-	addi     r0, r3, 0x08000008@l
-	lwz      r4, 0x18(r4)
-	and.     r0, r4, r0
-	beq      lbl_803212F4
-	lwz      r0, 0xac(r29)
-	cmpwi    r0, 1
-	beq      lbl_803212A8
-	bge      lbl_8032127C
-	cmpwi    r0, 0
-	bge      lbl_80321288
-	b        lbl_803212E8
-
-lbl_8032127C:
-	cmpwi    r0, 3
-	bge      lbl_803212E8
-	b        lbl_803212D8
-
-lbl_80321288:
-	li       r0, 1
-	mr       r3, r29
-	stw      r0, 0xac(r29)
-	li       r4, 0
-	bl       putinPiki__Q32og9newScreen10ObjContenaFb
-	lfs      f0, 0xb0(r29)
-	stfs     f0, 0xb4(r29)
-	b        lbl_803213A0
-
-lbl_803212A8:
-	lwz      r3, sys@sda21(r13)
-	lfs      f2, 0xb4(r29)
-	lfs      f1, 0x54(r3)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fsubs    f1, f2, f1
-	stfs     f1, 0xb4(r29)
-	lfs      f1, 0xb4(r29)
-	fcmpo    cr0, f1, f0
-	bge      lbl_803213A0
-	li       r0, 2
-	stw      r0, 0xac(r29)
-	b        lbl_803213A0
-
-lbl_803212D8:
-	mr       r3, r29
-	li       r4, 1
-	bl       putinPiki__Q32og9newScreen10ObjContenaFb
-	b        lbl_803213A0
-
-lbl_803212E8:
-	li       r0, 0
-	stw      r0, 0xac(r29)
-	b        lbl_803213A0
-
-lbl_803212F4:
-	lis      r3, 0x04000004@ha
-	addi     r0, r3, 0x04000004@l
-	and.     r0, r4, r0
-	beq      lbl_80321398
-	lwz      r0, 0xac(r29)
-	cmpwi    r0, 3
-	beq      lbl_8032134C
-	bge      lbl_80321320
-	cmpwi    r0, 0
-	beq      lbl_8032132C
-	b        lbl_8032138C
-
-lbl_80321320:
-	cmpwi    r0, 5
-	bge      lbl_8032138C
-	b        lbl_8032137C
-
-lbl_8032132C:
-	li       r0, 3
-	mr       r3, r29
-	stw      r0, 0xac(r29)
-	li       r4, 0
-	bl       takeoutPiki__Q32og9newScreen10ObjContenaFb
-	lfs      f0, 0xb0(r29)
-	stfs     f0, 0xb4(r29)
-	b        lbl_803213A0
-
-lbl_8032134C:
-	lwz      r3, sys@sda21(r13)
-	lfs      f2, 0xb4(r29)
-	lfs      f1, 0x54(r3)
-	lfs      f0, lbl_8051DC8C@sda21(r2)
-	fsubs    f1, f2, f1
-	stfs     f1, 0xb4(r29)
-	lfs      f1, 0xb4(r29)
-	fcmpo    cr0, f1, f0
-	bge      lbl_803213A0
-	li       r0, 4
-	stw      r0, 0xac(r29)
-	b        lbl_803213A0
-
-lbl_8032137C:
-	mr       r3, r29
-	li       r4, 1
-	bl       takeoutPiki__Q32og9newScreen10ObjContenaFb
-	b        lbl_803213A0
-
-lbl_8032138C:
-	li       r0, 0
-	stw      r0, 0xac(r29)
-	b        lbl_803213A0
-
-lbl_80321398:
-	li       r0, 0
-	stw      r0, 0xac(r29)
-
-lbl_803213A0:
-	lwz      r0, 0x24(r1)
-	mr       r3, r31
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	lwz      r28, 0x10(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -1218,8 +527,7 @@ void ObjContena::commonUpdate()
 				mAnimList[i]->update();
 		}
 		for (int i = 0; i < 6; i++) {
-			u8 alpha = mAlphaMgr[i]->calc();
-			mPaneList[i]->setAlpha(alpha);
+			mPaneList[i]->setAlpha(mAlphaMgr[i]->calc());
 		}
 		f32 scale1 = mScaleMgr3->calc();
 		f32 scale2 = mScaleMgr4->calc();
@@ -1231,26 +539,16 @@ void ObjContena::commonUpdate()
 		if (angle > TAU) {
 			angle -= TAU;
 		}
-		f32 cosangle    = sinf(angle) * msVal._28;
-		J2DPane* pane   = mPaneArrowUp;
-		pane->mOffset.x = mPaneArrowUpPos.x;
-		pane->mOffset.y = -1.0f + mPaneArrowUpPos.y + cosangle;
-		pane->calcMtx();
+		f32 cosangle = sinf(angle) * msVal._28;
+		mPaneArrowUp->setOffset(mPaneArrowUpPos.x, msVal._2C + (mPaneArrowUpPos.y + cosangle));
 
-		pane            = mPaneArrowDown;
-		pane->mOffset.x = mPaneArrowDownPos.x;
-		pane->mOffset.y = 1.0f + mPaneArrowDownPos.y - cosangle;
-		pane->calcMtx();
+		mPaneArrowDown->setOffset(mPaneArrowDownPos.x, msVal._30 + (mPaneArrowDownPos.y - cosangle));
 
-		u8 alpha = mAlphaArrow1->calc();
-		mPaneArrowUp->setAlpha(alpha);
-		alpha = mAlphaArrow2->calc();
-		mPaneArrowDown->setAlpha(alpha);
+		mPaneArrowUp->setAlpha(u32(mAlpha * mAlphaArrow1->calc()) / 255);
+		mPaneArrowDown->setAlpha(u32(mAlpha * mAlphaArrow2->calc()) / 255);
 
-		f32 scale3 = mScaleArrow1->calc();
-		scale3     = msVal._34 * (scale3 - 1.0f) + 1.0f;
-		f32 scale4 = mScaleArrow2->calc();
-		scale4     = msVal._34 * (scale4 - 1.0f) + 1.0f;
+		f32 scale3 = msVal._34 * (mScaleArrow1->calc() - 1.0f) + 1.0f;
+		f32 scale4 = msVal._34 * (mScaleArrow2->calc() - 1.0f) + 1.0f;
 		mPaneArrowUp->updateScale(scale3);
 		mPaneArrowDown->updateScale(scale4);
 	}
@@ -1262,34 +560,33 @@ void ObjContena::commonUpdate()
 			mMenuMoveAngle += input1 * 100.0f;
 		}
 		if (input2 > 0.4f || input2 < -0.4f) {
-			mYAnalog += input1 * -100.0f;
+			mYAnalog += input2 * -100.0f;
 		}
 		if (mFuriko) {
 			mFuriko->setParam(msVal._14, msVal._1C, msVal._18);
 		}
 	}
 
-	for (int i = 0; i < mPikiPaneNum; i++) {
-		if (i + 1 > mDisp->mNewInPartyNum) {
-			mPikiPaneList[i]->hide();
-		} else {
-			mPikiPaneList[i]->show();
-		}
-	}
+	tairetuOnOff();
+
 	mDoDraw = true;
 	mContena->setXY(mMenuMoveAngle, mYAnalog);
-	mScreenCupsule->calcMtx();
+	mContena->update();
 
-	mTimer += sys->mDeltaTime;
-	f32 time = mTimer;
-	if (mTimer > TAU) {
-		time = 0.0f;
+	mScreenCupsule->update();
+
+	mTimer += msVal._08;
+	if (mTimer >= TAU) {
+		mTimer = 0.0f;
 	}
-	mPaneSpot->setOffset(msVal._00 * 2.0f * JMath::sincosTable_.mTable[(int)(time *= 325.9493f) & 0x7ffU].first, mSpotX + msVal._04,
-	                     msVal._00 * JMath::sincosTable_.mTable[(int)(time *= 325.9493f) & 0x7ffU].first, mSpotY);
+	f32 time = mTimer;
+
+	f32 x = (2.0f * msVal._00) * cosf(time) + (mSpotX + msVal._04);
+	f32 y = msVal._00 * sinf(time) + mSpotY;
+	mPaneSpot->setOffset(x, y);
 
 	mPaneSpot->setAlpha(mScreenAngle * 255.0f * msVal._10);
-	mPaneSpot->updateScale(msVal._0C * ((1.0f - mScreenAngle) * 2.0f + 1.0f) * _104);
+	mPaneSpot->updateScale(msVal._0C * (((1.0f - mScreenAngle) * 2.0f + 1.0f) * mSpotScale));
 	mScreenSpot->update();
 	/*
 	stwu     r1, -0x60(r1)
@@ -1803,58 +1100,12 @@ bool ObjContena::doUpdateFadein()
 	commonUpdate();
 	mFadeLevel += sys->mDeltaTime;
 	mScreenAngle   = mFadeLevel / msVal._20;
-	f32 calc       = og::Screen::calcSmooth0to1(mFadeLevel, msVal._20);
-	mMenuMoveAngle = (1.0f - calc) * 800.0f;
+	mMenuMoveAngle = (1.0f - og::Screen::calcSmooth0to1(mFadeLevel, msVal._20)) * 800.0f;
 
-	if (mFadeLevel >= msVal._20)
+	if (mFadeLevel >= msVal._20) {
 		check = true;
+	}
 	return check;
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	li       r30, 0
-	stw      r29, 0x14(r1)
-	mr       r29, r3
-	bl       commonUpdate__Q32og9newScreen10ObjContenaFv
-	lwz      r4, sys@sda21(r13)
-	lis      r3, msVal__Q32og9newScreen10ObjContena@ha
-	lfs      f1, 0x110(r29)
-	addi     r31, r3, msVal__Q32og9newScreen10ObjContena@l
-	lfs      f0, 0x54(r4)
-	fadds    f0, f1, f0
-	stfs     f0, 0x110(r29)
-	lfs      f1, 0x110(r29)
-	lfs      f0, 0x20(r31)
-	fdivs    f0, f1, f0
-	stfs     f0, 0xa8(r29)
-	lfs      f1, 0x110(r29)
-	lfs      f2, 0x20(r31)
-	bl       calcSmooth0to1__Q22og6ScreenFff
-	lfs      f2, lbl_8051DC94@sda21(r2)
-	lfs      f0, lbl_8051DC88@sda21(r2)
-	fsubs    f1, f2, f1
-	fmuls    f0, f0, f1
-	stfs     f0, 0xf0(r29)
-	lfs      f1, 0x110(r29)
-	lfs      f0, 0x20(r31)
-	fcmpo    cr0, f1, f0
-	cror     2, 1, 2
-	bne      lbl_80321C5C
-	li       r30, 1
-
-lbl_80321C5C:
-	lwz      r0, 0x24(r1)
-	mr       r3, r30
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
@@ -1864,27 +1115,30 @@ lbl_80321C5C:
 bool ObjContena::doUpdateFadeout()
 {
 	bool check = false;
-	commonUpdate();
 	mFadeLevel += sys->mDeltaTime;
 	mScreenAngle   = 1.0f - mFadeLevel / msVal._20;
-	f32 calc       = og::Screen::calcSmooth0to1(mFadeLevel, msVal._20);
-	mMenuMoveAngle = -800.0f * calc;
+	mMenuMoveAngle = -800.0f * og::Screen::calcSmooth0to1(mFadeLevel, msVal._20);
 	if (mFadeLevel >= msVal._20) {
-		check                               = true;
-		::Screen::SceneBase* scene          = getOwner();
-		og::Screen::DispMemberContena* disp = mDisp;
-		disp->mState                        = mDispState;
-		if (disp->mState == 3 && disp->_2C) {
-			if (disp->mOnyonID == 4 || disp->mOnyonID == 3) {
+		check                         = true;
+		::Screen::SceneBase* scene    = getOwner();
+		og::Screen::DataContena* data = mDisp->getDataContena();
+		data->mState                  = mDispState;
+		if (data->mState == 3 && data->mExitSoundType) {
+			if (data->mOnyonID == Game::White || data->mOnyonID == Game::Purple) {
 				::Screen::SetSceneArg arg(SCENE_UFO_MENU, getDispMember());
+				arg.mDoCreateBackup = false;
 				if (scene->setScene(arg) && !scene->startScene(nullptr)) {
-					JUT_PANICLINE(944, "‚¾‚ß‚Å‚·\n");
+					JUT_PANICLINE(944, "ã ã‚ã§ã™\n");
 				}
 			}
 			return;
 		}
-		JUT_ASSERTLINE(953, scene->setBackupScene(), "START ERR! (BackupScene)");
-		JUT_ASSERTLINE(958, scene->startScene(nullptr), "setBackupScene ERR!");
+
+		if (scene->setBackupScene()) {
+			JUT_ASSERTLINE(953, scene->startScene(nullptr), "START ERR! (BackupScene)");
+		} else {
+			JUT_PANICLINE(958, "setBackupScene ERR!");
+		}
 	}
 	commonUpdate();
 	return check;

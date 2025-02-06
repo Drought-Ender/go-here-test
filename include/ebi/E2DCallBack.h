@@ -29,7 +29,7 @@ struct E2DCallBack_Base : public P2DScreen::CallBackNode {
 		if (mIsEnabled) {
 			do_draw(gfx, graf);
 		}
-	}                                                    // _14 (weak)
+	} // _14 (weak)
 	virtual void do_update() { }                         // _1C (weak)
 	virtual void do_draw(Graphics&, J2DGrafContext&) { } // _20 (weak)
 
@@ -132,7 +132,12 @@ struct E2DCallBack_BlinkFontColor : public E2DCallBack_Base {
 	virtual ~E2DCallBack_BlinkFontColor() { } // _08 (weak)
 	virtual void do_update();                 // _1C
 
-	void set(J2DTextBox*, J2DTextBox*);
+	void set(J2DTextBox* pane1, J2DTextBox* pane2)
+	{
+		setColors(0, pane1);
+		setColors(1, pane2);
+	}
+
 	void set(E2DFullFontColor& fontA, E2DFullFontColor& fontB)
 	{
 		mFonts[0] = fontA;
@@ -168,7 +173,7 @@ struct E2DCallBack_BlinkFontColor : public E2DCallBack_Base {
 		if (mPane) {
 			J2DTextBox* pane = static_cast<J2DTextBox*>(mPane);
 			pane->setCharColor(mFonts[colorID].mCol1);
-			pane->setGradientColor(mFonts[colorID].mCol2);
+			pane->setGradColor(mFonts[colorID].mCol2);
 			pane->setWhite(mFonts[colorID].mWhite);
 			pane->setBlack(mFonts[colorID].mBlack);
 		}

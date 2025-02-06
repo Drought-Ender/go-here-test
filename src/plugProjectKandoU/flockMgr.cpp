@@ -95,19 +95,21 @@ void BaseFlockMgr::resolveCollision(f32 p1)
 	f32 halfVal = 0.5f * p1; // f31
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < getMaxObjects(); j++) {
-			if (isFlagAlive(j)) {
-				for (int k = 0; k < getMaxObjects(); k++) {
-					if (isFlagAlive(k) && j != k) {
-						TFlock* flock1 = getFlock(j); // r31
-						TFlock* flock2 = getFlock(k); // r3
-						Vector3f sep   = *flock1 - *flock2;
-						sep.y          = 0.0f;
-						if (sep.length2D() < p1) {
-							sep.normalise();
-							sep *= halfVal;
-							(Vector3f)* flock1 = *flock1 - sep;
-							(Vector3f)* flock2 = *flock2 + sep;
-						}
+			if (!isFlagAlive(j)) {
+				continue;
+			}
+
+			for (int k = 0; k < getMaxObjects(); k++) {
+				if (isFlagAlive(k) && j != k) {
+					TFlock* flock1 = getFlock(j); // r31
+					TFlock* flock2 = getFlock(k); // r3
+					Vector3f sep   = *flock1 - *flock2;
+					sep.y          = 0.0f;
+					if (sep.length2D() < p1) {
+						sep.normalise();
+						sep *= halfVal;
+						(Vector3f)* flock1 = *flock1 - sep;
+						(Vector3f)* flock2 = *flock2 + sep;
 					}
 				}
 			}
@@ -326,12 +328,12 @@ void BaseFlockMgr::doSimpleDraw(Viewport* vp, J3DModelData** models, int p1)
 {
 	if (mIsAgentVisible[vp->mVpId]) {
 		for (int i = 0; i < p1; i++) {
-			J3DModelData* model     = models[i];
-			J3DMaterial* mat        = model->mJointTree.mJoints[0]->mMaterial;
-			j3dSys.mVtxPos          = model->mVertexData.mVtxPos;
-			j3dSys.mVtxNorm         = model->mVertexData.mVtxNorm;
-			j3dSys.mVtxColor        = model->mVertexData.mVtxColor[0];
-			J3DShape::sOldVcdVatCmd = nullptr;
+			J3DModelData* model = models[i];
+			J3DMaterial* mat    = model->getJointNodePointer(0)->getMesh();
+			j3dSys.setVtxPos(model->getVtxPosArray());
+			j3dSys.setVtxNrm(model->getVtxNrmArray());
+			j3dSys.setVtxCol(model->getVtxColorArray(0));
+			J3DShape::resetVcdVatCache();
 
 			while (mat) {
 				mat->loadSharedDL();
@@ -340,7 +342,7 @@ void BaseFlockMgr::doSimpleDraw(Viewport* vp, J3DModelData** models, int p1)
 				for (int j = 0; j < getMaxObjects(); j++) {
 					TFlock* flock = getFlock(j);
 					if (isFlagAlive(j)) {
-						if (flock->isVisible() && flock->_40 == i) {
+						if (flock->isVisible() && flock->mModelIdx == i) {
 							Matrixf mtx;
 							PSMTXConcat(vp->getMatrix(true)->mMatrix.mtxView, flock->mTransformationMtx.mMatrix.mtxView,
 							            mtx.mMatrix.mtxView);

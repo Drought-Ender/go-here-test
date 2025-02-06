@@ -2,54 +2,61 @@
 #define _DROUGHT_GAME_NAVIGOHERE_H_
 
 #include "Game/Navi.h"
+#include "Game/MapMgr.h"
 #include "Game/NaviState.h"
 #include "Drought/Pathfinder.h"
 
-namespace Game
-{
+namespace Game {
 
-/* setting this to true will have the navi still
- * attempt to route through water if it 
- * has non-blue pikmin */
-const bool cTryRouteWater = false;
+bool AreAllPikisBlue(Game::Navi* navi);
 
-bool CheckAllPikisBlue(Game::Navi* navi);
+struct NaviGoHereStateArg : public StateArg {
+	inline NaviGoHereStateArg(Vector3f pos, Drought::Path path)
+	    : mPosition(pos)
+	    , mPath(path)
+	{
+	}
 
-struct NaviGoHereStateArg : public StateArg
-{
-    inline NaviGoHereStateArg(Vector3f pos, Drought::Path* path) 
-        : mPosition(pos)
-        , mPath(path)
-    {
-    }
-
-    Vector3f mPosition;
-    Drought::Path* mPath;
+	Vector3f mPosition;
+	Drought::Path mPath;
 };
-
 
 struct NaviGoHereState : public NaviState {
 	inline NaviGoHereState()
 	    : NaviState(NSID_GoHere)
+	    , mFinishDistanceThreshold(15.0f)
 	{
 	}
 
-	virtual void init(Navi*, StateArg*); // _08
-	virtual void exec(Navi*);            // _0C
-	virtual void cleanup(Navi*);         // _10
+	virtual void init(Navi*, StateArg*);
+	virtual void exec(Navi*);
+	virtual void cleanup(Navi*);
+	virtual void collisionCallback(Navi*, CollEvent&);
 	virtual bool callable() { return true; }
 
-	bool execMove(Navi*);
-	bool execMoveGoal(Navi*);
+	bool handleControlStick(Navi*);   // True if update should stop
+	bool navigateToFinalPoint(Navi*); // True if target reached, false if not
+	void navigateToWayPoint(Navi*, Game::WayPoint*);
+	void changeState(Navi* player, bool isWanted);
 
-	// _00     = VTBL
-	// _00-_10 = NaviState
-	Vector3f mPosition;       // _14
-	Drought::PathNode* mCurrNode;
-	Drought::Path* mPath;
+	inline Game::WayPoint* getCurrentWaypoint()
+	{
+		if (mActiveRouteNodeIndex == -1 || mActiveRouteNodeIndex >= mPath.mLength) {
+			return nullptr;
+		}
+
+		return Game::getWaypointAt(mPath.mWaypointList[mActiveRouteNodeIndex]);
+	}
+
+	const f32 mFinishDistanceThreshold;
+
+	f32 mTimeoutTimer;         // The time in seconds before the player gives up trying to get there
+	s32 mActiveRouteNodeIndex; // The current waypoint we're trying to get to
+	Vector3f mLastPosition;    // The last position the player was at
+	Vector3f mTargetPosition;  // The position we're trying to get to
+	Drought::Path mPath;       // The path we're trying to follow
 };
-    
-} // namespace Game
 
+} // namespace Game
 
 #endif

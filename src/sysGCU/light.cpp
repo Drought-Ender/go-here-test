@@ -63,7 +63,7 @@ void LightObj::set(Matrixf& posMtx)
 	Matrixf invMtx, tposeMtx;
 	Vector3f pos;
 
-#ifndef NONMATCHING
+#if MATCHING
 	Vector3f* posPtr = &pos; // INTNS: Required for matching compile.
 #endif
 
@@ -172,8 +172,8 @@ void LightObj::drawPos(Graphics& gfx, Matrixf& transformationMtx)
  */
 LightMgr::LightMgr(char* name)
     : CNode(name)
-    , mAmbientLight("ƒAƒ“ƒrƒGƒ“ƒgƒ‰ƒCƒg")
-    , mLightObjChain("ƒ‰ƒCƒg")
+    , mAmbientLight("ã‚¢ãƒ³ãƒ“ã‚¨ãƒ³ãƒˆãƒ©ã‚¤ãƒˆ")
+    , mLightObjChain("ãƒ©ã‚¤ãƒˆ")
     , mLightCount(0)
 {
 	add(&mAmbientLight);

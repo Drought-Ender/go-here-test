@@ -44,8 +44,8 @@ void Obj::onEndCapture()
 {
 	constraintOff();
 	disableEvent(0, EB_Invulnerable);
-	_2BC           = 1;
-	mCaptureMatrix = nullptr;
+	mHasEscapedCapture = 1;
+	mCaptureMatrix     = nullptr;
 }
 
 /**
@@ -65,12 +65,12 @@ void Obj::onInit(CreatureInitArg* initArg)
 	disableEvent(0, EB_DamageAnimEnabled);
 	disableEvent(0, EB_DeathEffectEnabled);
 
-	_2BC     = 0;
-	_2BD     = 0;
-	_2C8     = 0;
-	_2C0     = 0;
-	_2C4     = 0;
-	mCarrier = nullptr;
+	mHasEscapedCapture   = 0;
+	mDoSkipRender        = 0;
+	mHasMadeLightEfx     = 0;
+	mAnimStartDelayTimer = 0;
+	mBitterHitCount      = 0;
+	mCarrier             = nullptr;
 
 	mFsm->start(this, BOMB_Wait, nullptr);
 
@@ -100,15 +100,15 @@ void Obj::onInit(CreatureInitArg* initArg)
  */
 Obj::Obj()
 {
-	_2BC      = 0;
-	_2BD      = 0;
-	_2C0      = 0;
-	_2C4      = 0;
-	_2C8      = 0;
-	_2C9      = 0;
-	mFsm      = nullptr;
-	mEfxLight = nullptr;
-	mAnimator = new ProperAnimator;
+	mHasEscapedCapture   = 0;
+	mDoSkipRender        = 0;
+	mAnimStartDelayTimer = 0;
+	mBitterHitCount      = 0;
+	mHasMadeLightEfx     = 0;
+	mDoReduceVelocity    = 0;
+	mFsm                 = nullptr;
+	mEfxLight            = nullptr;
+	mAnimator            = new ProperAnimator;
 	setFSM(new FSM);
 	mEfxLight = new efx::TBombrockLight;
 }
@@ -119,7 +119,7 @@ Obj::Obj()
  */
 void Obj::doUpdate()
 {
-	if (_2C9) {
+	if (mDoReduceVelocity) {
 		mAcceleration *= 0.9f;
 		mCurrentVelocity.x *= 0.9f;
 		if (mCurrentVelocity.y > 0.0f) {
@@ -128,7 +128,7 @@ void Obj::doUpdate()
 		mCurrentVelocity.z *= 0.9f;
 	}
 
-	if (mBounceTriangle) {
+	if (mFloorTriangle) {
 		mTargetVelocity = Vector3f(0.0f);
 	} else {
 		mTargetVelocity = mCurrentVelocity;
@@ -155,7 +155,7 @@ void Obj::doDebugDraw(Graphics&) { }
  */
 void Obj::doEntry()
 {
-	if (!_2BD) {
+	if (!mDoSkipRender) {
 		EnemyBase::doEntry();
 	}
 }
@@ -190,8 +190,8 @@ void Obj::doAnimationCullingOff()
 		mCollTree->update();
 	}
 
-	if (!isStickTo() && !isStopMotion() && !_2C8 && mHealth < 4.0f) { // why 4
-		_2C8 = 1;
+	if (!isStickTo() && !isStopMotion() && !mHasMadeLightEfx && mHealth < 4.0f) { // why 4
+		mHasMadeLightEfx = 1;
 		efx::Arg fxArg(mPosition);
 		mEfxLight->create(&fxArg);
 	}
@@ -255,7 +255,7 @@ bool Obj::needShadow() { return (!EnemyBase::needShadow()) ? false : mCaptureMat
 void Obj::doFinishStoneState()
 {
 	EnemyBase::doFinishStoneState();
-	if (getStateID() == BOMB_Wait && getMotionFrame() == 0.0f && !_2BC) {
+	if (getStateID() == BOMB_Wait && getMotionFrame() == 0.0f && !mHasEscapedCapture) {
 		stopMotion();
 	}
 
@@ -271,7 +271,7 @@ void Obj::doStartStoneState()
 {
 	EnemyBase::doStartStoneState();
 	mEfxLight->fade();
-	_2C8 = 0;
+	mHasMadeLightEfx = 0;
 }
 
 /**
@@ -306,10 +306,11 @@ void Obj::doEndMovie() { mEfxLight->endDemoDrawOn(); }
  */
 bool Obj::damageCallBack(Creature* creature, f32 damage, CollPart* collpart)
 {
-	if (!_2BC || mBounceTriangle) {
+	if (!mHasEscapedCapture || mFloorTriangle) {
 		if (isEvent(0, EB_Bittered)) {
-			_2C4++;
-			if (_2C4 > 4) {
+			// after taking specifically 5 hits while bittered, kill the bomb. sure.
+			mBitterHitCount++;
+			if (mBitterHitCount > 4) {
 				kill(nullptr);
 			}
 			return true;
@@ -329,12 +330,12 @@ bool Obj::bombCallBack(Creature* creature, Vector3f& direction, f32 damage)
 {
 	if (!mCaptureMatrix && !isEvent(0, EB_Bittered) && creature->isTeki()) {
 		if (static_cast<EnemyBase*>(creature)->getEnemyTypeID() == EnemyTypeID::EnemyID_Bomb) {
-			if (getStateID() == BOMB_Wait && _2C0 == 0) {
+			if (getStateID() == BOMB_Wait && mAnimStartDelayTimer == 0) {
 				Vector3f creaturePos = creature->getPosition();
 				f32 rad              = C_GENERALPARMS.mAttackRadius.mValue;
 				rad *= rad;
-				f32 factor = (1.0f - (sqrDistanceXZ(creaturePos, mPosition) / rad)) * (f32)C_PROPERPARMS.mTriggerLimit();
-				_2C0       = (int)factor + 1;
+				f32 factor           = (1.0f - (sqrDistanceXZ(creaturePos, mPosition) / rad)) * (f32)C_PROPERPARMS.mTriggerLimit();
+				mAnimStartDelayTimer = (int)factor + 1;
 			}
 		} else {
 			damageCallBack(creature, 0.0f, nullptr);
@@ -359,7 +360,7 @@ bool Obj::pressCallBack(Creature*, f32, CollPart*) { return false; }
  */
 void Obj::bounceCallback(Sys::Triangle* triangle)
 {
-	if (_2BC) {
+	if (mHasEscapedCapture) {
 		createBounceEffect(mPosition, 0.5f);
 		return;
 	}
@@ -380,7 +381,7 @@ void Obj::collisionCallback(CollEvent& collEvent)
 	if (isBirthTypeDropGroup() && collEvent.mCollidingCreature && !collEvent.mCollidingCreature->isTeki() && getStateID() == BOMB_Wait) {
 		createBounceEffect(mPosition, 0.5f);
 		forceBomb();
-		_2C9 = 1;
+		mDoReduceVelocity = 1;
 	}
 }
 
@@ -402,7 +403,18 @@ void Obj::forceBomb()
  */
 bool Obj::isBombStart()
 {
-	// UNUSED FUNCTION
+	if (!mAnimStartDelayTimer) {
+		return false;
+	}
+
+	mAnimStartDelayTimer++;
+
+	if (mAnimStartDelayTimer > C_PROPERPARMS.mTriggerLimit.mValue) {
+		mAnimStartDelayTimer = 0;
+		return true;
+	}
+
+	return false;
 }
 
 /**
@@ -430,33 +442,11 @@ bool Obj::canEat()
  */
 bool Obj::isAnimStart()
 {
-	bool check;
-	if (isBirthTypeDropGroup() || !(mFlickTimer >= C_PROPERPARMS.mDamageLimit.mValue)) {
-		if (!_2BC || !mBounceTriangle) {
-			if (!_2C0) {
-				check = false;
-			} else {
-
-				_2C0++;
-
-				if (_2C0 > C_PROPERPARMS.mTriggerLimit.mValue) {
-					_2C0  = 0;
-					check = true;
-				} else {
-					check = false;
-				}
-			}
-
-			if (check) {
-			yes:
-				return true;
-			}
-		} else {
-			goto yes;
-		}
-	} else {
-		goto yes;
+	if ((!isBirthTypeDropGroup() && (mFlickTimer >= C_PROPERPARMS.mDamageLimit.mValue)) || (mHasEscapedCapture && mFloorTriangle != 0)
+	    || isBombStart()) {
+		return true;
 	}
+
 	return false;
 }
 

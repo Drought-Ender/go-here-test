@@ -1,5 +1,6 @@
 #include "ebi/Save.h"
 #include "Controller.h"
+#include "ebi/Utility.h"
 
 static const char name[] = "ebiSaveMgr";
 
@@ -67,7 +68,7 @@ void FSMState_DoYouSave::do_exec(TMgr* mgr)
 		if (mgr->mSaveType) {
 			mgr->mSaveMenu.closeScreen(nullptr);
 			if (mgr->mSaveMenu.isFinishScreen()) {
-				mgr->goEnd_(TMgr::End_2);
+				mgr->goEnd_(TMgr::End_SelectNoSave);
 			}
 		} else {
 			transit(mgr, DoYouContinue, nullptr);
@@ -76,7 +77,7 @@ void FSMState_DoYouSave::do_exec(TMgr* mgr)
 	case 2:
 		mgr->mSaveMenu.closeScreen(nullptr);
 		if (mgr->mSaveMenu.isFinishScreen()) {
-			mgr->goEnd_(TMgr::End_1);
+			mgr->goEnd_(TMgr::End_Cancel);
 		}
 		break;
 	}
@@ -102,13 +103,13 @@ void FSMState_DoYouContinue::do_exec(TMgr* mgr)
 	case 0:
 		mgr->mSaveMenu.closeScreen(nullptr);
 		if (mgr->mSaveMenu.isFinishScreen()) {
-			mgr->goEnd_(TMgr::End_2);
+			mgr->goEnd_(TMgr::End_SelectNoSave);
 		}
 		break;
 	case 1:
 		mgr->mSaveMenu.closeScreen(nullptr);
 		if (mgr->mSaveMenu.isFinishScreen()) {
-			mgr->goEnd_(TMgr::End_3);
+			mgr->goEnd_(TMgr::End_ReturnToFS);
 		}
 		break;
 	case 2:
@@ -202,7 +203,7 @@ void FSMState_CardRequest::do_exec(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardNoCard(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_NoCard2);
+	CardErrorArg arg(CardError::TMgr::Start_NoCard_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -213,7 +214,7 @@ void FSMState_CardRequest::do_transitCardNoCard(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardIOError(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_IOError2);
+	CardErrorArg arg(CardError::TMgr::Start_IOError_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -224,7 +225,7 @@ void FSMState_CardRequest::do_transitCardIOError(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardWrongDevice(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_WrongDevice2);
+	CardErrorArg arg(CardError::TMgr::Start_WrongDevice_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -235,7 +236,7 @@ void FSMState_CardRequest::do_transitCardWrongDevice(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardWrongSector(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_WrongSector2);
+	CardErrorArg arg(CardError::TMgr::Start_WrongSector_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -246,7 +247,7 @@ void FSMState_CardRequest::do_transitCardWrongSector(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardBroken(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_DataBrokenAndDoYouFormat2);
+	CardErrorArg arg(CardError::TMgr::Start_DataBrokenAndDoYouFormat_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -257,7 +258,7 @@ void FSMState_CardRequest::do_transitCardBroken(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardEncoding(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_DataBrokenAndDoYouFormat2);
+	CardErrorArg arg(CardError::TMgr::Start_DataBrokenAndDoYouFormat_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -268,7 +269,7 @@ void FSMState_CardRequest::do_transitCardEncoding(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardNoFileSpace(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_OverCapacity2);
+	CardErrorArg arg(CardError::TMgr::Start_OverCapacity_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -279,7 +280,7 @@ void FSMState_CardRequest::do_transitCardNoFileSpace(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardNoFileEntry(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_OverCapacity2);
+	CardErrorArg arg(CardError::TMgr::Start_OverCapacity_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -290,7 +291,7 @@ void FSMState_CardRequest::do_transitCardNoFileEntry(TMgr* mgr)
  */
 void FSMState_CardRequest::do_transitCardFileOpenError(TMgr* mgr)
 {
-	CardErrorArg arg(CardError::TMgr::Start_DoYouCreateNewFile2);
+	CardErrorArg arg(CardError::TMgr::Start_DoYouCreateNewFile_Save);
 
 	transit(mgr, CardError, &arg);
 }
@@ -455,7 +456,7 @@ void FSMState_NowSave::do_exec(TMgr* mgr)
 		}
 		break;
 	case 4:
-		if (mgr->mCounter * sys->mDeltaTime < 0.5f && mgr->mController->mButton.mButtonDown & Controller::PRESS_A) {
+		if (mgr->mCounter * sys->mDeltaTime < 0.5f && mgr->mController->getButtonDown() & Controller::PRESS_A) {
 			mgr->mSaveMenu.closeMsg();
 		}
 
@@ -505,7 +506,7 @@ void FSMState_AfterSave::do_init(TMgr* mgr, Game::StateArg*)
  */
 void FSMState_AfterSave::do_exec(TMgr* mgr)
 {
-	if (mgr->mCounter * sys->mDeltaTime < 0.5f && mgr->mController->mButton.mButtonDown & Controller::PRESS_A) {
+	if (mgr->mCounter * sys->mDeltaTime < 0.5f && mgr->mController->getButtonDown() & Controller::PRESS_A) {
 		mgr->mSaveMenu.closeMsg();
 	}
 
@@ -518,7 +519,7 @@ void FSMState_AfterSave::do_exec(TMgr* mgr)
 	}
 
 	if (mgr->mSaveMenu.isFinishScreen()) {
-		mgr->goEnd_(TMgr::End_0);
+		mgr->goEnd_(TMgr::End_SaveDone);
 	}
 }
 
@@ -545,19 +546,19 @@ void FSMState_CardError::do_exec(TMgr* mgr)
 	}
 
 	switch (mgr->mMemCardErrorMgr.mEndStat) {
-	case CardError::TMgr::End_3:
-		if (mgr->_47A) {
+	case CardError::TMgr::End_RestartSaveOption:
+		if (mgr->mDoRetryOnError) {
 			transit(mgr, DoYouSave, nullptr);
 			mgr->mMemCardErrorMgr.forceQuitSeq();
 		} else {
-			mgr->goEnd_(TMgr::End_4);
+			mgr->goEnd_(TMgr::End_Error);
 		}
 		break;
-	case CardError::TMgr::End_4:
+	case CardError::TMgr::End_GoToCheckCard:
 		transit(mgr, MountCheck, nullptr);
 		break;
 	default:
-		JUT_PANICLINE(621, "想定外です。ありえねー\0"); // "Unexpected. Impossible"
+		JUT_PANICLINE(621, "諠ｳ螳壼､悶〒縺吶ゅ≠繧翫∴縺ｭ繝ｼ"); // "Unexpected. Impossible"
 		JUT_PANICLINE(622, "P2Assert");
 		break;
 	}
@@ -650,7 +651,7 @@ TMgr::TMgr()
 	mIsStoryGameSave   = FALSE;
 	mSaveType          = 0;
 	mIsAutosaveOn      = false;
-	_47A               = true;
+	mDoRetryOnError    = true;
 	mDVDErrorSuspended = false;
 }
 
@@ -699,7 +700,7 @@ bool TMgr::isFinish()
  */
 void TMgr::goEnd_(TMgr::enumEnd end)
 {
-	mCurrStateID = end;
+	mEndState = end;
 	mStateMachine.transit(this, Standby, nullptr);
 	mSaveMenu.killScreen();
 	mMemCardErrorMgr.forceQuitSeq();

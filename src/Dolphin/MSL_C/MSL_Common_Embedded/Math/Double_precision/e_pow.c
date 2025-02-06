@@ -5,7 +5,7 @@
 //      Part of the standard mathematical function library
 //
 //========================================================================
-//####ECOSGPLCOPYRIGHTBEGIN####
+// ####ECOSGPLCOPYRIGHTBEGIN####
 // -------------------------------------------
 // This file is part of eCos, the Embedded Configurable Operating System.
 // Copyright (C) 1998, 1999, 2000, 2001, 2002 Red Hat, Inc.
@@ -36,9 +36,9 @@
 // Alternative licenses for eCos may be arranged by contacting Red Hat, Inc.
 // at http://sources.redhat.com/ecos/ecos-license/
 // -------------------------------------------
-//####ECOSGPLCOPYRIGHTEND####
+// ####ECOSGPLCOPYRIGHTEND####
 //========================================================================
-//#####DESCRIPTIONBEGIN####
+// #####DESCRIPTIONBEGIN####
 //
 // Author(s):     jlarmour
 // Contributors:
@@ -47,7 +47,7 @@
 // Description:
 // Usage:
 //
-//####DESCRIPTIONEND####
+// ####DESCRIPTIONEND####
 //
 //========================================================================
 
@@ -157,7 +157,8 @@ ivln2_l  =  1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
 #ifdef __STDC__
 f64 __ieee754_pow(f64 x, f64 y)
 #else
-f64 __ieee754_pow(x, y) f64 x, y;
+f64 __ieee754_pow(x, y)
+f64 x, y;
 #endif
 {
 	f64 z, ax, z_h, z_l, p_h, p_l;
@@ -256,7 +257,7 @@ f64 __ieee754_pow(x, y) f64 x, y;
 	   implementation defined.  */
 
 	if (((((int)hx >> 31) + 1) | yisint) == 0) {
-		errno = 33;
+		errno = EDOM;
 		return (f64)NAN;
 	};
 

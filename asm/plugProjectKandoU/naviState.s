@@ -790,14 +790,6 @@ lbl_constructor:
 	.4byte "restart__Q24Game22FSMState<Q24Game4Navi>FPQ24Game4Navi"
 	.4byte "transit__Q24Game22FSMState<Q24Game4Navi>FPQ24Game4NaviiPQ24Game8StateArg"
 .endobj "__vt__Q24Game22FSMState<Q24Game4Navi>"
-.obj __vt__Q24Game7NaviFSM, global
-	.4byte 0
-	.4byte 0
-	.4byte init__Q24Game7NaviFSMFPQ24Game4Navi
-	.4byte "start__Q24Game26StateMachine<Q24Game4Navi>FPQ24Game4NaviiPQ24Game8StateArg"
-	.4byte "exec__Q24Game26StateMachine<Q24Game4Navi>FPQ24Game4Navi"
-	.4byte transit__Q24Game7NaviFSMFPQ24Game4NaviiPQ24Game8StateArg
-.endobj __vt__Q24Game7NaviFSM
 .obj __vt__Q24Game9NaviState, global
 	.4byte 0
 	.4byte 0

@@ -17,6 +17,12 @@ enum JASMixMode {
 	MixMode_InterLeave = 3,
 };
 
+enum JASOutputMode {
+	JASOUTPUT_Mono     = 0,
+	JASOUTPUT_Stereo   = 1,
+	JASOUTPUT_Surround = 2,
+};
+
 namespace JASDriver {
 typedef s32 (*DriverCallback)(void*);
 typedef void (*DspDacCallback)(s16*, u32);
@@ -50,7 +56,7 @@ void readDspBuffer(s16*, u32);
 void finishDSPFrame();
 void registerMixCallback(MixCallback, JASMixMode);
 f32 getDacRate();
-int getSubFrames();
+u32 getSubFrames();
 static int getDacSize();
 static int getFrameSamples();
 static void mixMonoTrack(s16*, u32, MixCallback);

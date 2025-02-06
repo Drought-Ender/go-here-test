@@ -41,14 +41,17 @@
 #define PELCOLOR_SPECTRALID (0)
 #define PELSIZE_SPECTRALID  (1)
 
-// pellet types
 // for use with Pellet:mPelletType and getKind()
-#define PELTYPE_NUMBER   (0)
-#define PELTYPE_CARCASS  (1)
-#define PELTYPE_BERRY    (2)
-#define PELTYPE_TREASURE (3)
-#define PELTYPE_UPGRADE  (4)
-#define PELTYPE_INVALID  (0xFF)
+struct PelletType {
+	enum Type {
+		Number   = 0,
+		Carcass  = 1,
+		Berry    = 2,
+		Treasure = 3,
+		Upgrade  = 4,
+		Invalid  = 0xFF,
+	};
+};
 
 namespace PSM {
 struct EventBase;
@@ -64,6 +67,13 @@ struct PathNode;
 struct PelletState;
 struct Onyon;
 
+enum PelletBirthType {
+	PelBirthType_Normal      = 0,
+	PelBirthType_Appear      = 1,
+	PelBirthType_ScaleAppear = 2,
+	PelBirthType_Piklopedia  = 3,
+};
+
 struct PelletMgr : public NodeObjectMgr<GenericObjectMgr> {
 	struct OtakaraItemCode {
 		OtakaraItemCode(s16 v = 0)
@@ -72,6 +82,9 @@ struct PelletMgr : public NodeObjectMgr<GenericObjectMgr> {
 		}
 
 		operator s16() { return mValue; }
+
+		inline u8 getPelletKind() { return mValue >> 8; }
+		inline u8 getPelletIndex() { return mValue & 255; }
 
 		bool isNull();
 		void read(Stream&);
@@ -92,7 +105,7 @@ struct PelletMgr : public NodeObjectMgr<GenericObjectMgr> {
 	virtual void doDirectDraw(Graphics& gfx);   // _78 (weak)
 	virtual char* getMgrName()                  // _80 (weak)
 	{
-		return "ペレットマネージャ"; // pellet manager
+		return "繝壹Ξ繝�繝医�槭ロ繝ｼ繧ｸ繝｣"; // pellet manager
 	}
 	virtual char* getCaveName(int);       // _84
 	virtual int getCaveID(char*);         // _88
@@ -114,7 +127,9 @@ struct PelletMgr : public NodeObjectMgr<GenericObjectMgr> {
 	void decode(s32, u8&, int&);
 	int encode(u8, int);
 	BasePelletMgr* getMgrByID(u8);
+	BasePelletMgr* getMgrByIndex(int);
 	void calcNearestTreasure(Vector3f&, f32);
+	void setUseFlagAll(bool);
 
 	static bool mDebug;
 	static bool disableDynamics;
@@ -131,7 +146,7 @@ struct PelletIterator {
 	Pellet* operator*();
 	void setFirst();
 
-	u32 _00;                              // _00 - unknown
+	u32 mType;                            // _00, always 0, if its anything else the game will crash, so thats probably good
 	FixedSizePelletMgr<Pellet>* mMgr;     // _04
 	TObjectNode<GenericObjectMgr>* mNode; // _08
 	int mIndex;                           // _0C
@@ -143,16 +158,16 @@ struct PelletIterator {
 struct PelletInitArg : public CreatureInitArg {
 	PelletInitArg()
 	{
-		_1C                   = 0;
-		mState                = 0;
-		mPelletType           = PELTYPE_INVALID;
+		mDoSkipCreateModel    = false;
+		mState                = PelBirthType_Normal;
+		mPelletType           = PelletType::Invalid;
 		mPelView              = nullptr;
-		_17                   = 0;
-		_04                   = true;
+		mDontCheckCollected   = 0;
+		mUnusedFlag           = true;
 		mAdjustWeightForSquad = 0;
 		mMaxCarriers          = -1;
 		mMinCarriers          = -1;
-		_1E                   = 0;
+		mUnusedFlag2          = false;
 		mFromEnemy            = 0;
 	}
 
@@ -165,17 +180,17 @@ struct PelletInitArg : public CreatureInitArg {
 		return "PelletInitArg";
 	}
 
-	bool _04;                 // _04
+	bool mUnusedFlag;         // _04, always true, never used
 	char* mTextIdentifier;    // _08
 	int mPelletColor;         // _0C, for number pellets
 	int mPelletIndex;         // _10
 	u16 mState;               // _14
-	u8 mPelletType;           // _16
-	u8 _17;                   // _17
+	u8 mPelletType;           // _16, use PelletType:: struct
+	u8 mDontCheckCollected;   // _17, true = dont check if you already have it before spawning, never true
 	PelletView* mPelView;     // _18
-	u8 _1C;                   // _1C
+	u8 mDoSkipCreateModel;    // _1C, true for corpses, or breadbug drops since those were already loaded
 	u8 mAdjustWeightForSquad; // _1D, should Item decrease weight for piki squads that are less than minimum carry weight
-	u8 _1E;                   // _1E
+	u8 mUnusedFlag2;          // _1E, always false, never used
 	u8 mFromEnemy;            // _1F
 	int mMinCarriers;         // _20
 	int mMaxCarriers;         // _24
@@ -191,14 +206,14 @@ struct PelletNumberInitArg : public PelletInitArg {
 
 struct PelletKillArg : public CreatureKillArg {
 	inline PelletKillArg()
-	    : CreatureKillArg(0)
+	    : CreatureKillArg(CKILL_NULL)
 	{
-		_08 = 1;
+		mDoRevive = true;
 	}
 
 	// _00     = VTBL
 	// _00-_08 = CreatureKillArg
-	u8 _08; // _08
+	u8 mDoRevive; // _08
 };
 
 /**
@@ -342,6 +357,7 @@ struct Pellet : public DynCreature, public SysShape::MotionListener, public Carr
 	void init_pmotions();
 	void update_pmotions();
 	void start_pmotions();
+	void start_carrymotion();
 	void stop_carrymotion();
 	void finish_carrymotion();
 	int getSpeicalSlot();
@@ -399,7 +415,7 @@ struct Pellet : public DynCreature, public SysShape::MotionListener, public Carr
 		}
 	}
 
-	inline bool isTreasurePosition() // this probably needs a better name; used in Pellet::onSetPosition
+	inline bool doSpawnBuried()
 	{
 		bool check = false;
 		if ((mCaptureMatrix == nullptr) && (PelletMgr::mDebug == false) && (mConfig->mParams.mDepth.mData > 0.0f) && (mIsCaptured == 0)) {
@@ -428,9 +444,9 @@ struct Pellet : public DynCreature, public SysShape::MotionListener, public Carr
 
 	inline void setupDynParticle(int idx, f32 height, Vector3f& rotation)
 	{
-		_2F4                          = _2F4 + rotation;
-		mDynParticle->getAt(idx)->_00 = rotation;
-		mDynParticle->getAt(idx)->_18 = height;
+		mRotation                           = mRotation + rotation;
+		mDynParticle->getAt(idx)->mRotation = rotation;
+		mDynParticle->getAt(idx)->mRadius   = height;
 	}
 
 	inline bool checkBedamaColor(int color)
@@ -438,6 +454,8 @@ struct Pellet : public DynCreature, public SysShape::MotionListener, public Carr
 		int bedamaColor = getBedamaColor();
 		return bedamaColor != color;
 	}
+
+	inline Vector3f getOffset() { return mConfig->mParams.mOffset.mData; }
 
 	// _00		= VTABLE 1
 	// _04-_314	= DYNCREATURE
@@ -475,7 +493,7 @@ struct Pellet : public DynCreature, public SysShape::MotionListener, public Carr
 	f32 mAngleOffset;                 // _3E0
 	PelletSlots mSlots;               // _3E4
 	s16 mSlotCount;                   // _3F4
-	u8 _3F6;                          // _3F6
+	u8 mIsAlwaysCarried;              // _3F6, is never set to true, probably testing
 	u32 mPikminCount[PikiColorCount]; // _3F8
 	u32 mTotalCarriers;               // _414, might be for non-pikmin carriers?
 	f32 mCarryPower;                  // _418
@@ -550,12 +568,12 @@ struct PelletAppearState : public PelletState {
 	virtual bool appeared() { return false; } // _24 (weak)
 
 	f32 mTime;      // _10
-	f32 mAngle;     // _14
+	f32 mTimeSine;  // _14
 	f32 mGoalScale; // _18
 	f32 _1C;        // _1C
 	f32 _20;        // _20
-	f32 _24;        // _24
-	f32 _28;        // _28
+	f32 mDuration;  // _24
+	f32 mMagnitude; // _28
 	bool mEfxMade;  // _29
 };
 
@@ -674,8 +692,8 @@ struct PelletScaleAppearState : public PelletState {
 	f32 mGoalScale; // _18
 	f32 _1C;        // _1C
 	f32 _20;        // _20
-	f32 _24;        // _24
-	f32 _28;        // _28
+	f32 mDuration;  // _24
+	f32 mMagnitude; // _28
 	bool mEfxMade;  // _2C
 };
 

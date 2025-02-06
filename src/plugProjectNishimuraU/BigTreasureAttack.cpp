@@ -408,13 +408,13 @@ bool BigTreasureElecAttack::update()
 		pos.y += 20.0f;
 		Sys::Sphere moveSphere(pos, 20.0f);
 		MoveInfo info(&moveSphere, &mVelocity, mAttackData->mElecBounceFactor);
-		info.mInfoOrigin = mOwner;
+		info.mMovingCreature = mOwner;
 		mapMgr->traceMove(info, sys->mDeltaTime);
 
 		mPosition = moveSphere.mPosition;
 		mPosition.y -= 20.0f;
 
-		if (info.mBounceTriangle) {
+		if (info.mFloorTriangle) {
 			mVelocity.x *= mAttackData->mElecFrictionFactor;
 			mVelocity.z *= mAttackData->mElecFrictionFactor;
 
@@ -422,7 +422,7 @@ bool BigTreasureElecAttack::update()
 				PSStartSoundVec(PSSE_EN_BIGTAKARA_EP_BOUND, (Vec*)&mPosition);
 			}
 
-			mFloorTri = info.mBounceTriangle;
+			mFloorTri = info.mFloorTriangle;
 		} else {
 			mFloorTri = nullptr;
 		}
@@ -433,7 +433,7 @@ bool BigTreasureElecAttack::update()
 		mPosition = mOwner->mModel->getJoint("otakara_elec_eff")->getWorldMatrix()->getColumn(3);
 	}
 
-	if (mIsVisibleNode) {
+	if (mConnectedNode) {
 		Vector3f partnerSep = mConnectedNode->mPosition - mPosition; // f30, f26, f31
 		f32 dist            = partnerSep.normalise();                // f29
 
@@ -458,9 +458,9 @@ bool BigTreasureElecAttack::update()
 				Vector3f creaturePos = creature->getPosition();
 
 				Vector3f sep = creaturePos - mPosition;
-				f32 dot1     = dot(crossVec1, sep);
-				if (absVal(dot1) < 10.0f && absVal(dot(crossVec2, sep)) < 20.0f) {
-					f32 dotSep = dot(partnerSep, sep);
+				f32 dot1     = crossVec1.dot(sep);
+				if (absVal(dot1) < 10.0f && absVal(crossVec2.dot(sep)) < 20.0f) {
+					f32 dotSep = partnerSep.dot(sep);
 					if (dotSep > 0.0f && dotSep < dist) {
 						Vector3f zapDir(dot1 * crossVec1.x, 0.0f, dot1 * crossVec1.z);
 						zapDir.normalise();
@@ -2374,10 +2374,10 @@ void BigTreasureAttackMgr::startElecAttack()
 		counter++;
 	}
 
-	f32 attackVal     = (f32)mAttackData->mElecMaxNodes * 0.25f;
-	mElecSENodeIDs[0] = attackVal * 1.0f;
-	mElecSENodeIDs[1] = attackVal * 2.0f;
-	mElecSENodeIDs[2] = attackVal * 3.0f;
+	f32 attackVal = (f32)mAttackData->mElecMaxNodes * 0.25f;
+	for (int i = 0; i < 3; i++) {
+		mElecSENodeIDs[i] = attackVal * f32(i);
+	}
 
 	/*
 	stwu     r1, -0xd0(r1)

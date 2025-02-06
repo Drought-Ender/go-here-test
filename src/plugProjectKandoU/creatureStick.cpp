@@ -1,4 +1,5 @@
 #include "Game/Stickers.h"
+#include "Game/Navi.h" // specifically for the navi scale defines. no other reason to include --EpochFlame
 #include "CollInfo.h"
 
 static const char className[] = "creatureStick";
@@ -215,14 +216,16 @@ void Creature::updateStick(Vector3f& pos)
 
 		static_cast<MouthCollPart*>(mStuckCollPart)->copyMatrixTo(stuckMtx);
 
-		// Set the scale factor if the creature is a Navi
+		// If the owner is a greater jellyfloat, set the captains scale, and the collparts offset
+		// otherwise, ignore these things
 		f32 scale = 1.0f;
-		if (static_cast<MouthCollPart*>(mStuckCollPart)->_6C) {
+		if (static_cast<MouthCollPart*>(mStuckCollPart)->mIsOniKurage) {
 			if (isNavi()) {
-				if (getCreatureID() == Game::EnemyTypeID::EnemyID_Pelplant) {
-					scale = 1.3f;
+				// use olimar/louie's scale
+				if (getCreatureID() == 0) {
+					scale = OLIMAR_SCALE;
 				} else {
-					scale = 1.5f;
+					scale = LOUIE_SCALE;
 				}
 			}
 
@@ -272,7 +275,7 @@ void Creature::updateStick(Vector3f& pos)
 			// Get direction from creature to slot, then calculate the angle on the Y axis
 			Vector3f direction = mSticker->getPosition() - position;
 			_normaliseXZ(direction);
-			f32 angleBetween = JMath::atanTable_.atan2_(direction.x, direction.z);
+			f32 angleBetween = JMAAtan2Radian(direction.x, direction.z);
 
 			setPosition(position, true);
 

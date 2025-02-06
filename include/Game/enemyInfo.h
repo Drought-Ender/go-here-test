@@ -5,6 +5,8 @@
 
 namespace Game {
 
+extern int gEnemyInfoNum;
+
 struct EnemyInfo {
 	char* mName;        // _00
 	char mId;           // _04
@@ -21,6 +23,21 @@ struct EnemyInfo {
 	int mChildID;       // _28
 	int mChildNum;      // _2C
 	char mBitterDrops;  // _30
+};
+
+enum EnemyInfoFlags {
+	// Note: 2 is enabled anywhere EFlag_CanBeSpawned is, but doesnt seem to do anything
+
+	// 0x100 is also used for a few (dwarf bulborbs and sheargrubs), but doesnt seem to have a purpose
+	// It may have originally been another day end take off max count flag, but max 7 is just the default instead
+
+	EFlag_UseOwnID        = 1,     // Should this enemy use its own ID instead of the parent ID
+	EFlag_CanBeSpawned    = 4,     // Can be spawned at all, should be true unless youre UmiMushiBase or Pom (seems to only apply to caves)
+	EFlag_CanAppearDayEnd = 0x10,  // Can this enemy appear in the day end takeoff at all
+	EFlag_DayEndMax1      = 0x20,  // Max 1 of these enemies in day end takeoff
+	EFlag_DayEndMax2      = 0x40,  // Max 2 of these enemies in day end takeoff (no enemy seems to use this one in particular)
+	EFlag_DayEndMax4      = 0x80,  // Max 4 of these enemies (If none of the max count flags are set, 7 is the max)
+	EFlag_HasNoInfo       = 0x200, // Don't track pikmin lost/creatures defeated/piklopedia entered
 };
 
 enum EBitterDropType { // ID
@@ -150,13 +167,29 @@ u8 mCount;             // _04
 
 extern EnemyInfo gEnemyInfo[];
 
-extern int gEnemyInfoNum;
+struct EnemyNumInfo {
+	EnemyNumInfo()
+	    : mEnemyNumList(nullptr)
+	{
+	}
+
+	static int getOriginalEnemyID(int enemyID);
+
+	void init();
+	void resetEnemyNum();
+	void addEnemyNum(int enemyID, u8 num);
+	u8 getEnemyNum(int enemyID, bool doCheckOriginal);
+	u8 getEnemyNumData(int enemyID);
+
+	u8 _00[4];                  // _00
+	EnemyTypeID* mEnemyNumList; // _04
+};
 
 namespace EnemyInfoFunc {
-EnemyInfo* getEnemyInfo(int id, int flags);
-char* getEnemyName(int id, int flags);
-char* getEnemyResName(int id, int flags);
-char getEnemyMember(int id, int flags);
+EnemyInfo* getEnemyInfo(int enemyID, int flags);
+char* getEnemyName(int enemyID, int flags);
+char* getEnemyResName(int enemyID, int flags);
+char getEnemyMember(int enemyID, int flags);
 int getEnemyID(char* name, int flags);
 } // namespace EnemyInfoFunc
 
@@ -168,12 +201,15 @@ inline int getEnemyMgrID(int enemyID)
 		char id = gEnemyInfo[i].mId;
 
 		if (id == enemyID) {
-			idx = (gEnemyInfo[i].mFlags & 1) ? enemyID : gEnemyInfo[i].mParentID;
+			idx = (gEnemyInfo[i].mFlags & EFlag_UseOwnID) ? enemyID : gEnemyInfo[i].mParentID;
 		}
 	}
 
 	return idx;
 }
+
+#define SHIJIMICHOU_GROUP_COUNT 25
+#define TAMAGOMUSHI_GROUP_COUNT 30
 
 #define IS_ENEMY_BOSS(id)                                                                                                        \
 	(id == EnemyTypeID::EnemyID_Queen || id == EnemyTypeID::EnemyID_SnakeCrow || id == EnemyTypeID::EnemyID_KingChappy           \

@@ -5,6 +5,7 @@
 #include "Game/gameChallenge2D.h"
 #include "efx2d/T2DBattleDive.h"
 #include "Dolphin/rand.h"
+#include "Screen/Game2DMgr.h"
 #include "Controller.h"
 
 static const char unusedName[] = "vsSelect2D";
@@ -71,15 +72,15 @@ void TVsSelectIndPane::draw()
 
 	Mtx mtx;
 	Mtx23 indMtx;
-	if (_44) {
-		indMtx[0][0] = _34;
+	if (mMtxUseType) {
+		indMtx[0][0] = mMtxXOffset;
 		indMtx[0][1] = 0.0f;
 		indMtx[0][2] = 0.0f;
 		indMtx[1][0] = 0.0f;
-		indMtx[1][1] = _38;
+		indMtx[1][1] = mMtxYOffset;
 		indMtx[1][2] = 0.0f;
 	} else {
-		PSMTXRotRad(mtx, J2DROTATE_Z, _40 * 0.01745329f);
+		PSMTXRotRad(mtx, J2DROTATE_Z, MTXDegToRad(mRotation));
 		indMtx[0][0] = mtx[0][0] * 0.5f;
 		indMtx[0][1] = mtx[0][1] * 0.5f;
 		indMtx[0][2] = 0.0f;
@@ -88,7 +89,7 @@ void TVsSelectIndPane::draw()
 		indMtx[1][2] = 0.0f;
 	}
 
-	GXSetIndTexMtx(GX_ITM_0, indMtx, _3C);
+	GXSetIndTexMtx(GX_ITM_0, indMtx, mTexMtxScale);
 	GXSetTevIndWarp(GX_TEVSTAGE0, GX_IND_TEX_STAGE_0, GX_TRUE, GX_FALSE, GX_ITM_0);
 	GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
 	GXSetTevOp(GX_TEVSTAGE0, GX_REPLACE);
@@ -196,10 +197,10 @@ void TVsPiki::update(int pikis)
 	mPikminRight->setBasePosition(J2DPOS_TopLeft);
 	mPikminFlower->setBasePosition(J2DPOS_Center);
 
-	mBounds[0]
-	    = Vector2f(mPikminLeft->getGlbVtx(0).x - mPikminRight->getGlbVtx(1).x, mPikminLeft->getGlbVtx(0).y - mPikminRight->getGlbVtx(1).y);
-	mBounds[1] = Vector2f(mPikminLeft->getGlbVtx(0).x - mPikminFlower->getGlbVtx(0).x,
-	                      mPikminLeft->getGlbVtx(0).y - mPikminFlower->getGlbVtx(0).y);
+	mBounds[0] = Vector2f(mPikminLeft->getGlbVtx(GLBVTX_BtmLeft).x - mPikminRight->getGlbVtx(GLBVTX_BtmRight).x,
+	                      mPikminLeft->getGlbVtx(GLBVTX_BtmLeft).y - mPikminRight->getGlbVtx(GLBVTX_BtmRight).y);
+	mBounds[1] = Vector2f(mPikminLeft->getGlbVtx(GLBVTX_BtmLeft).x - mPikminFlower->getGlbVtx(GLBVTX_BtmLeft).x,
+	                      mPikminLeft->getGlbVtx(GLBVTX_BtmLeft).y - mPikminFlower->getGlbVtx(GLBVTX_BtmLeft).y);
 
 	for (int i = 0; i < 10; i++) {
 		if (i < pikis) {
@@ -249,12 +250,11 @@ void TVsPiki::update(int pikis)
  */
 void TVsPiki::draw()
 {
-	JGeometry::TVec3f pos = mPikminLeft->getGlbVtx(2);
+	JGeometry::TVec3f pos = mPikminLeft->getGlbVtx(GLBVTX_TopLeft);
 	f32 x1                = pos.x - mPikiOffset.x;
 	f32 xoffs             = mPikiOffset.x;
 	f32 y1                = pos.y - 50.0f;
-	pos                   = mPikminLeft->getGlbVtx(2);
-	f32 y2                = pos.y - y1;
+	f32 y2                = mPikminLeft->getGlbVtx(GLBVTX_TopLeft).y - y1;
 	f32 x2                = (xoffs * 12.0f + x1) - x1;
 	GXSetScissor(x1, y1, x2, y2);
 	Vector2f* offs = &mPikiOffset;
@@ -262,8 +262,8 @@ void TVsPiki::draw()
 	for (int i = 0; i < 10; i++) {
 		J2DPicture* pic = mPikminLeft;
 		f32 calc        = TVsSelect::mDemoScale;
-		f32 x           = mPosInfos[i].mPosition.x * calc + pic->getGlbVtx(0).x;
-		f32 y           = mPosInfos[i].mPosition.y * calc + pic->getGlbVtx(0).y;
+		f32 x           = mPosInfos[i].mPosition.x * calc + pic->getGlbVtx(GLBVTX_BtmLeft).x;
+		f32 y           = mPosInfos[i].mPosition.y * calc + pic->getGlbVtx(GLBVTX_BtmLeft).y;
 		pic->draw(x, y, calc * pic->getWidth(), calc * pic->getHeight(), false, false, false);
 		pic->calcMtx();
 
@@ -277,6 +277,8 @@ void TVsPiki::draw()
 	}
 
 	GXSetScissor(0, 0, 640, 480);
+
+	FORCE_DONT_INLINE;
 
 	/*
 	stwu     r1, -0x80(r1)
@@ -496,12 +498,19 @@ void TVsSelectOnyon::posUpdate(f32 rate)
 			}
 		}
 	}
-	f32 dist = getAngDist();
-	dist     = mAngleTimer * dist;
-	dist     = FABS(dist) > TAU ? TAU : (dist < 0.0f) ? (TAU) : dist;
+
+	f32 dist  = mAngleTimer * getAngDist();
+	f32 clamp = TAU;
+	if (FABS(dist) > clamp) {
+		if (dist > 0.0f) {
+			dist = clamp;
+		} else {
+			dist = -clamp;
+		}
+	}
 
 	mGoalAngle  = roundAng(mGoalAngle + dist);
-	f32 speed   = rate * TVsSelect::mMoveSpeed;
+	f32 speed   = TVsSelect::mMoveSpeed * rate;
 	mAngleDef.x = speed * sinf(mGoalAngle);
 	mAngleDef.y = speed * -cosf(mGoalAngle);
 
@@ -531,229 +540,6 @@ void TVsSelectOnyon::posUpdate(f32 rate)
 		mOnyonPane->show();
 	}
 	mOnyonPane->updateScale(scale);
-
-	/*
-	stwu     r1, -0x40(r1)
-	mflr     r0
-	stw      r0, 0x44(r1)
-	stfd     f31, 0x30(r1)
-	psq_st   f31, 56(r1), 0, qr0
-	stw      r31, 0x2c(r1)
-	mr       r31, r3
-	fmr      f31, f1
-	lwz      r3, 0x38(r3)
-	addi     r0, r3, 1
-	stw      r0, 0x38(r31)
-	lwz      r0, 0x38(r31)
-	cmpwi    r0, 0
-	ble      lbl_8039A158
-	lfs      f2, lbl_8051F180@sda21(r2)
-	fcmpu    cr0, f2, f31
-	bne      lbl_8039A134
-	lfs      f1, 0x34(r31)
-	lfs      f0, mAngUp__Q28Morimura9TVsSelect@sda21(r13)
-	fadds    f0, f1, f0
-	stfs     f0, 0x34(r31)
-	lfs      f0, 0x34(r31)
-	fcmpo    cr0, f0, f2
-	ble      lbl_8039A158
-	stfs     f2, 0x34(r31)
-	b        lbl_8039A158
-
-lbl_8039A134:
-	lfs      f2, 0x34(r31)
-	lfs      f1, mAngUp__Q28Morimura9TVsSelect@sda21(r13)
-	lfs      f0, lbl_8051F170@sda21(r2)
-	fsubs    f1, f2, f1
-	stfs     f1, 0x34(r31)
-	lfs      f1, 0x34(r31)
-	fcmpo    cr0, f1, f0
-	bge      lbl_8039A158
-	stfs     f0, 0x34(r31)
-
-lbl_8039A158:
-	mr       r3, r31
-	bl       getAngDist__Q28Morimura14TVsSelectOnyonFv
-	lfs      f0, 0x34(r31)
-	lfs      f2, lbl_8051F1C8@sda21(r2)
-	fmuls    f1, f0, f1
-	fabs     f0, f1
-	frsp     f0, f0
-	fcmpo    cr0, f0, f2
-	ble      lbl_8039A194
-	lfs      f0, lbl_8051F170@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_8039A190
-	fmr      f1, f2
-	b        lbl_8039A194
-
-lbl_8039A190:
-	fneg     f1, f2
-
-lbl_8039A194:
-	lfs      f0, 0x2c(r31)
-	fadds    f1, f0, f1
-	bl       roundAng__Ff
-	stfs     f1, 0x2c(r31)
-	lfs      f0, lbl_8051F170@sda21(r2)
-	lfs      f1, mMoveSpeed__Q28Morimura9TVsSelect@sda21(r13)
-	lfs      f2, 0x2c(r31)
-	fmuls    f3, f1, f31
-	fcmpo    cr0, f2, f0
-	bge      lbl_8039A1E8
-	lfs      f0, lbl_8051F1B0@sda21(r2)
-	lis      r3, sincosTable___5JMath@ha
-	addi     r3, r3, sincosTable___5JMath@l
-	fmuls    f0, f2, f0
-	fctiwz   f0, f0
-	stfd     f0, 8(r1)
-	lwz      r0, 0xc(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	lfsx     f0, r3, r0
-	fneg     f0, f0
-	b        lbl_8039A20C
-
-lbl_8039A1E8:
-	lfs      f0, lbl_8051F1B4@sda21(r2)
-	lis      r3, sincosTable___5JMath@ha
-	addi     r3, r3, sincosTable___5JMath@l
-	fmuls    f0, f2, f0
-	fctiwz   f0, f0
-	stfd     f0, 0x10(r1)
-	lwz      r0, 0x14(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	lfsx     f0, r3, r0
-
-lbl_8039A20C:
-	fmuls    f1, f3, f0
-	lfs      f0, lbl_8051F170@sda21(r2)
-	stfs     f1, 0x24(r31)
-	lfs      f2, 0x2c(r31)
-	fcmpo    cr0, f2, f0
-	bge      lbl_8039A228
-	fneg     f2, f2
-
-lbl_8039A228:
-	lfs      f1, lbl_8051F1B4@sda21(r2)
-	lis      r3, sincosTable___5JMath@ha
-	addi     r3, r3, sincosTable___5JMath@l
-	lfs      f0, lbl_8051F1CC@sda21(r2)
-	fmuls    f1, f2, f1
-	fctiwz   f1, f1
-	stfd     f1, 0x18(r1)
-	lwz      r0, 0x1c(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	add      r3, r3, r0
-	lfs      f1, 4(r3)
-	fneg     f1, f1
-	fmuls    f1, f3, f1
-	stfs     f1, 0x28(r31)
-	lfs      f1, 0x34(r31)
-	fcmpo    cr0, f1, f0
-	bge      lbl_8039A270
-	fmr      f1, f0
-
-lbl_8039A270:
-	lfs      f0, lbl_8051F1D0@sda21(r2)
-	fdivs    f31, f0, f1
-	fcmpo    cr0, f31, f0
-	cror     2, 0, 2
-	bne      lbl_8039A29C
-	lfs      f0, lbl_8051F170@sda21(r2)
-	stfs     f0, 0x24(r31)
-	stfs     f0, 0x28(r31)
-	stfs     f0, 0x1c(r31)
-	stfs     f0, 0x20(r31)
-	b        lbl_8039A2D4
-
-lbl_8039A29C:
-	lfs      f1, lbl_8051F1C8@sda21(r2)
-	lfs      f0, 0x2c(r31)
-	fsubs    f1, f1, f0
-	bl       roundAng__Ff
-	lfs      f0, lbl_8051F1D4@sda21(r2)
-	lwz      r3, 8(r31)
-	fmuls    f1, f0, f1
-	lfs      f0, lbl_8051F1C8@sda21(r2)
-	fdivs    f0, f1, f0
-	stfs     f0, 0xc0(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-
-lbl_8039A2D4:
-	lfs      f0, 0x24(r31)
-	lfs      f6, 0x1c(r31)
-	lfs      f1, 0x28(r31)
-	lfs      f5, 0x20(r31)
-	fsubs    f2, f0, f6
-	lfs      f0, lbl_8051F1D8@sda21(r2)
-	fsubs    f4, f1, f5
-	lfs      f1, lbl_8051F1E0@sda21(r2)
-	fmuls    f2, f2, f0
-	lfs      f3, lbl_8051F1DC@sda21(r2)
-	fmuls    f0, f4, f0
-	fadds    f2, f6, f2
-	fadds    f0, f5, f0
-	stfs     f2, 0x1c(r31)
-	stfs     f0, 0x20(r31)
-	lfs      f2, 0xc(r31)
-	lfs      f0, 0x1c(r31)
-	fadds    f0, f2, f0
-	stfs     f0, 0xc(r31)
-	lfs      f2, 0x10(r31)
-	lfs      f0, 0x20(r31)
-	fadds    f0, f2, f0
-	stfs     f0, 0x10(r31)
-	lfs      f0, 0xc(r31)
-	lfs      f2, 0x10(r31)
-	fadds    f0, f1, f0
-	lwz      r3, 8(r31)
-	fadds    f1, f3, f2
-	stfs     f0, 0xd4(r3)
-	stfs     f1, 0xd8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lfs      f0, lbl_8051F1E4@sda21(r2)
-	fcmpo    cr0, f31, f0
-	ble      lbl_8039A36C
-	fmr      f31, f0
-
-lbl_8039A36C:
-	lfs      f0, lbl_8051F1D0@sda21(r2)
-	fcmpo    cr0, f31, f0
-	cror     2, 0, 2
-	bne      lbl_8039A390
-	lwz      r3, 8(r31)
-	li       r0, 0
-	fmr      f31, f0
-	stb      r0, 0xb0(r3)
-	b        lbl_8039A39C
-
-lbl_8039A390:
-	lwz      r3, 8(r31)
-	li       r0, 1
-	stb      r0, 0xb0(r3)
-
-lbl_8039A39C:
-	lwz      r3, 8(r31)
-	stfs     f31, 0xcc(r3)
-	stfs     f31, 0xd0(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	psq_l    f31, 56(r1), 0, qr0
-	lwz      r0, 0x44(r1)
-	lfd      f31, 0x30(r1)
-	lwz      r31, 0x2c(r1)
-	mtlr     r0
-	addi     r1, r1, 0x40
-	blr
-	*/
 }
 
 /**
@@ -772,7 +558,7 @@ f32 TVsSelectOnyon::getAngDist()
 		y = 0.1f;
 	}
 
-	f32 angle = JMath::atanTable_.atan2_(x, -y);
+	f32 angle = JMAAtan2Radian(x, -y);
 	return angDist(roundAng(angle), mGoalAngle);
 }
 
@@ -785,9 +571,9 @@ void TVsSelectOnyon::draw()
 	if (0.4f == mOnyonPane->mScale.x) {
 		mNaviPane->setBasePosition(J2DPOS_Center);
 		mNaviPane->draw(mCurrentPosition.x + -30.0f, mCurrentPosition.y + -30.0f, false, false, false);
-		mOnyonPane->calcMtx();
+		mNaviPane->calcMtx();
 		_30 += 0.05f;
-		mNaviPane->hide();
+		mOnyonPane->hide();
 		if (_30 > 2.0f) {
 			_30 = 2.0f;
 		}
@@ -1074,7 +860,7 @@ void TVsSelect::doCreate(JKRArchive* arc)
 	mDispMember->mDebugExpHeap->becomeCurrentHeap();
 	sys->heapStatusStart("vsSelectTexture", nullptr);
 	mVsSelectTextureArc = nullptr;
-	char path[64];
+	char path[50];
 	og::newScreen::makeLanguageResName(path, "res_vsSelectTexture.szs");
 	mVsSelectTextureArc = JKRMountArchive(path, JKRArchive::EMM_Mem, nullptr, JKRArchive::EMD_Head);
 	JUT_ASSERTLINE(893, mVsSelectTextureArc, "arcName = %s\n", path);
@@ -1084,11 +870,11 @@ void TVsSelect::doCreate(JKRArchive* arc)
 	    = { "timg/otegaru.bti",  "timg/ujyaujya.bti", "timg/hirobiro.bti", "timg/karakuchi.bti", "timg/semai.bti",
 		    "timg/hiyahiya.bti", "timg/nobinobi.bti", "timg/kakukaku.bti", "timg/meiro.bti",     "timg/tile.bti" };
 	for (int i = 0; i < mStageCount; i++) {
-		mLevelTextures[i] = (ResTIMG*)mVsSelectTextureArc->getResource(texNames[i]);
+		mLevelTextures[i] = JKRGetArchiveImageResource(mVsSelectTextureArc, texNames[i]);
 
 		// Use louie face as a default if level icon not found
 		if (!mLevelTextures[i]) {
-			mLevelTextures[i] = (ResTIMG*)mArchive->getResource("timg/loozy_icon.bti");
+			mLevelTextures[i] = JKRGetArchiveImageResource(mArchive, "timg/loozy_icon.bti");
 		}
 	}
 
@@ -1096,9 +882,9 @@ void TVsSelect::doCreate(JKRArchive* arc)
 	    = { "timg/orima001.bti", "timg/orima002.bti", "timg/orima003.bti", "timg/orima004.bti", "timg/orima005.bti" };
 	const char* louieTexNames[5] = { "timg/lui001.bti", "timg/lui002.bti", "timg/lui003.bti", "timg/lui004.bti", "timg/lui005.bti" };
 	for (int i = 0; i < 5; i++) {
-		mOrimaTexture[i] = (ResTIMG*)mVsSelectTextureArc->getResource(olimarTexNames[i]);
+		mOrimaTexture[i] = JKRGetArchiveImageResource(mVsSelectTextureArc, olimarTexNames[i]);
 		P2ASSERTLINE(926, mOrimaTexture[i]);
-		mLouieTexture[i] = (ResTIMG*)mVsSelectTextureArc->getResource(louieTexNames[i]);
+		mLouieTexture[i] = JKRGetArchiveImageResource(mVsSelectTextureArc, louieTexNames[i]);
 		P2ASSERTLINE(930, mLouieTexture[i]);
 	}
 
@@ -1109,12 +895,9 @@ void TVsSelect::doCreate(JKRArchive* arc)
 		                 'P1icon00', 'P1icon01', 'P1icon02', 'P1icon03', 'P1icon04', 'P1icon05' };
 
 	for (int i = 0; i < 12; i++) {
-		TVsSelectSlotIndex* info = TVsSelectSlotIndex::getIndexInfo(i);
-		int id                   = info->mIndex;
-		int tagID                = info->mTagID;
-		vu64 tag                 = info->mMesg;
-		mPowerIconPanes[id]      = mSlotTexturesScreen->mScreenObj->search(iconTags[tagID]);
-		P2ASSERTLINE(949, mPowerIconPanes[id]);
+		TVsSelectSlotIndex info      = *TVsSelectSlotIndex::getIndexInfo(i);
+		mPowerIconPanes[info.mIndex] = mSlotTexturesScreen->mScreenObj->search(iconTags[info.mTagID]);
+		P2ASSERTLINE(949, mPowerIconPanes[info.mIndex]);
 	}
 
 	mArrowBlink = new og::Screen::ArrowAlphaBlink;
@@ -1354,7 +1137,7 @@ void TVsSelect::doCreate(JKRArchive* arc)
 		mIndexPaneList[i]->mPane->show();
 	}
 
-	f32 calc = mIndexPaneList[0]->mPane->mOffset.y - mIndexPaneList[1]->mPane->mOffset.y;
+	f32 calc = getHeight();
 
 	mIndexGroup               = new TIndexGroup;
 	mIndexGroup->mHeight      = calc;
@@ -1389,9 +1172,8 @@ void TVsSelect::doCreate(JKRArchive* arc)
 	int max = (mStageCount - something) + 2;
 	for (int i = 0; i < max; i++) {
 		for (int j = 0; j < mNumActiveRows; j++) {
-			TIndexPane* indpane = mIndexPaneList[j];
-			indpane->mPane->setOffsetY(indpane->mYOffset + calc);
-			mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->mPane->mOffset.y;
+			mIndexPaneList[j]->setOffset(calc);
+			mIndexPaneList[j]->mYOffset = mIndexPaneList[j]->getPaneOffsetY();
 		}
 		updateIndex(0);
 		mIndexGroup->reset();
@@ -4058,7 +3840,8 @@ bool TVsSelect::doUpdate()
 		rulesinactive = true;
 	}
 
-	if (mCanInput && mDispMember->mState == 0 && !static_cast<TVsSelectScene*>(getOwner())->mConfirmEndWindow->mHasDrawn) {
+	if (mCanInput && mDispMember->mState == Screen::Game2DMgr::CHECK2D_VsSelect_Default
+	    && !static_cast<TVsSelectScene*>(getOwner())->mConfirmEndWindow->mHasDrawn) {
 		if (mZoomState == 0) {
 			if (rulesinactive) {
 				if (mController->getButtonDown() & Controller::PRESS_R) {
@@ -4120,8 +3903,7 @@ bool TVsSelect::doUpdate()
 				}
 			} else if (mController->getButtonDown() & Controller::PRESS_Z) {
 				mRulesWindow->openClose();
-			}
-			if (rulesinactive) {
+			} else if (rulesinactive) {
 				if (mController->getButtonDown() & (Controller::PRESS_START | Controller::PRESS_A)) {
 					if (!mIsSection) {
 						mIsDemoStarted = 1;
@@ -4172,9 +3954,10 @@ bool TVsSelect::doUpdate()
 		}
 	}
 
-	if (mDispMember->mState != 1 && mDispMember->mDispWorldMapInfoWin0->mResult == 1 && !mIsSection) {
+	if (mDispMember->mState != Screen::Game2DMgr::CHECK2D_VsSelect_InDemo && mDispMember->mDispWorldMapInfoWin0->mResult == 1
+	    && !mIsSection) {
 		mIsDemoStarted      = 0;
-		mDispMember->mState = 1;
+		mDispMember->mState = Screen::Game2DMgr::CHECK2D_VsSelect_InDemo;
 		getOwner()->endScene(nullptr);
 	}
 
@@ -4220,7 +4003,8 @@ bool TVsSelect::doUpdate()
 				mEfxCountKira->mScale = calc;
 				J2DPane* pane         = mMainScreen->mScreenObj->search('Pori_c');
 				pane->setBasePosition(J2DPOS_Center);
-				Vector2f pos(pane->getWidth() * 0.5f + pane->getGlbVtx(0).x, pane->getHeight() * 0.5f + pane->getGlbVtx(0).y);
+				Vector2f pos(pane->getGlbVtx(GLBVTX_BtmLeft).x + pane->getWidth() / 2,
+				             pane->getGlbVtx(GLBVTX_BtmLeft).y + pane->getHeight() / 2);
 				efx2d::Arg arg(pos);
 				mEfxCountKira->create(&arg);
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_2P_WIN_COUNT, 0);
@@ -4237,7 +4021,8 @@ bool TVsSelect::doUpdate()
 				mEfxCountKira->mScale = calc;
 				J2DPane* pane         = mMainScreen->mScreenObj->search('Plui_c');
 				pane->setBasePosition(J2DPOS_Center);
-				Vector2f pos(pane->getWidth() * 0.5f + pane->getGlbVtx(0).x, pane->getHeight() * 0.5f + pane->getGlbVtx(0).y);
+				Vector2f pos(pane->getGlbVtx(GLBVTX_BtmLeft).x + pane->getWidth() / 2,
+				             pane->getGlbVtx(GLBVTX_BtmLeft).y + pane->getHeight() / 2);
 				efx2d::Arg arg(pos);
 				mEfxCountKira->create(&arg);
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_2P_WIN_COUNT, 0);
@@ -4259,7 +4044,7 @@ bool TVsSelect::doUpdate()
 	mListScreen->mScreenObj->scaleScreen(mDemoScale);
 	mFireScreen->mScreenObj->scaleScreen(mDemoScale);
 
-	f32 calc = -mScreenXPos / mDemoScale;
+	f32 calc = mScreenXPos / mDemoScale;
 	mPaneSpot->updateScale(mScreenXPos);
 	f32 something = 243.0f;
 	something *= 40.0f;
@@ -4274,7 +4059,7 @@ bool TVsSelect::doUpdate()
 		dist = -30.0f;
 	}
 	mLevelNameYPos += (dist - mLevelNameYPos) * 0.3f;
-	if (fabs(mLevelNameYPos - dist) < 0.1f) {
+	if ((f32)fabs(mLevelNameYPos - dist) < 0.1f) {
 		mLevelNameYPos = dist;
 	}
 	mPaneLevelName->setOffset(0.0f, mLevelNameYPos + -3.0f);
@@ -4322,13 +4107,13 @@ bool TVsSelect::doUpdate()
 	}
 	mPaneRulesInfo->setOffset(mRulesPanePos.x + mRulesMoveXPos, mRulesPanePos.y);
 
-	JGeometry::TVec3f vec1 = mPaneStageNameBg->getGlbVtx(0);
-	JGeometry::TVec3f vec2 = mPaneStageNameBg->getGlbVtx(3);
+	JGeometry::TVec3f vec1 = mPaneStageNameBg->getGlbVtx(GLBVTX_BtmLeft);
+	JGeometry::TVec3f vec2 = mPaneStageNameBg->getGlbVtx(GLBVTX_TopRight);
 	TVsSelectScreen* scrn  = static_cast<TVsSelectScreen*>(mMainScreen);
-	scrn->mCallbackScissor->mBounds.set(Vector2f(vec1.x, vec1.y), Vector2f(vec2.x, vec2.y));
+	scrn->mCallbackScissor->mBounds.set(vec1.x, vec1.y, vec2.x, vec2.y);
 
-	vec1 = mPaneStageList->getGlbVtx(0);
-	vec2 = mPaneStageList->getGlbVtx(3);
+	vec1 = mPaneStageList->getGlbVtx(GLBVTX_BtmLeft);
+	vec2 = mPaneStageList->getGlbVtx(GLBVTX_TopRight);
 	mScissorBounds.set(vec1.x, vec1.y, vec2.x, vec2.y);
 
 	for (int i = 0; i < 2; i++) {
@@ -5762,14 +5547,18 @@ void TVsSelect::doDraw(Graphics& gfx)
 		GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 		GXBegin(GX_QUADS, GX_VTXFMT0, 4);
 
-		GXTexCoord2f32(0.0f, 0.0f);
-		GXTexCoord2f32(0.0f, 386.0f);
+		f32 zero = 0.0f;
+		f32 pos1 = 386.0f;
+		f32 pos2 = 290.0f;
 
-		GXTexCoord2f32(0.0f, 0.0f);
-		GXTexCoord2f32(386.0f, 290.0f);
+		GXTexCoord2f32(zero, zero);
+		GXTexCoord2f32(zero, pos1);
 
-		GXTexCoord2f32(0.0f, 0.0f);
-		GXTexCoord2f32(290.0f, 0.0f);
+		GXTexCoord2f32(zero, zero);
+		GXTexCoord2f32(pos1, pos2);
+
+		GXTexCoord2f32(zero, zero);
+		GXTexCoord2f32(pos2, zero);
 
 		J2DPicture pics[2];
 		pics[0] = J2DPicture("navi_l.bti");
@@ -5827,10 +5616,10 @@ void TVsSelect::doDraw(Graphics& gfx)
 	gfx.mOrthoGraph.setPort();
 
 	for (int i = 0; i < 2; i++) {
-		// mVsPiki[i]->draw(); needs to not inline
+		mVsPiki[i]->draw();
 	}
 
-	if (mZoomState > 2) {
+	if (mZoomState >= 3) {
 		for (int i = 0; i < 2; i++) {
 			mOnyonObj[i]->draw();
 		}
@@ -5840,10 +5629,10 @@ void TVsSelect::doDraw(Graphics& gfx)
 	mRulesWindow->draw(gfx, graf);
 	mFireScreen->draw(gfx, graf);
 
-	bool test             = false;
+	bool needBG           = false;
 	TVsSelectScene* owner = static_cast<TVsSelectScene*>(getOwner());
 	if (owner->mConfirmEndWindow->mHasDrawn) {
-		test = true;
+		needBG = true;
 
 		owner = static_cast<TVsSelectScene*>(getOwner());
 		if (owner->mConfirmEndWindow->mIsActive) {
@@ -5860,7 +5649,7 @@ void TVsSelect::doDraw(Graphics& gfx)
 		}
 	}
 
-	if (test) {
+	if (needBG) {
 		JUtility::TColor c;
 		c.set(0, 0, 0, 0);
 		c.a = mDrawAlpha;
@@ -5882,15 +5671,17 @@ void TVsSelect::doDraw(Graphics& gfx)
 				baseID = 6;
 			}
 			J2DPictureEx* pane = (J2DPictureEx*)mPowerIconPanes[baseID + i];
-			pane->draw(mPowerIconOffset.x + (0.5f * pane->getWidth() - mPaneRulesIcons[i]->mGlobalMtx[0][3]),
-			           mPowerIconOffset.y + (0.5f * pane->getHeight() - mPaneRulesIcons[i]->mGlobalMtx[1][3]), false, false, false);
+			f32 width          = pane->getWidth();
+			f32 height         = pane->getHeight();
+			pane->draw(mPowerIconOffset.x + (width / 2 - mPaneRulesIcons[i]->mGlobalMtx[0][3]),
+			           mPowerIconOffset.y + (height / 2 - mPaneRulesIcons[i]->mGlobalMtx[1][3]), width, height, false, false, false);
 			mPowerIconPanes[baseID + i]->calcMtx();
 		}
 		gfx.mPerspGraph.setPort();
 	}
 
 	JUtility::TColor c;
-	c.set(0, 0, 0, mFadeAlpha);
+	c.set(0, 0, 0, 255 - mFadeAlpha);
 	graf->setColor(c);
 	GXSetAlphaUpdate(GX_FALSE);
 	u32 y    = System::getRenderModeObj()->efbHeight;
@@ -6657,9 +6448,9 @@ void TVsSelect::doUpdateFadeoutFinish()
 	mDispMember->mLouieHandicap      = mHandicapSel[1];
 	mDispMember->mSelectedStageIndex = mIndexPaneList[mCurrActiveRowSel]->getIndex();
 	if (mIsDemoStarted) {
-		mDispMember->mState = 3;
+		mDispMember->mState = Screen::Game2DMgr::CHECK2D_VsSelect_ExitFinished;
 	} else {
-		mDispMember->mState = 2;
+		mDispMember->mState = Screen::Game2DMgr::CHECK2D_VsSelect_CancelToTitle;
 	}
 }
 
@@ -6949,8 +6740,7 @@ int TVsSelect::getIdMax() { return mStageCount; }
 int TVsSelect::getCourseID(int id)
 {
 	if (!mIsSection) {
-		Game::Vs2D_TitleInfo::Info* info = (*mDispMember->mTitleInfo)(id);
-		id                               = info->mInfo;
+		id = (*mDispMember->mTitleInfo)(id)->mIndex;
 	}
 	return id;
 }
@@ -6979,14 +6769,19 @@ void TVsSelect::doZoom()
 	} else if (mZoomState == 2) {
 		mZoomLevel -= 1.0f;
 		if (mZoomLevel <= 0.0f) {
-			mZoomLevel = 0.0f;
-			f32 y1     = mOnyonObj[0]->mCurrentPosition.y - 240.0f;
-			f32 x1     = mOnyonObj[0]->mCurrentPosition.x - 320.0f;
-			f32 y2     = mOnyonObj[1]->mCurrentPosition.y - 240.0f;
-			f32 x2     = mOnyonObj[1]->mCurrentPosition.x - 320.0f;
-			if ((y2 * y2) + (x2 * x2) <= 160000.0f && (y1 * y1) + (x1 * x1) <= 160000.0f) {
-				mZoomState = 0;
+			mZoomLevel  = 0.0f;
+			bool finish = true;
+			Vector2f offset(320.0f, 240.0f);
+			Vector2f diff1 = mOnyonObj[0]->mCurrentPosition - offset;
+			if (diff1.sqrMagnitude() < 160000.0f) {
+				finish = false;
 			}
+			Vector2f diff2 = mOnyonObj[1]->mCurrentPosition - offset;
+			if (diff2.sqrMagnitude() < 160000.0f) {
+				finish = false;
+			}
+			if (finish)
+				mZoomState = 0;
 		}
 	}
 
@@ -7192,7 +6987,7 @@ void TVsSelect::doScreenEffect()
 			mEndDelayTimer += 1.0f;
 			if (mEndDelayTimer > 15.0f && !mIsSection) {
 				mZoomState          = 0;
-				mDispMember->mState = 1;
+				mDispMember->mState = Screen::Game2DMgr::CHECK2D_VsSelect_InDemo;
 				P2ASSERTLINE(2374, getOwner());
 				getOwner()->endScene(nullptr);
 				for (int i = 0; i < mNumActiveRows; i++) {
@@ -7611,10 +7406,11 @@ void TVsSelect::demoStart()
 {
 	mDemoScale  = 1.0f;
 	mScreenXPos = 0.0f;
+	int i       = 0;
 	mZoomState  = 0;
 	mZoomLevel  = 0.0f;
 
-	for (int i = 0; i < 2; i++) {
+	for (; i < 2; i++) {
 		mOnyonObj[i]->reset();
 	}
 

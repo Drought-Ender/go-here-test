@@ -12,9 +12,9 @@ extern "C" {
 
 ///////////// USEFUL HELPERS ///////////////
 // Set bitfields manually.
-#define GX_BITFIELD(field, pos, size, value)       (__rlwimi((field), (value), 31 - (pos) - (size) + 1, (pos), (pos) + (size)-1))
+#define GX_BITFIELD(field, pos, size, value)       (__rlwimi((field), (value), 31 - (pos) - (size) + 1, (pos), (pos) + (size) - 1))
 #define GX_BITFIELD_SET(field, pos, size, value)   ((field) = GX_BITFIELD(field, pos, size, value))
-#define GX_BITFIELD_TRUNC(field, pos, size, value) (__rlwimi((field), (value), 0, (pos), (pos) + (size)-1))
+#define GX_BITFIELD_TRUNC(field, pos, size, value) (__rlwimi((field), (value), 0, (pos), (pos) + (size) - 1))
 #define GX_BITGET(field, pos, size)                ((field) >> (31 - (pos) - (size) + 1) & ((1 << (size)) - 1))
 ////////////////////////////////////////////
 
@@ -24,7 +24,8 @@ typedef struct _GXColor {
 	u8 r, g, b, a; // _00, _01, _02, _03
 } GXColor;
 
-#define GXCOLOR_AS_U32(color) (*((u32*)&(color)))
+#define GXCOLOR_AS_U32(color)   (*((u32*)&(color)))
+#define RGBA_TO_U32(r, g, b, a) (((u8)(r) << 24) | ((u8)(g) << 16) | ((u8)(b) << 8) | ((u8)(a)))
 
 // Signed 10-bit-component colors for TEV const (konst) colors.
 typedef struct _GXColorS10 {

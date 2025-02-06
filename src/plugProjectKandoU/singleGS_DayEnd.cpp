@@ -67,7 +67,7 @@ void DayEndState::init(SingleGameSection* game, StateArg* arg)
 	PelletCarcass::mgr->resetMgr();
 	PelletFruit::mgr->resetMgr();
 	PelletItem::mgr->resetMgrAndResources();
-	PelletOtakara::mgr->resetMgrAndResources();
+
 	Navi* navi = naviMgr->getAt(NAVIID_Olimar);
 	if (navi->isAlive()) {
 		navi->mFsm->transit(navi, NSID_Walk, nullptr);
@@ -117,18 +117,19 @@ void DayEndState::exec(SingleGameSection* game)
 				}
 
 				if (numTreasures == 0) {
-					arg.mStreamID = 0xC0011004;
+					arg.mStreamID = P2_STREAM_SOUND_ID(PSSTR_DAYEND_B); // bad day end
 				} else if (numTreasures <= 14) {
-					arg.mStreamID = 0xC0011002;
+					arg.mStreamID = P2_STREAM_SOUND_ID(PSSTR_DAYEND_N); // normal day end
 				} else {
-					arg.mStreamID = 0xC0011003;
+					arg.mStreamID = P2_STREAM_SOUND_ID(PSSTR_DAYEND_G); // good day end
 				}
+
 				JUT_ASSERTLINE(222, naviMgr->getAliveOrima(ALIVEORIMA_Active), "no alive:s01_dayend");
 				Navi* navi = naviMgr->getActiveNavi();
 				int id     = 0;
 				if (navi) {
 					id = navi->mNaviIndex;
-					if (id == NAVIID_Captain2 && playData->isStoryFlag(STORY_DebtPaid)) {
+					if (id == NAVIID_Louie && playData->isStoryFlag(STORY_DebtPaid)) {
 						id++;
 					}
 				}
@@ -181,18 +182,18 @@ void DayEndState::exec(SingleGameSection* game)
  * @note Address: 0x8023AAFC
  * @note Size: 0x5B8
  */
-void DayEndState::onMovieStart(SingleGameSection* game, MovieConfig* config, u32 p3, u32 p4)
+void DayEndState::onMovieStart(SingleGameSection* game, MovieConfig* movie, u32, u32 p4)
 {
 	Screen::gGame2DMgr->startFadeBG_CourseName();
 	Screen::gGame2DMgr->startCount_CourseName();
 	gameSystem->mTimeMgr->setEndTime();
-	if (config->is("s01_dayend")) {
+	if (movie->is("s01_dayend")) {
 		P2ASSERTLINE(335, Screen::gGame2DMgr->mScreenMgr->reset() == true);
 		Vector3f origin(156.0f, 0.0f, 166.0f);
 		if (mapMgr->getDemoMatrix()) {
 			origin = mapMgr->getDemoMatrix()->mtxMult(origin);
 
-			Piki* pikiBuffer[100];
+			Piki* pikiBuffer[MAX_PIKI_COUNT];
 			int i = 0;
 			Iterator<Piki> iterator(pikiMgr);
 			CI_LOOP(iterator)
@@ -203,10 +204,10 @@ void DayEndState::onMovieStart(SingleGameSection* game, MovieConfig* config, u32
 				}
 			}
 			for (int j = 0; j < i; j++) {
-				PikiKillArg arg(1);
+				PikiKillArg arg(CKILL_DontCountAsDeath);
 				pikiBuffer[j]->kill(&arg);
 			}
-			pikiMgr->moveAllPikmins(*(Vector3f*)&origin, 50.0f, nullptr);
+			pikiMgr->moveAllPikmins(origin, 50.0f, nullptr);
 
 			Iterator<Piki> iterator2(pikiMgr);
 			CI_LOOP(iterator2)
@@ -215,14 +216,14 @@ void DayEndState::onMovieStart(SingleGameSection* game, MovieConfig* config, u32
 				Navi* navi = naviMgr->getAliveOrima(ALIVEORIMA_Active);
 				JUT_ASSERTLINE(376, navi, "no alive navi");
 				PikiAI::ActFormationInitArg arg(navi);
-				piki->mNavi = navi;
-				arg._08     = true;
+				piki->mNavi       = navi;
+				arg.mIsDemoFollow = true;
 				piki->mBrain->start(PikiAI::ACT_Formation, &arg);
 				piki->movie_begin(false);
 			}
 		}
 	} else {
-		if (config->is("s21_dayend_takeoff")) {
+		if (movie->is("s21_dayend_takeoff")) {
 			cellMgr->clear();
 			generalEnemyMgr->prepareDayendEnemies();
 		}
@@ -306,7 +307,7 @@ void DayEndState::draw(SingleGameSection* game, Graphics& gfx) { game->BaseGameS
 void DayEndState::cleanup(SingleGameSection* game)
 {
 	playData->setPikminCounts_Today();
-	GameStat::getMapPikmins(-1);
+	GameStat::getMapPikmins(AllPikminCalcs);
 	int alivePikis = GameStat::alivePikis;
 	int mePikis    = GameStat::mePikis;
 	gameSystem->setPause(false, "dayend;cln", 3);

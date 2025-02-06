@@ -59,7 +59,7 @@ void AABBWaterBox::startDown(f32 diff)
  */
 void AABBWaterBox::startUp(f32)
 {
-	JUT_PANICLINE(167, "�܂�! startUp\n"); // "Manda"
+	JUT_PANICLINE(167, "まんだ! startUp\n"); // "Manda"
 }
 
 /**
@@ -184,7 +184,7 @@ void AABBWaterBox::doEntry()
 	if (gameSystem && !gameSystem->isStoryMode() && !gameSystem->isZukanMode()
 	    && (!gameSystem->isChallengeMode() || gameSystem->isMultiplayerMode())) {
 		if (gameSystem) {
-			gameSystem->setDrawBuffer(4);
+			gameSystem->setDrawBuffer(DB_PostRenderLayer);
 			mModel->mJ3dModel->calcMaterial();
 			mModel->mJ3dModel->entry();
 		}
@@ -193,33 +193,16 @@ void AABBWaterBox::doEntry()
 
 	if (gameSystem->isStoryMode()) {
 		BaseGameSection* section = gameSystem->getSection();
-		if (section->mPrevNaviIdx == NAVIID_President) {
+		if (section->mPrevNaviIdx == NAVIID_Multiplayer) {
 			if (gameSystem) {
-				gameSystem->setDrawBuffer(4);
+				gameSystem->setDrawBuffer(DB_PostRenderLayer);
+
 				Mtx copyMatrix;
 				PSMTXIdentity(copyMatrix);
-				J3DTexMtx* texMtx = mModel->mJ3dModel->mModelData->mMaterialTable.mMaterials[0]->mTexGenBlock->getTexMtx(3); // good lord
-				texMtx->mTexMtxInfo.mEffectMtx[0][0] = copyMatrix[0][0];
-				texMtx->mTexMtxInfo.mEffectMtx[0][1] = copyMatrix[0][1];
-				texMtx->mTexMtxInfo.mEffectMtx[0][2] = copyMatrix[0][2];
-				texMtx->mTexMtxInfo.mEffectMtx[0][3] = copyMatrix[0][3];
-				texMtx->mTexMtxInfo.mEffectMtx[1][0] = copyMatrix[1][0];
-				texMtx->mTexMtxInfo.mEffectMtx[1][1] = copyMatrix[1][1];
-				texMtx->mTexMtxInfo.mEffectMtx[1][2] = copyMatrix[1][2];
-				texMtx->mTexMtxInfo.mEffectMtx[1][3] = copyMatrix[1][3];
-				texMtx->mTexMtxInfo.mEffectMtx[2][0] = copyMatrix[2][0];
-				texMtx->mTexMtxInfo.mEffectMtx[2][1] = copyMatrix[2][1];
-				texMtx->mTexMtxInfo.mEffectMtx[2][2] = copyMatrix[2][2];
-				texMtx->mTexMtxInfo.mEffectMtx[2][3] = copyMatrix[2][3];
-				texMtx->mTexMtxInfo.mEffectMtx[3][0] = texMtx->mTexMtxInfo.mEffectMtx[3][1] = texMtx->mTexMtxInfo.mEffectMtx[3][2] = 0.0f;
-				texMtx->mTexMtxInfo.mEffectMtx[3][3]                                                                               = 1.0f;
+				mModel->mJ3dModel->mModelData->getMaterialNodePointer(0)->mTexGenBlock->getTexMtx(3)->getTexMtxInfo().setMtx(copyMatrix);
 
-				u16 id                   = getFbTexIndex();
-				J3DTexture* texData      = getFbTexture();
-				const ResTIMG* timg      = section->mMizuTexture->getTexInfo();
-				*texData->getResTIMG(id) = *timg;
-				texData->setImageOffset((u32)timg, id);
-				texData->setPaletteOffset((u32)timg, id);
+				mFbTexture->changeImage(section->mMizuTexture->getTexInfo(), mFbTexIndex);
+
 				mModel->mJ3dModel->calcMaterial();
 				mModel->mJ3dModel->entry();
 			}
@@ -244,32 +227,13 @@ void AABBWaterBox::doEntry()
 	}
 
 	if (gameSystem) {
-		gameSystem->setDrawBuffer(4);
+		gameSystem->setDrawBuffer(DB_PostRenderLayer);
 		mModel->mJ3dModel->calcMaterial();
 
 		if (mFbTexture) {
-			J3DTexMtx* texMtx = mModel->mJ3dModel->mModelData->mMaterialTable.mMaterials[0]->mTexGenBlock->getTexMtx(3); // good lord x2
-			texMtx->mTexMtxInfo.mEffectMtx[0][0] = copyMatrix[0][0];
-			texMtx->mTexMtxInfo.mEffectMtx[0][1] = copyMatrix[0][1];
-			texMtx->mTexMtxInfo.mEffectMtx[0][2] = copyMatrix[0][2];
-			texMtx->mTexMtxInfo.mEffectMtx[0][3] = copyMatrix[0][3];
-			texMtx->mTexMtxInfo.mEffectMtx[1][0] = copyMatrix[1][0];
-			texMtx->mTexMtxInfo.mEffectMtx[1][1] = copyMatrix[1][1];
-			texMtx->mTexMtxInfo.mEffectMtx[1][2] = copyMatrix[1][2];
-			texMtx->mTexMtxInfo.mEffectMtx[1][3] = copyMatrix[1][3];
-			texMtx->mTexMtxInfo.mEffectMtx[2][0] = copyMatrix[2][0];
-			texMtx->mTexMtxInfo.mEffectMtx[2][1] = copyMatrix[2][1];
-			texMtx->mTexMtxInfo.mEffectMtx[2][2] = copyMatrix[2][2];
-			texMtx->mTexMtxInfo.mEffectMtx[2][3] = copyMatrix[2][3];
-			texMtx->mTexMtxInfo.mEffectMtx[3][0] = texMtx->mTexMtxInfo.mEffectMtx[3][1] = texMtx->mTexMtxInfo.mEffectMtx[3][2] = 0.0f;
-			texMtx->mTexMtxInfo.mEffectMtx[3][3]                                                                               = 1.0f;
+			mModel->mJ3dModel->mModelData->getMaterialNodePointer(0)->mTexGenBlock->getTexMtx(3)->getTexMtxInfo().setMtx(copyMatrix);
 
-			u16 id                   = getFbTexIndex();
-			J3DTexture* texData      = getFbTexture();
-			const ResTIMG* timg      = gameSystem->getXfbTexture()->getTexInfo();
-			*texData->getResTIMG(id) = *timg;
-			texData->setImageOffset((u32)timg, id);
-			texData->setPaletteOffset((u32)timg, id);
+			mFbTexture->changeImage(gameSystem->getXfbTexture()->getTexInfo(), mFbTexIndex);
 		}
 	}
 
@@ -472,9 +436,10 @@ SeaMgr::SeaMgr()
 
 	u32 flags;
 	if (Game::gameSystem && Game::gameSystem->isMultiplayerMode()) {
-		flags = 0x20240010;
+		flags = J3DMLF_Material_PE_FogOff | J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL | J3DMLF_UseImmediateMtx;
 	} else {
-		flags = 0x21240010;
+		flags = J3DMLF_Material_PE_FogOff | J3DMLF_Material_UseIndirect | J3DMLF_UseUniqueMaterials | J3DMLF_UseSingleSharedDL
+		      | J3DMLF_UseImmediateMtx;
 	}
 
 	mModelData[0] = J3DModelLoaderDataBase::load(file, flags);

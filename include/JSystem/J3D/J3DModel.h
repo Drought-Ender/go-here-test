@@ -58,42 +58,6 @@ struct J3DUnkCalc2 {
 	virtual void calc(J3DModelData* mpModelData);
 };
 
-// TODO: name these
-enum J3DModelFlags {
-	J3DMODEL_Unk1       = 0x1,
-	J3DMODEL_Unk2       = 0x2,
-	J3DMODEL_SkinPosCpu = 0x4,
-	J3DMODEL_SkinNrmCpu = 0x8,
-	J3DMODEL_Unk5       = 0x10,
-	J3DMODEL_Unk6       = 0x20,
-	J3DMODEL_Unk7       = 0x40,
-	J3DMODEL_Unk8       = 0x80,
-	J3DMODEL_Unk9       = 0x100,
-	J3DMODEL_Unk10      = 0x200,
-	J3DMODEL_Unk11      = 0x400,
-	J3DMODEL_Unk12      = 0x800,
-	J3DMODEL_Unk13      = 0x1000,
-	J3DMODEL_Unk14      = 0x2000,
-	J3DMODEL_Unk15      = 0x4000,
-	J3DMODEL_Unk16      = 0x8000,
-	J3DMODEL_Unk17      = 0x10000,
-	J3DMODEL_Unk18      = 0x20000,
-	J3DMODEL_Unk19      = 0x40000,
-	J3DMODEL_Unk20      = 0x80000,
-	J3DMODEL_Unk21      = 0x100000,
-	J3DMODEL_Unk22      = 0x200000,
-	J3DMODEL_Unk23      = 0x400000,
-	J3DMODEL_Unk24      = 0x800000,
-	J3DMODEL_Unk25      = 0x1000000,
-	J3DMODEL_Unk26      = 0x2000000,
-	J3DMODEL_Unk27      = 0x4000000,
-	J3DMODEL_Unk28      = 0x8000000,
-	J3DMODEL_Unk29      = 0x10000000,
-	J3DMODEL_Unk30      = 0x20000000,
-	J3DMODEL_Unk31      = 0x40000000,
-	J3DMODEL_Unk32      = 0x80000000,
-};
-
 /**
  * @size{0xE4}
  */
@@ -142,7 +106,7 @@ struct J3DModelData {
 	u16 getShapeNum() const { return mShapeTable.getShapeNum(); }
 	u16 getMaterialNum() const { return mMaterialTable.getMaterialNum(); }
 	u16 getJointNum() const { return mJointTree.getJointNum(); }
-	u16 getDrawMtxNum() const { return mJointTree.getDrawMtxNum(); }
+	u32 getDrawMtxNum() const { return mJointTree.getDrawMtxNum(); }
 	J3DMaterial* getMaterialNodePointer(u16 idx) const { return mMaterialTable.getMaterialNodePointer(idx); }
 	J3DShape* getShapeNodePointer(u16 idx) const { return mShapeTable.getItem(idx); }
 	J3DJointTree& getJointTree() { return mJointTree; }
@@ -157,6 +121,11 @@ struct J3DModelData {
 	GXColor* getVtxColorArray(u8 idx) const { return mVertexData.getVtxColorArray(idx); }
 	u32 getVertexNum() const { return mVertexData.getVtxNum(); }
 	u32 getVertexColorNum() const { return mVertexData.getColNum(); }
+	const J3DModelHierarchy* getHierarchy() const { return mJointTree.getHierarchy(); }
+
+	u8 getDrawMtxFlag(u16 idx) const { return mJointTree.getDrawMtxFlag(idx); }
+	u16 getDrawMtxIndex(u16 idx) const { return mJointTree.getDrawMtxIndex(idx); }
+	u16* getWEvlpImportantMtxIndex() const { return mJointTree.getWEvlpImportantMtxIndex(); }
 
 	bool checkFlag(u32 flag) const { return (mModelLoaderFlags & flag) ? true : false; }
 	u32 getFlag() const { return mModelLoaderFlags; }
@@ -183,11 +152,11 @@ struct J3DModelData {
  * @size{0xDC}
  */
 struct J3DModel {
-	J3DModel(J3DModelData* data, u32 flags, u32 modelType)
+	J3DModel(J3DModelData* data, u32 matFlags, u32 viewNum)
 	{
 		mVertexBuffer.init();
 		initialize();
-		entryModelData(data, flags, modelType);
+		entryModelData(data, matFlags, viewNum);
 	}
 
 	virtual void update();         // _08
@@ -237,10 +206,23 @@ struct J3DModel {
 		mModelScale.y = scale.y;
 		mModelScale.z = scale.z;
 	}
+	void setBaseScale(Vector3f scale)
+	{
+		mModelScale.x = scale.x;
+		mModelScale.y = scale.y;
+		mModelScale.z = scale.z;
+	}
+	void setBaseScale(f32 x, f32 y, f32 z)
+	{
+		mModelScale.x = x;
+		mModelScale.y = y;
+		mModelScale.z = z;
+	}
 	void setUserArea(u32 area) { mUserArea = area; }
 	u32 getUserArea() const { return mUserArea; }
 	void setAnmMtx(int i, Mtx m) { mMtxBuffer->setAnmMtx(i, m); }
 	MtxP getAnmMtx(int p1) { return mMtxBuffer->getAnmMtx(p1); }
+	J3DMtxBuffer* getMtxBuffer() const { return mMtxBuffer; }
 
 	// void setBaseScale(const Vec& scale) { mModelScale = scale; }
 	Vec* getBaseScale() { return &mModelScale; }

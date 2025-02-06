@@ -30,9 +30,9 @@ void Obj::setInitialSetting(EnemyInitialParamBase*) { }
 void Obj::onInit(CreatureInitArg* initArg)
 {
 	EnemyBase::onInit(initArg);
-	mStateTimer = 0.0f;
-	mNextState  = TADPOLE_NULL;
-	_2C0        = 1;
+	mStateTimer    = 0.0f;
+	mNextState     = TADPOLE_NULL;
+	mLeapDirection = 1;
 	mFsm->start(this, TADPOLE_Wait, nullptr);
 }
 
@@ -116,7 +116,7 @@ void Obj::setRandTarget(bool check)
 	f32 radius          = randWeightFloat(p1) + C_GENERALPARMS.mHomeRadius.mValue;
 	Vector3f tadpolePos = getPosition();
 	Vector3f homePos    = mHomePosition;
-	f32 angle           = JMath::atanTable_.atan2_(tadpolePos.x - homePos.x, tadpolePos.z - homePos.z);
+	f32 angle           = JMAAtan2Radian(tadpolePos.x - homePos.x, tadpolePos.z - homePos.z);
 	angle               = randWeightFloat(PI) + angle + HALF_PI;
 
 	mTargetPosition = Vector3f(radius * sinf(angle) + homePos.x, homePos.y, radius * cosf(angle) + homePos.z);

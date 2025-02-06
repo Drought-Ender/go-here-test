@@ -1,46 +1,47 @@
 #ifndef _SYSTEM_H
 #define _SYSTEM_H
 
+#include "JSystem/JGeometry.h"
 #include "DvdThreadCommand.h"
-#include "Dolphin/gx.h"
 #include "SysTimers.h"
-#include "JSystem/JKernel/JKRHeap.h"
-#include "node.h"
 #include "BitFlag.h"
-#include "types.h"
+#include "node.h"
+
+struct RenderModeInfo {
+	u32 mIdentifier; // _00, must be set to 'vald' for saved render mode to be used
+	u8 mRenderMode;  // _04 (System::ERenderMode)
+};
+// This struct represents a region of memory that will be saved through soft-resets
+#define RENDER_INFO_STORE ((RenderModeInfo*)DOL_ADDR_LIMIT)
 
 struct Graphics;
 struct OSContext;
 struct _GXRenderModeObj;
 struct HeapStatus;
 
-void Pikmin2DefaultMemoryErrorRoutine(void*, u32, s32);
-void kando_panic_f(bool, const char*, s32, const char*, ...);
-extern void preUserCallback(u16, OSContext*, u32, u32);
-
 struct HeapInfo : public Node, public JKRDisposer {
-	inline HeapInfo(char* name) { mName = name; }
 
 	virtual ~HeapInfo(); // _20 (weak)
 
-	void search(HeapInfo*);
+	HeapInfo* search(HeapInfo*);
 
 	void dump(int, bool);
 	void getTotalUsedSize();
-	void dumpNode(int);
 	void search(char*, bool);
 	void isInvalidUsedSize();
 	void isValidUsedSize();
 	void getUsedSize(bool);
 
+	inline JSUTree<CoreNode>* getTree() { return &mTree; }
+
 	// _00-_24 = Node
 	// _20     = VTBL (Node)
 	// _24-_3C = JKRDisposer
-	u32 _3C;         // _3C
-	int _40;         // _40
-	u32 _44;         // _44
-	HeapStatus* _48; // _48
-	HeapStatus* _4C; // _4C
+	u32 mUnused0;           // _3C
+	int mUnused1;           // _40
+	u32 mUnused2;           // _44
+	HeapInfo* mCurrentNode; // _48
+	HeapInfo* mParent;      // _4C
 };
 
 struct HeapStatus {
@@ -110,14 +111,16 @@ struct System : public OSMutex {
 	struct GXVerifyArg {
 		GXVerifyArg();
 
-		u32 _00; // _00
-		u8 _04;  // _04
+		u32 mUnused00; // _00
+		u8 mUnused04;  // _04
 	};
 
 	System();
 	~System();
 
 	static _GXRenderModeObj* getRenderModeObj();
+	static int getRenderModeWidth() { return getRenderModeObj()->fbWidth; }
+	static int getRenderModeHeight() { return getRenderModeObj()->efbHeight; }
 	static int assert_fragmentation(char*);
 	static void loadSoundResource();
 	static void initialize();
@@ -153,7 +156,7 @@ struct System : public OSMutex {
 	void heapStatusDump(bool);
 	void heapStatusIndividual();
 	void heapStatusNormal();
-	void resetOn(bool);
+	void resetOn(bool doResetToMenu);
 	void resetPermissionOn();
 	bool isResetActive();
 	void activeGP();
@@ -197,6 +200,21 @@ struct System : public OSMutex {
 	inline void setFlag(u32 flag) { mFlags.typeView |= flag; }
 	inline void resetFlag(u32 flag) { mFlags.typeView &= ~flag; }
 	inline bool isFlag(u32 flag) const { return mFlags.typeView & flag; }
+
+	/**
+	 * Returns the full screen box dimensions.
+	 *
+	 * This function calculates and returns the screen box dimensions based on the current render mode height and width.
+	 *
+	 * @return The screen box dimensions as a `JGeometry::TBox2f` object.
+	 */
+	inline JGeometry::TBox2f getFullScreenBox()
+	{
+		u32 height = getRenderModeHeight();
+		u32 width  = getRenderModeWidth();
+		f32 offset = 0.0f; // Ahh... what we have to do to match a function....
+		return JGeometry::TBox2f(0, 0, offset + width, offset + height);
+	}
 
 	// _00-_18 = OSMutex
 	JKRHeap* mBackupHeap;                 // _18

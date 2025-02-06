@@ -78,7 +78,7 @@ void StateDead::exec(EnemyBase* enemy)
 			kurage->getJAIObject()->startSound(PSSE_EN_KURAGE_HARETSU, 0);
 
 			Vector3f position = kurage->getPosition();
-			rumbleMgr->startRumble(9, position, 2);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed9, position, RUMBLEID_Both);
 
 		} else if ((u32)kurage->mCurAnim->mType == KEYEVENT_END) {
 			kurage->kill(nullptr);
@@ -103,7 +103,7 @@ void StateWait::init(EnemyBase* enemy, StateArg* stateArg)
 	kurage->mStateTimer = 0.0f;
 	kurage->enableEvent(0, EB_Untargetable);
 	kurage->mTargetVelocity = Vector3f(0.0f);
-	kurage->_2C8            = 3.5f;
+	kurage->mMovePitchTimer = 3.5f;
 	kurage->startMotion(KURAGEANIM_Move, nullptr);
 }
 
@@ -164,7 +164,7 @@ void StateMove::init(EnemyBase* enemy, StateArg* stateArg)
 	kurage->setRandTarget();
 	kurage->enableEvent(0, EB_Untargetable);
 	kurage->mTargetVelocity = Vector3f(0.0f);
-	kurage->_2C8            = 3.5f;
+	kurage->mMovePitchTimer = 3.5f;
 	kurage->startMotion(KURAGEANIM_Move, nullptr);
 }
 
@@ -237,7 +237,7 @@ void StateChase::init(EnemyBase* enemy, StateArg* stateArg)
 	kurage->mNextState = KURAGE_NULL;
 	kurage->setEmotionExcitement();
 	kurage->mTargetVelocity = Vector3f(0.0f);
-	kurage->_2C8            = 3.5f;
+	kurage->mMovePitchTimer = 3.5f;
 	kurage->startMotion(KURAGEANIM_Move, nullptr);
 }
 
@@ -442,8 +442,8 @@ void StateLand::init(EnemyBase* enemy, StateArg* stateArg)
 	kurage->createDownEffect();
 
 	Vector3f position = kurage->getPosition();
-	cameraMgr->startVibration(0, position, 2);
-	rumbleMgr->startRumble(9, position, 2);
+	cameraMgr->startVibration(VIBTYPE_LightSlowShort, position, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed9, position, RUMBLEID_Both);
 }
 
 /**
@@ -592,7 +592,7 @@ void StateFlyFlick::exec(EnemyBase* enemy)
 			                            parms->mGeneral.mShakeDamage.mValue, -1000.0, nullptr);
 			kurage->mFlickTimer = 0.0f;
 			Vector3f position   = kurage->getPosition();
-			rumbleMgr->startRumble(9, position, 2);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed9, position, RUMBLEID_Both);
 
 		} else if ((u32)kurage->mCurAnim->mType == KEYEVENT_END) {
 			int nextFlyingState = kurage->getFlyingNextState();
@@ -644,7 +644,7 @@ void StateGroundFlick::exec(EnemyBase* enemy)
 	if (kurage->mCurAnim->mIsPlaying) {
 		if ((u32)kurage->mCurAnim->mType == KEYEVENT_2) {
 			Vector3f position = kurage->getPosition();
-			rumbleMgr->startRumble(9, position, 2);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed9, position, RUMBLEID_Both);
 
 		} else if ((u32)kurage->mCurAnim->mType == KEYEVENT_3) {
 			Parms* parms1 = CG_PARMS(kurage);

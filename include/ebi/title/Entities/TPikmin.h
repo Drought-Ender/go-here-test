@@ -28,22 +28,22 @@ struct TParam : public TParamBase {
 	 * @note Size: 0x418
 	 */
 	TParam()
-	    : mIntScale(this, 'pk00', "ŠCŠO”ÅƒXƒP[ƒ‹", 2.4f, 0.0f, 10.0f)                      // 'overseas version scale'
-	    , mJpnScale(this, 'pk99', "“ú–{Œê”ÅƒXƒP[ƒ‹", 2.6f, 0.0f, 10.0f)                    // 'Japanese version scale'
-	    , mCollRadius(this, 'pk01', "ƒRƒŠƒWƒ‡ƒ“”¼Œa", 5.0f, 0.0f, 100.0f)                   // 'collision radius'
-	    , mStopDist(this, 'pk02', "’â~‹——£", 20.0f, 0.0f, 100.0f)                          // 'stopping distance'
-	    , mConvDist(this, 'pk03', "û‘©‹——£", 50.0f, 0.0f, 100.0f)                          // 'convergence distance'
-	    , mShadowX(this, 'pk05', "‰e‚¸‚ç‚µX", 5.0f, 0.0f, 100.0f)                           // 'shadow offset X'
-	    , mShadowZ(this, 'pk06', "‰e‚¸‚ç‚µZ", 5.0f, 0.0f, 100.0f)                           // 'shadow offset Z'
-	    , mAnimSpeedWalk(this, 'pk07', "ƒAƒjƒƒXƒs[ƒh•à‚­i‘¬“x”ä—áj", 0.5f, 0.0f, 10.0f) // 'anime speed walking (speed proportional)'
-	    , mAnimSpeedStyle(this, 'pk08', "ƒAƒjƒƒXƒs[ƒh•—", 0.5f, 0.0f, 10.0f)              // 'anime speed wind'
-	    , mAnimMaxWaitTime(this, 'pk10', "ƒAƒjƒƒXƒs[ƒhWAITÅ‘å", 0.5f, 0.0f, 10.0f)       // 'anime speed WAIT max'
-	    , mAnimMinWaitTime(this, 'pk09', "ƒAƒjƒƒXƒs[ƒhWAITÅ¬", 0.0f, 0.0f, 10.0f)       // 'anime speed WAIT min'
-	    , mKogane(this, 'pk12', "ƒRƒKƒlD‚«D‚«ŒW”", 5.0f, -10.0f, 10.0f)                  // 'kogane attraction factor'
-	    , mChappyRun(this, 'pk13', "ƒ`ƒƒƒbƒs[‚©‚ç“¦‚°‚éŒW”", -5.0f, -10.0f, 10.0f)        // 'chappy repulsion factor'
-	    , mChaseGiveUp(this, 'pk14', "’Ç‚¢‚©‚¯‚ ‚«‚ç‚ß”¼Œa", 400.0f, 0.0f, 500.0f)          // 'chasing radius'
-	    , mWindTimer(this, 'pk11', "•—ƒ^ƒCƒ}[(•b)", 6.0f, 0.0f, 10.0f)                     // 'wind timer (sec)'
-	    , mDistSpeedFactor(this, 'pk04', "‹——£”ä—á‘¬“xŒW”", 0.2f, 0.0f, 1.0f)              // 'distance proportional speed factor'
+	    : mIntScale(this, 'pk00', "æµ·å¤–ç‰ˆã‚¹ã‚±ãƒ¼ãƒ«", 2.4f, 0.0f, 10.0f)                      // 'overseas version scale'
+	    , mJpnScale(this, 'pk99', "æ—¥æœ¬èªç‰ˆã‚¹ã‚±ãƒ¼ãƒ«", 2.6f, 0.0f, 10.0f)                    // 'Japanese version scale'
+	    , mCollRadius(this, 'pk01', "ã‚³ãƒªã‚¸ãƒ§ãƒ³åŠå¾„", 5.0f, 0.0f, 100.0f)                   // 'collision radius'
+	    , mStopDist(this, 'pk02', "åœæ­¢è·é›¢", 20.0f, 0.0f, 100.0f)                          // 'stopping distance'
+	    , mConvDist(this, 'pk03', "åæŸè·é›¢", 50.0f, 0.0f, 100.0f)                          // 'convergence distance'
+	    , mShadowX(this, 'pk05', "å½±ãšã‚‰ã—X", 5.0f, 0.0f, 100.0f)                           // 'shadow offset X'
+	    , mShadowZ(this, 'pk06', "å½±ãšã‚‰ã—Z", 5.0f, 0.0f, 100.0f)                           // 'shadow offset Z'
+	    , mAnimSpeedWalk(this, 'pk07', "ã‚¢ãƒ‹ãƒ¡ã‚¹ãƒ”ãƒ¼ãƒ‰æ­©ãï¼ˆé€Ÿåº¦æ¯”ä¾‹ï¼‰", 0.5f, 0.0f, 10.0f) // 'anime speed walking (speed proportional)'
+	    , mAnimSpeedStyle(this, 'pk08', "ã‚¢ãƒ‹ãƒ¡ã‚¹ãƒ”ãƒ¼ãƒ‰é¢¨", 0.5f, 0.0f, 10.0f)              // 'anime speed wind'
+	    , mAnimMaxWaitTime(this, 'pk10', "ã‚¢ãƒ‹ãƒ¡ã‚¹ãƒ”ãƒ¼ãƒ‰WAITæœ€å¤§", 0.5f, 0.0f, 10.0f)       // 'anime speed WAIT max'
+	    , mAnimMinWaitTime(this, 'pk09', "ã‚¢ãƒ‹ãƒ¡ã‚¹ãƒ”ãƒ¼ãƒ‰WAITæœ€å°", 0.0f, 0.0f, 10.0f)       // 'anime speed WAIT min'
+	    , mKogane(this, 'pk12', "ã‚³ã‚¬ãƒå¥½ãå¥½ãä¿‚æ•°", 5.0f, -10.0f, 10.0f)                  // 'kogane attraction factor'
+	    , mChappyRun(this, 'pk13', "ãƒãƒ£ãƒƒãƒ”ãƒ¼ã‹ã‚‰é€ƒã’ã‚‹ä¿‚æ•°", -5.0f, -10.0f, 10.0f)        // 'chappy repulsion factor'
+	    , mChaseGiveUp(this, 'pk14', "è¿½ã„ã‹ã‘ã‚ãã‚‰ã‚åŠå¾„", 400.0f, 0.0f, 500.0f)          // 'chasing radius'
+	    , mWindTimer(this, 'pk11', "é¢¨ã‚¿ã‚¤ãƒãƒ¼(ç§’)", 6.0f, 0.0f, 10.0f)                     // 'wind timer (sec)'
+	    , mDistSpeedFactor(this, 'pk04', "è·é›¢æ¯”ä¾‹é€Ÿåº¦ä¿‚æ•°", 0.2f, 0.0f, 1.0f)              // 'distance proportional speed factor'
 	{
 	}
 
@@ -84,28 +84,28 @@ struct TAnimator {
 	void setAnmWave(J3DModel*, f32, f32, f32);
 	void setAnmWait(J3DModel*, f32);
 
-	J3DModelData* mModelDataRed;    // _00
-	J3DModelData* mModelDataYellow; // _04
-	J3DModelData* mModelDataBlue;   // _08
-	J3DModelData* mModelDataPurple; // _0C
-	J3DModelData* mModelDataWhite;  // _10
-	J3DAnmTransform* _14;           // _14
-	J3DAnmTransform* _18;           // _18
-	J3DMtxCalcAnmBase* _1C;         // _1C
-	J3DMtxCalc* _20;                // _20
+	J3DModelData* mModelDataRed;     // _00
+	J3DModelData* mModelDataYellow;  // _04
+	J3DModelData* mModelDataBlue;    // _08
+	J3DModelData* mModelDataPurple;  // _0C
+	J3DModelData* mModelDataWhite;   // _10
+	J3DAnmTransform* mWaitAnim;      // _14
+	J3DAnmTransform* mWaveAnim;      // _18
+	J3DMtxCalcAnmBase* mAnmCalcWait; // _1C
+	J3DMtxCalc* mAnmCalcWave;        // _20
 };
 
 struct TBoidParam : public Parameters {
 	TBoidParam()
 	    : Parameters(nullptr, "TTitleStateParameters")
-	    , mTurnMag(this, 'tsp0', "Œü‚«•Ï‚¦ƒxƒNƒgƒ‹‚Ì‘å‚«‚³", 0.2f, 0.0f, 10.0f)        // 'turn vector magnitude'
-	    , mMaxTurnVec(this, 'tsp1', "Œü‚«•Ï‚¦ƒxƒNƒgƒ‹Å‘å", 0.4f, 0.0f, 10.0f)         // 'turn vector maximum'
-	    , mMaxWalkSpeed(this, 'tsp2', "Å‘å•à‚­‘¬“x", 2.0f, 0.0f, 10.0f)               // 'max walking speed'
-	    , mBoidColl(this, 'tsp5', "BOIDÕ“Ë‰ñ”ğŒW”", 800.0f, 0.0f, 10000.0f)          // 'BOID collision avoidance factor'
-	    , mBoidSpeedMatch(this, 'tsp6', "BOID‘¬“x‡‚í‚¹ŒW”", 4.5f, 0.0f, 100.0f)      // 'BOID speed adjust factor'
-	    , mBoidCenter(this, 'tsp7', "BOID’†SW‡ŒW”", 0.005f, 0.0f, 10.0f)           // 'BOID center set factor'
-	    , mBoidNeighbor(this, 'tsp8', "BOIDŒÂ‘Ì‚Ì‹ßŠƒT[ƒ`”¼Œa", 30.0f, 0.0f, 500.0f) // 'BOID neighbour search radius'
-	    , mGroupCenter(this, 'tsp9', "ŒQ‚Ì’†S‚ÆŒÂ‘Ì‚Ì–Ú“I’n‚ÌŠ„‡", 0.0f, 0.0f, 1.0f) // 'group center to individual dest ratio'
+	    , mTurnMag(this, 'tsp0', "å‘ãå¤‰ãˆãƒ™ã‚¯ãƒˆãƒ«ã®å¤§ãã•", 0.2f, 0.0f, 10.0f)        // 'turn vector magnitude'
+	    , mMaxTurnVec(this, 'tsp1', "å‘ãå¤‰ãˆãƒ™ã‚¯ãƒˆãƒ«æœ€å¤§", 0.4f, 0.0f, 10.0f)         // 'turn vector maximum'
+	    , mMaxWalkSpeed(this, 'tsp2', "æœ€å¤§æ­©ãé€Ÿåº¦", 2.0f, 0.0f, 10.0f)               // 'max walking speed'
+	    , mBoidColl(this, 'tsp5', "BOIDè¡çªå›é¿ä¿‚æ•°", 800.0f, 0.0f, 10000.0f)          // 'BOID collision avoidance factor'
+	    , mBoidSpeedMatch(this, 'tsp6', "BOIDé€Ÿåº¦åˆã‚ã›ä¿‚æ•°", 4.5f, 0.0f, 100.0f)      // 'BOID speed adjust factor'
+	    , mBoidCenter(this, 'tsp7', "BOIDä¸­å¿ƒé›†åˆä¿‚æ•°", 0.005f, 0.0f, 10.0f)           // 'BOID center set factor'
+	    , mBoidNeighbor(this, 'tsp8', "BOIDå€‹ä½“ã®è¿‘æ‰€ã‚µãƒ¼ãƒåŠå¾„", 30.0f, 0.0f, 500.0f) // 'BOID neighbour search radius'
+	    , mGroupCenter(this, 'tsp9', "ç¾¤ã®ä¸­å¿ƒã¨å€‹ä½“ã®ç›®çš„åœ°ã®å‰²åˆ", 0.0f, 0.0f, 1.0f) // 'group center to individual dest ratio'
 	{
 	}
 
@@ -130,19 +130,19 @@ struct TBoidParamMgr : public CNode {
 
 	// _00     = VTBL
 	// _00-_18 = CNode
-	u32 _18;               // _18
-	u32 _1C;               // _1C
-	TBoidParam mParams[5]; // _20
-	f32 _6B0;              // _6B0
-	f32 _6B4;              // _6B4
-	f32 _6B8;              // _6B8
-	f32 _6BC;              // _6BC
-	f32 _6C0;              // _6C0
-	f32 _6C4;              // _6C4
-	f32 _6C8;              // _6C8
-	f32 _6CC;              // _6CC
-	u32 mCounter;          // _6D0
-	u32 mCounter2;         // _6D4
+	u32 mCurrentState;       // _18
+	u32 mPrevState;          // _1C
+	TBoidParam mParams[5];   // _20
+	f32 mCurrWalkSpeed;      // _6B0
+	f32 mCurrMaxTurnSpeed;   // _6B4
+	f32 mCurrTurnMag;        // _6B8
+	f32 mCurrBoidCenter;     // _6BC
+	f32 mCurrBoidSpeedMatch; // _6C0
+	f32 mCurrBoidColl;       // _6C4
+	f32 mCurrGroupCenter;    // _6C8
+	f32 mCurrBoidNeighbor;   // _6CC
+	u32 mCounter;            // _6D0
+	u32 mCounter2;           // _6D4
 };
 
 // @size{0x98}
@@ -158,18 +158,18 @@ struct TUnit : public TObjBase {
 
 	TUnit()
 	{
-		mCounter       = 0;
-		mCounter2      = 0;
-		mDestPos       = Vector2f(0.0f, 0.0f);
-		mManager       = nullptr;
-		_60            = Vector2f(1.0f, 1.0f);
-		mEnemyObj      = nullptr;
-		_6C            = Vector2f(0.0f);
-		_74            = Vector2f(0.0f);
-		_7C            = Vector2f(0.0f);
-		mCurrentState  = STATE_Hidden;
-		mPreviousState = STATE_Hidden;
-		mIsDead        = false;
+		mCounter            = 0;
+		mCounter2           = 0;
+		mDestPos            = Vector2f(0.0f, 0.0f);
+		mManager            = nullptr;
+		mRandAnimSpeeds     = Vector2f(1.0f, 1.0f);
+		mEnemyObj           = nullptr;
+		mTargetPos          = Vector2f(0.0f);
+		mVelocity           = Vector2f(0.0f);
+		mGroupPosDifference = Vector2f(0.0f);
+		mCurrentState       = STATE_Hidden;
+		mPreviousState      = STATE_Hidden;
+		mIsDead             = false;
 	}
 
 	~TUnit() { }
@@ -190,21 +190,20 @@ struct TUnit : public TObjBase {
 
 	// _00     = VTBL
 	// _00-_2C = TObjBase
-	Vector2f mDestPos;           // _2C
-	TMgr* mManager;              // _34
-	J3DFrameCtrl mFrameControlA; // _38
-	J3DFrameCtrl mFrameControlB; // _4C
-	Vector2f _60;                // _60
-	TObjBase* mEnemyObj;         // _68
-	Vector2f _6C;                // _6C
-	Vector2f _74;                // _74
-	Vector2f _7C;                // _7C
-	enumState mCurrentState;     // _84
-	enumState mPreviousState;    // _88
-	u32 mCounter;                // _8C
-	u32 mCounter2;               // _90
-	bool mIsDead;                // _94
-	bool _96[2];                 // _96
+	Vector2f mDestPos;            // _2C
+	TMgr* mManager;               // _34
+	J3DFrameCtrl mFrameControlA;  // _38
+	J3DFrameCtrl mFrameControlB;  // _4C
+	Vector2f mRandAnimSpeeds;     // _60, probably not an actual Vector2 but idk
+	TObjBase* mEnemyObj;          // _68
+	Vector2f mTargetPos;          // _6C
+	Vector2f mVelocity;           // _74
+	Vector2f mGroupPosDifference; // _7C
+	enumState mCurrentState;      // _84
+	enumState mPreviousState;     // _88
+	u32 mCounter;                 // _8C
+	u32 mCounter2;                // _90
+	bool mIsDead;                 // _94
 };
 
 struct TMgr : public CNode {
@@ -236,7 +235,7 @@ struct TMgr : public CNode {
 	TParam mParams;              // _1C
 	TUnit* mUnits;               // _2AC
 	TBoidParamMgr mBoidParamMgr; // _2B0
-	Vector2f _988;               // _988
+	Vector2f mGroupAvgPosition;  // _988
 };
 } // namespace Pikmin
 } // namespace title

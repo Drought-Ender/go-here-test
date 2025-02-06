@@ -51,7 +51,7 @@ MoviePlayer::MoviePlayer()
 	mNaviID        = 0;
 	mCameraName    = nullptr;
 	mStreamID      = 0;
-	mDemoState     = 0;
+	mDemoState     = DEMOSTATE_Inactive;
 	mObjectSystem  = nullptr;
 	mDemoPSM       = nullptr;
 	mTextControl   = nullptr;
@@ -130,7 +130,7 @@ void MoviePlayer::clearMovieHeap()
  * @note Address: 0x8042C9D0
  * @note Size: 0x60
  */
-u8 MoviePlayer::play(MoviePlayArg& arg)
+int MoviePlayer::play(MoviePlayArg& arg)
 {
 	MovieConfig* config = findConfig(arg.mMovieName, arg.mCourseName);
 	if (config) {
@@ -144,13 +144,13 @@ u8 MoviePlayer::play(MoviePlayArg& arg)
  * @note Address: 0x8042CA30
  * @note Size: 0x33C
  */
-u8 MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
+int MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
 {
 	if (isFlag(MVP_IsActive)) {
 		// if a movie is already playing, put the new cutscene in the queue instead
 		MovieContext* context = getNewContext();
 		if (!context) {
-			JUT_PANICLINE(560, "******* ÅöÉLÉÖÅ[Ç…ÇÕÇ¢ÇËÇ´ÇÁÇÒÇÊÅ`ÅIÅI\n"); // "******* ÅöDon't miss the queue! !"
+			JUT_PANICLINE(560, "******* ‚òÖ„Ç≠„É•„Éº„Å´„ÅØ„ÅÑ„Çä„Åç„Çâ„Çì„ÇàÔΩûÔºÅÔºÅ\n"); // "******* ‚òÖIt won't fit in the queue!!"
 			return MOVIEPLAY_QUEUEFAIL;
 		} else {
 			setContext(context, config, arg);
@@ -162,7 +162,7 @@ u8 MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
 		}
 		mAltNavi   = mTargetNavi;
 		mAltCamera = mActingCamera;
-		cameraMgr->controllerLock(2);
+		cameraMgr->controllerLock(CAMNAVI_Both);
 		config->dump();
 		mCurrentConfig = config;
 		mNaviID        = arg.mNaviID;
@@ -181,14 +181,14 @@ u8 MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
 			test = (posFlag & 4) || (posFlag & 8);
 			if (test) {
 				mCameraPosition = arg.mOrigin;
-				mCameraAngle    = arg.mAngle * 57.295776f;
+				mCameraAngle    = arg.mAngle * RAD2DEG;
 				if (mCurrentConfig->mPositionFlag & 8) {
 					JUT_ASSERTLINE(609, mapMgr, "The Bikkuri\n");
-					mCameraAngle = 57.295776f * mapMgr->getBestAngle(mCameraPosition, 250.0f, 0.43633235f);
+					mCameraAngle = RAD2DEG * mapMgr->getBestAngle(mCameraPosition, 250.0f, 0.43633235f);
 				}
 			} else if (posFlag & 16) {
 				mCameraPosition = arg.mOrigin;
-				mCameraAngle    = arg.mAngle * 57.295776f;
+				mCameraAngle    = arg.mAngle * RAD2DEG;
 				mOffset         = arg.mSoundPosition;
 			} else {
 				mCameraPosition = posConfig->mOrigin;
@@ -198,7 +198,7 @@ u8 MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
 
 		resetFlag(MVP_IsFinished);
 		setFlag(MVP_IsActive);
-		resetFlag(MVP_Unk32);
+		resetFlag(MVP_DoSkip);
 		mDelegate1  = arg.mDelegateEnd;
 		mDelegate2  = arg.mDelegateStart;
 		mCameraName = arg.mPelletName;
@@ -214,10 +214,10 @@ u8 MoviePlayer::play(MovieConfig* config, MoviePlayArg& arg, bool flag)
 				gameSystem->startFadeout(0.5f);
 				mFadeTimer = 0.5f;
 			}
-			mDemoState = 1;
+			mDemoState = DEMOSTATE_Fadeout;
 		} else {
 			sys->dvdLoadUseCallBack(&mThreadCommand, mDelegate3);
-			mDemoState = 2;
+			mDemoState = DEMOSTATE_Loading;
 			mFadeTimer = 0.0f;
 		}
 		return MOVIEPLAY_SUCCESS;
@@ -366,7 +366,7 @@ void MoviePlayer::getSuspendedContext()
 			// return false;
 		}
 	} else {
-		JUT_PANICLINE(772, " ÉLÉÖÅ[Ç…Ç»Ç…Ç‡Ç»Ç¢ÇºÅ[Å[(T^T)\n"); // "there's nothing in the queue (T^T)"
+		JUT_PANICLINE(772, " „Ç≠„É•„Éº„Å´„Å™„Å´„ÇÇ„Å™„ÅÑ„Åû„Éº„Éº(T^T)\n"); // "There's nothing in the queue (T^T)\n"
 	}
 }
 
@@ -400,8 +400,8 @@ void MoviePlayer::setContext(MovieContext* context, MovieConfig* config, MoviePl
  */
 void MoviePlayer::loadResource()
 {
-	char path1[256];
-	char path2[256];
+	char path1[PATH_MAX];
+	char path2[PATH_MAX];
 	sprintf(path1, "/user/Mukki/movie/%s/demo.stb", mCurrentConfig->mMovieNameBuffer2);
 	sprintf(path2, "/user/Mukki/movie/%s/demo.szs", mCurrentConfig->mMovieNameBuffer2);
 	sys->startChangeCurrentHeap(mMovieHeap);
@@ -423,8 +423,8 @@ void MoviePlayer::loadResource()
 	mStudioFactory->appendCreateObject(mPikminCreateObjectAudio);
 
 	mStudioControl = new JStudio::TControl;
-	mStudioControl->create(mStudioFactory, (!mStudioFactory) ? nullptr : (&mStudioFactory->mFvbFactory));
-	mStudioControl->_58 = 0.03333333507180214;
+	mStudioControl->setFactory(mStudioFactory);
+	mStudioControl->mSecondsPerFrame = 0.03333333507180214;
 
 	sys->heapStatusStart("movieResource", nullptr);
 
@@ -456,9 +456,9 @@ void MoviePlayer::loadResource()
 	sys->heapStatusStart("stb", nullptr);
 	if (mArchive) {
 		mStbFile = mArchive->getResource("demo.stb");
-		JUT_ASSERTLINE(954, mStbFile, "Ç‹Ç¿Ç©Çó\n"); // "Really? w"
+		JUT_ASSERTLINE(954, mStbFile, "„Åæ„Å¢„ÅãÔΩó\n"); // "Seriously?"
 	} else {
-		JUT_PANICLINE(957, "demo.szs Ç™Ç»Ç¢Ç∆ÇæÇﬂÇæÇÊÇó\n"); // "It's useless without it w"
+		JUT_PANICLINE(957, "demo.szs „Åå„Å™„ÅÑ„Å®„Å†„ÇÅ„Å†„ÇàÔΩó\n"); // "It's no good without it lol\n"
 	}
 	JUT_ASSERTLINE(960, mStbFile, "resource open failed!\n");
 	sys->heapStatusEnd("stb");
@@ -486,7 +486,7 @@ bool MoviePlayer::parse(bool flag)
 
 	const void* file = mStbFile;
 	if (!parse.parse_next(&file, test)) {
-		JUT_PANICLINE(1004, "ÉfÅ[É^ÇâéﬂÇ≈Ç´Ç‹ÇµÇ•ÇÒ\n"); // "I can interpret the data"
+		JUT_PANICLINE(1004, "„Éá„Éº„Çø„ÇíËß£Èáà„Åß„Åç„Åæ„Åó„Åá„Çì\n"); // "I can interpret the data\n"
 		return false;
 	} else {
 		mObjectSystem->reset();
@@ -501,9 +501,12 @@ bool MoviePlayer::parse(bool flag)
 bool MoviePlayer::update(Controller* input1, Controller* input2)
 {
 	switch (mDemoState) {
-	case 0:
+	case 7: // entirely unused state?
+		break;
+	case DEMOSTATE_Inactive:
 		return false;
-	case 1:
+
+	case DEMOSTATE_Fadeout:
 		if (mFadeTimer > 0.0f) {
 			mFadeTimer -= sys->mDeltaTime;
 			if (mFadeTimer <= 0.0f) {
@@ -511,20 +514,21 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 			}
 		} else {
 			sys->dvdLoadUseCallBack(&mThreadCommand, mDelegate3);
-			mDemoState = 2;
+			mDemoState = DEMOSTATE_Loading;
 			gameSystem->startFadeblack();
 		}
 		return true;
-	case 2:
+
+	case DEMOSTATE_Loading:
 		if (mFadeTimer > 0.0f) {
 			mFadeTimer -= sys->mDeltaTime;
 		}
-		if (mThreadCommand.mMode == 2) {
+		if (mThreadCommand.mMode == DvdThreadCommand::CM_Completed) {
 			sys->startChangeCurrentHeap(mMovieHeap);
 			setCamera(getActiveGameCamera());
 			sys->endChangeCurrentHeap();
 		}
-		if (mThreadCommand.mMode == 2 && mFadeTimer <= 0.0f) {
+		if (mThreadCommand.mMode == DvdThreadCommand::CM_Completed && mFadeTimer <= 0.0f) {
 			gameSystem->setPause(false, "moviePl:loaddone", 3);
 			gameSystem->paused();
 			if (mDelegate2) {
@@ -535,27 +539,31 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 			}
 			start(nullptr);
 			setPauseAndDraw(mCurrentConfig);
-			mDemoState = 5;
+			mDemoState = DEMOSTATE_Playing;
 			u16 flag   = mCurrentConfig->mDrawType;
-			if (flag & 4 || flag & 2) {
+			if (!(flag & 4) && flag & 2) {
 				gameSystem->startFadein(0.5f);
 			} else {
 				gameSystem->startFadewhite();
 			}
-			mDemoState = 3;
+			mDemoState = DEMOSTATE_LoadComplete;
 			return true;
 		}
 		return true;
-	case 3:
-		mDemoState = 4;
+
+	case DEMOSTATE_LoadComplete:
+		mDemoState = DEMOSTATE_Starting;
 		break;
-	case 4:
-		mDemoState = 5;
+
+	case DEMOSTATE_Starting:
+		mDemoState = DEMOSTATE_Playing;
 		break;
-	case 5:
+
+	case DEMOSTATE_Playing:
 		gameSystem->paused();
 		break;
-	case 6:
+
+	case DEMOSTATE_Finishing:
 		if (mObjectSystem) {
 			mObjectSystem->entry();
 		}
@@ -563,12 +571,12 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 		if (mFadeTimer < 1.1f && !mCanFinish) {
 			if (isFlag(MVP_IsFinished)) {
 				resetFrame();
-				bool end = 0;
+				bool end = false;
 				while (end == false) {
-					end = bool(mStudioControl->forward(1) == false);
+					end = !(mStudioControl->forward(1) != false); // dont even ask
 					mObjectSystem->update();
 					if (mTextControl) {
-						mTextControl->update(input1, input2);
+						((P2JME::TControl*)mTextControl)->update(input1, input2);
 					}
 					unsuspend(1, false);
 				}
@@ -594,10 +602,12 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 					context->del();
 					mStoreContextInactive.add(context);
 					mActiveContextNum--;
+				}
+				if (context) {
 					mTargetNavi   = context->mNavi;
 					mActingCamera = context->mCamera;
 					mTargetObject = context->mTargetObject;
-					u8 flag       = play(context->mConfig, context->mArg, true);
+					int flag      = play(context->mConfig, context->mArg, true);
 					switch (flag) {
 					case MOVIEPLAY_SUCCESS:
 						return true;
@@ -610,23 +620,23 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 						return false;
 					}
 				} else {
-					JUT_PANICLINE(772, " ÉLÉÖÅ[Ç…Ç»Ç…Ç‡Ç»Ç¢ÇºÅ[Å[(T^T)\n"); // "there's nothing in the queue (T^T)"
+					JUT_PANICLINE(772, " „Ç≠„É•„Éº„Å´„Å™„Å´„ÇÇ„Å™„ÅÑ„Åû„Éº„Éº(T^T)\n"); // "There's nothing in the queue (T^T)\n"
 				}
 				return false;
-			}
-			if (mDemoState == 2 || mDemoState == 1) {
+			} else if (mDemoState == DEMOSTATE_Loading || mDemoState == DEMOSTATE_Fadeout) {
 				PSMCancelToPauseOffMainBgm();
 			}
 		} else if (mFadeTimer <= 0.0f) {
-			mDemoState = 0;
+			mDemoState = DEMOSTATE_Inactive;
 		}
 		return true;
 	}
 
 	if (isFlag(MVP_IsActive)) {
 
-		if ((input1->getButton() & 0xf70) || (input2 && (input2->getButton() & 0xf70))) {
-			mFlags.typeView |= 0x80000000;
+		if (!(input1->getButton() & Controller::PRESS_ABXYLRZ)
+		    && (!input2 || (input2 && !(input2->getButton() & Controller::PRESS_ABXYLRZ)))) {
+			setFlag(MVP_DoSkip);
 		}
 
 		if ((int)mStudioControl->mSuspend <= 0) {
@@ -648,8 +658,8 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 			}
 		}
 		if (!mStudioControl->forward(1)) {
-			if (mDemoState != 6) {
-				mDemoState = 6;
+			if (mDemoState != DEMOSTATE_Finishing) {
+				mDemoState = DEMOSTATE_Finishing;
 				mFadeTimer = 2.0f;
 				mCanFinish = false;
 				gameSystem->setPause(true, nullptr, 3);
@@ -665,11 +675,14 @@ bool MoviePlayer::update(Controller* input1, Controller* input2)
 				mTextControl->update(input1, input2);
 			}
 		}
-		if (mDemoState == 5 && mFlags.isSet(0x80000000) && !mStudioControl->mSuspend) {
-			if ((input1->getButtonDown() & 0xf70) || (input2 && (input2->getButton() & 0xf70)) && mCurrentConfig->isSkippable()) {
+		if (mDemoState == DEMOSTATE_Playing && mFlags.isSet(MVP_DoSkip) && !mStudioControl->mSuspend) {
+			if (((input1->getButtonDown() & Controller::PRESS_ABXYLRZ) || (input2 && (input2->getButton() & Controller::PRESS_ABXYLRZ)))
+			    && mCurrentConfig->isSkippable()) {
 				skip();
-			} else if ((input1->getButtonDown() & Controller::PRESS_START)
-			           || (input2 && (input2->getButtonDown() & Controller::PRESS_START)) && !mCurrentConfig->isNeverSkippable()) {
+
+			} else if (((input1->getButtonDown() & Controller::PRESS_START)
+			            || (input2 && (input2->getButtonDown() & Controller::PRESS_START)))
+			           && !mCurrentConfig->isNeverSkippable()) {
 				skip();
 			}
 		}
@@ -716,7 +729,7 @@ bool MoviePlayer::stop()
 	if (isFlag(MVP_IsActive)) {
 		clearPauseAndDraw();
 		resetFlag(MVP_IsActive);
-		resetFlag(MVP_Unk32);
+		resetFlag(MVP_DoSkip);
 		if (mObjectSystem) {
 			mObjectSystem->stop();
 			mObjectSystem->destroyObjectAll();
@@ -741,7 +754,7 @@ bool MoviePlayer::stop()
 	mTargetObject = nullptr;
 	mAltNavi      = nullptr;
 	mAltCamera    = nullptr;
-	return isFlag(MVP_IsActive);
+	return !isFlag(MVP_IsActive);
 }
 
 /**
@@ -759,16 +772,16 @@ void MoviePlayer::do_stop()
  */
 void MoviePlayer::setCamera(Camera* cam)
 {
-	P2JST::ObjectCamera* objcam = static_cast<P2JST::ObjectCamera*>(mObjectSystem->findObject("MyCamera", JStage::TEO_Camera));
+	P2JST::ObjectCamera* objcam = (P2JST::ObjectCamera*)mObjectSystem->findObject("MyCamera", JStage::TEO_Camera);
 	if (!objcam) {
-		objcam = static_cast<P2JST::ObjectCamera*>(mObjectSystem->findObject("camera", JStage::TEO_Camera));
+		objcam = (P2JST::ObjectCamera*)mObjectSystem->findObject("camera", JStage::TEO_Camera);
 	}
 
 	if (!objcam) {
-		PSM::DemoArg arg;
-		arg.mName       = (mCurrentConfig) ? mCurrentConfig->mParam.mFolderName.mName : nullptr;
+		PSM::DemoArg arg((mCurrentConfig) ? mCurrentConfig->mParam.mFolderName.mData : nullptr);
 		arg.mCameraName = mCameraName;
 		arg.mBgmID      = mStreamID;
+
 		if (getActiveGameCamera()) {
 			mDemoPSM->init((Vec*)getActiveGameCamera()->getSoundPositionPtr(), (Vec*)getActiveGameCamera()->getSoundPositionPtr(),
 			               getActiveGameCamera()->getSoundMatrixPtr()->mMatrix.mtxView, arg);
@@ -776,270 +789,27 @@ void MoviePlayer::setCamera(Camera* cam)
 			mDemoPSM->init(nullptr, nullptr, nullptr, arg);
 		}
 		mDemoPSM->onDemoTop();
-	} else {
-		P2ASSERTLINE(1453, objcam);
-		objcam->setCamera(getActiveGameCamera());
-
-		PSM::DemoArg arg;
-		arg.mName       = (mCurrentConfig) ? mCurrentConfig->mParam.mFolderName.mName : nullptr;
-		arg.mCameraName = mCameraName;
-		arg.mBgmID      = mStreamID;
-		Matrixf* mtx    = cam->getSoundMatrixPtr();
-		mDemoPSM->init((Vec*)cam->getSoundPositionPtr(), (Vec*)cam->getSoundPositionPtr(), mtx->mMatrix.mtxView, arg);
-
-		cam->getViewMatrix(false);
-		cam->getViewMatrix(false)->print("viewmat");
-		cam->getSoundPositionPtr();
-		cam->getSoundPositionPtr();
-		cam->getSoundPositionPtr();
-		mDemoPSM->onDemoTop();
+		return;
 	}
 
-	/*
-	stwu     r1, -0x60(r1)
-	mflr     r0
-	li       r5, 3
-	stw      r0, 0x64(r1)
-	stmw     r27, 0x4c(r1)
-	mr       r31, r3
-	lis      r3, lbl_80499F10@ha
-	mr       r27, r4
-	addi     r29, r3, lbl_80499F10@l
-	addi     r4, r29, 0x1d4
-	lwz      r3, 0x1cc(r31)
-	bl       findObject__Q34Game5P2JST12ObjectSystemCFPCcQ26JStage8TEObject
-	or.      r28, r3, r3
-	bne      lbl_8042E0B0
-	lwz      r3, 0x1cc(r31)
-	addi     r4, r2, lbl_80520658@sda21
-	li       r5, 3
-	bl       findObject__Q34Game5P2JST12ObjectSystemCFPCcQ26JStage8TEObject
-	mr       r28, r3
+	P2ASSERTLINE(1453, objcam);
+	if (getActiveGameCamera()) {
+		cam = mActingCamera;
+	}
+	objcam->setCamera(cam);
 
-lbl_8042E0B0:
-	cmplwi   r28, 0
-	bne      lbl_8042E20C
-	lwz      r3, 0xb0(r31)
-	cmplwi   r3, 0
-	beq      lbl_8042E0CC
-	lwz      r4, 0xa0(r3)
-	b        lbl_8042E0D0
+	PSM::DemoArg arg((mCurrentConfig) ? mCurrentConfig->mParam.mFolderName.mData : nullptr);
+	arg.mCameraName = mCameraName;
+	arg.mBgmID      = mStreamID;
 
-lbl_8042E0CC:
-	li       r4, 0
+	mDemoPSM->init((Vec*)cam->getSoundPositionPtr(), (Vec*)cam->getSoundPositionPtr(), cam->getSoundMatrixPtr()->mMatrix.mtxView, arg);
 
-lbl_8042E0D0:
-	lwz      r5, 0x1a0(r31)
-	li       r3, 0
-	lwz      r0, 0xc4(r31)
-	stw      r3, 0x38(r1)
-	cmplwi   r5, 0
-	lwz      r3, 0xc0(r31)
-	stw      r4, 0x3c(r1)
-	stw      r3, 0x38(r1)
-	stw      r0, 0x40(r1)
-	beq      lbl_8042E0FC
-	b        lbl_8042E100
-
-lbl_8042E0FC:
-	lwz      r5, 0x190(r31)
-
-lbl_8042E100:
-	cmplwi   r5, 0
-	beq      lbl_8042E1C4
-	lwz      r4, 0x38(r1)
-	lwz      r3, 0x3c(r1)
-	lwz      r0, 0x40(r1)
-	stw      r4, 0x20(r1)
-	stw      r3, 0x24(r1)
-	stw      r0, 0x28(r1)
-	lwz      r3, 0x1a0(r31)
-	cmplwi   r3, 0
-	beq      lbl_8042E134
-	mr       r28, r3
-	b        lbl_8042E138
-
-lbl_8042E134:
-	lwz      r28, 0x190(r31)
-
-lbl_8042E138:
-	cmplwi   r3, 0
-	beq      lbl_8042E148
-	mr       r29, r3
-	b        lbl_8042E14C
-
-lbl_8042E148:
-	lwz      r29, 0x190(r31)
-
-lbl_8042E14C:
-	cmplwi   r3, 0
-	beq      lbl_8042E158
-	b        lbl_8042E15C
-
-lbl_8042E158:
-	lwz      r3, 0x190(r31)
-
-lbl_8042E15C:
-	lwz      r12, 0(r3)
-	lwz      r12, 0x6c(r12)
-	mtctr    r12
-	bctrl
-	mr       r30, r3
-	mr       r3, r29
-	lwz      r12, 0(r29)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r29, r3
-	mr       r3, r28
-	lwz      r12, 0(r28)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0xac(r31)
-	mr       r5, r29
-	mr       r6, r30
-	lwz      r12, 0(r3)
-	addi     r7, r1, 0x20
-	lwz      r12, 0xc(r12)
-	mtctr    r12
-	bctrl
-	b        lbl_8042E200
-
-lbl_8042E1C4:
-	lwz      r6, 0x38(r1)
-	addi     r7, r1, 0x14
-	lwz      r3, 0x3c(r1)
-	li       r4, 0
-	lwz      r0, 0x40(r1)
-	li       r5, 0
-	stw      r6, 0x14(r1)
-	li       r6, 0
-	stw      r3, 0x18(r1)
-	stw      r0, 0x1c(r1)
-	lwz      r3, 0xac(r31)
-	lwz      r12, 0(r3)
-	lwz      r12, 0xc(r12)
-	mtctr    r12
-	bctrl
-
-lbl_8042E200:
-	lwz      r3, 0xac(r31)
-	bl       onDemoTop__Q23PSM4DemoFv
-	b        lbl_8042E374
-
-lbl_8042E20C:
-	bne      lbl_8042E224
-	addi     r3, r29, 0x18
-	addi     r5, r29, 0x28
-	li       r4, 0x5ad
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_8042E224:
-	lwz      r0, 0x1a0(r31)
-	cmplwi   r0, 0
-	beq      lbl_8042E234
-	b        lbl_8042E238
-
-lbl_8042E234:
-	lwz      r0, 0x190(r31)
-
-lbl_8042E238:
-	cmplwi   r0, 0
-	beq      lbl_8042E244
-	lwz      r27, 0x190(r31)
-
-lbl_8042E244:
-	mr       r3, r28
-	mr       r4, r27
-	bl       setCamera__Q34Game5P2JST12ObjectCameraFP6Camera
-	lwz      r3, 0xb0(r31)
-	cmplwi   r3, 0
-	beq      lbl_8042E264
-	lwz      r6, 0xa0(r3)
-	b        lbl_8042E268
-
-lbl_8042E264:
-	li       r6, 0
-
-lbl_8042E268:
-	lwz      r0, 0xc4(r31)
-	li       r5, 0
-	lwz      r4, 0xc0(r31)
-	mr       r3, r27
-	stw      r5, 0x2c(r1)
-	stw      r4, 8(r1)
-	stw      r6, 0xc(r1)
-	stw      r0, 0x10(r1)
-	lwz      r12, 0(r27)
-	stw      r6, 0x30(r1)
-	lwz      r12, 0x6c(r12)
-	stw      r4, 0x2c(r1)
-	stw      r0, 0x34(r1)
-	mtctr    r12
-	bctrl
-	mr       r29, r3
-	mr       r3, r27
-	lwz      r12, 0(r27)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r30, r3
-	mr       r3, r27
-	lwz      r12, 0(r27)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	lwz      r3, 0xac(r31)
-	mr       r5, r30
-	mr       r6, r29
-	lwz      r12, 0(r3)
-	addi     r7, r1, 8
-	lwz      r12, 0xc(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r27
-	li       r4, 0
-	lwz      r12, 0(r27)
-	lwz      r12, 0x48(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r27
-	li       r4, 0
-	lwz      r12, 0(r27)
-	lwz      r12, 0x48(r12)
-	mtctr    r12
-	bctrl
-	addi     r4, r2, lbl_80520660@sda21
-	bl       print__7MatrixfFPc
-	mr       r3, r27
-	lwz      r12, 0(r27)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r27
-	lwz      r12, 0(r27)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	mr       r3, r27
-	lwz      r12, 0(r27)
-	lwz      r12, 0x68(r12)
-	mtctr    r12
-	bctrl
-	lwz      r3, 0xac(r31)
-	bl       onDemoTop__Q23PSM4DemoFv
-
-lbl_8042E374:
-	lmw      r27, 0x4c(r1)
-	lwz      r0, 0x64(r1)
-	mtlr     r0
-	addi     r1, r1, 0x60
-	blr
-	*/
+	cam->getViewMatrix(false);
+	cam->getViewMatrix(false)->print("viewmat");
+	cam->getSoundPositionPtr();
+	cam->getSoundPositionPtr();
+	cam->getSoundPositionPtr();
+	mDemoPSM->onDemoTop();
 }
 
 /**
@@ -1096,8 +866,8 @@ void MoviePlayer::setTransform(Vector3f& pos, f32 angle)
 	mTransform                 = pos;
 	mTransformAngle            = angle * DEG2RAD * PI;
 	JStudio::TControl* control = mStudioControl;
-	control->_75               = 1;
-	control->_74               = 1;
+	control->mTransformOnGet   = true;
+	control->mTransformOnSet   = true;
 	control                    = mStudioControl;
 
 	control->transformOnGet_setOrigin(*(Vec*)&pos, angle);
@@ -1121,9 +891,12 @@ bool MoviePlayer::isPlaying(char* name)
  * @note Address: N/A
  * @note Size: 0x20
  */
-void MoviePlayer::isLoadingBlack()
+bool MoviePlayer::isLoadingBlack()
 {
-	// UNUSED FUNCTION
+	if (mCurrentConfig) {
+		return (mCurrentConfig->mDrawType >> 2) & 1;
+	}
+	return false;
 }
 
 /**
@@ -1138,8 +911,7 @@ void MoviePlayer::drawLoading(Graphics& gfx)
 
 		J2DOrthoGraph& graf = gfx.mOrthoGraph;
 		graf.setColor(c);
-		u8 doBox = (mCurrentConfig) ? (mCurrentConfig->mDrawType >> 1) & 1 : false;
-		if (doBox) {
+		if (isLoadingBlack()) {
 			u32 y    = System::getRenderModeObj()->efbHeight;
 			u32 x    = System::getRenderModeObj()->fbWidth;
 			f32 zero = 0.0f;
@@ -1156,16 +928,13 @@ void MoviePlayer::drawLoading(Graphics& gfx)
 void MoviePlayer::skip()
 {
 	setFlag(MVP_IsFinished);
-	mDemoState = 6;
+	mDemoState = DEMOSTATE_Finishing;
 	mFadeTimer = 2.0f;
 	mCanFinish = false;
 	gameSystem->startFadeout(1.0f);
 	mDemoPSM->onDemoFadeoutStart(30);
 	gameSystem->setPause(true, "moviePl:skip", 0);
-
-	// oh, thats nasty
-	while (mStudioControl->mObjectContainer.Iterator_isEnd_(
-	    *(JGadget::TNodeLinkList::const_iterator*)&mStudioControl->mObjectContainer.begin())) { }
+	mStudioControl->stopAllObjects();
 
 	/*
 	stwu     r1, -0x40(r1)

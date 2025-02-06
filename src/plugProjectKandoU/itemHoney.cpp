@@ -23,12 +23,12 @@ Mgr* mgr;
 void FSM::init(CFSMItem*)
 {
 	create(HONEY_StateCount);
-	registerState(new FallState());
-	registerState(new BounceState());
-	registerState(new WaitState());
-	registerState(new ShrinkState());
-	registerState(new TouchState());
-	registerState(new DemoState());
+	registerState(new FallState);
+	registerState(new BounceState);
+	registerState(new WaitState);
+	registerState(new ShrinkState);
+	registerState(new TouchState);
+	registerState(new DemoState);
 }
 
 /**
@@ -432,7 +432,7 @@ bool Item::absorbable()
 void Item::onKeyEvent(const SysShape::KeyEvent& keyEvent)
 {
 	if (getCurrState()) {
-		static_cast<State*>(getCurrState())->onKeyEvent(this, keyEvent);
+		static_cast<CItemState*>(getCurrState())->onKeyEvent(this, keyEvent);
 	}
 }
 
@@ -549,7 +549,7 @@ void Mgr::onLoadResources()
 {
 	sys->heapStatusStart("itemHoney", nullptr);
 	loadArchive("arc.szs");
-	loadBmd("mitu.bmd", 0, 0x20000);
+	loadBmd("mitu.bmd", 0, J3DMODEL_CreateNewDL);
 	(*mModelData)->newSharedDisplayList(0x40000);
 	JKRArchive* arc = openTextArc("texts.szs");
 	loadAnimMgr(arc, "honeyAnimMgr.txt");
@@ -562,7 +562,7 @@ void Mgr::onLoadResources()
  * @note Address: 0x801D41E4
  * @note Size: 0x2C
  */
-Item* Mgr::birth() { return mMonoObjectMgr.birth(); }
+Item* Mgr::birth() { return FixedSizeItemMgr<Item>::birth(); }
 
 /**
  * @note Address: 0x801D4210

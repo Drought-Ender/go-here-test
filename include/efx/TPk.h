@@ -8,12 +8,13 @@
 #include "efx/Toe.h"
 #include "BitFlag.h"
 
-#define PKEFF_Light (0x1)
-#define PKEFF_Doped (0x2)
-#define PKEFF_Fire  (0x4)
-#define PKEFF_Gas   (0x8)
-#define PKEFF_Water (0x10)
-#define PKEFF_Drown (0x20)
+#define PKEFF_Light       (0x1)
+#define PKEFF_Doped       (0x2)
+#define PKEFF_Fire        (0x4)
+#define PKEFF_Gas         (0x8)
+#define PKEFF_Water       (0x10)
+#define PKEFF_Drown       (0x20)
+#define PKEFF_InMovieDraw (0x80000000)
 
 namespace efx {
 void createSimplePkAp(Vector3f&);
@@ -157,8 +158,7 @@ struct TPkNageBlur : public TChaseMtx {
 };
 
 // Needed for dtor
-struct PtrlistContext : public JSUPtrList {
-};
+struct PtrlistContext : public JSUPtrList { };
 
 struct TPkOneEmitterSimple : public TBase, public JPAEmitterCallBack {
 	// vtable 1 (TBase)
@@ -200,10 +200,10 @@ struct TPkOneEmitterSimple : public TBase, public JPAEmitterCallBack {
 struct TPkEffectTane {
 	TPkEffectTane()
 	    : mPikiColor(-1)
-	    , mPos(nullptr)
-	    , _08(nullptr)
-	    , _0C(nullptr)
-	    , _10(nullptr)
+	    , mEfxPos(nullptr)
+	    , mObjPos(nullptr)
+	    , mHappaJntMtx(nullptr)
+	    , mObjMatrix(nullptr)
 	{
 	}
 
@@ -215,24 +215,24 @@ struct TPkEffectTane {
 	void createGlow1_(Vector3f*);
 	void killGlow1_();
 
-	int mPikiColor;      // _00
-	Vector3f* mPos;      // _04, unknown
-	Vector3f* _08;       // _08
-	Matrixf* _0C;        // _0C
-	Matrixf* _10;        // _10
-	TPkGlow1 mGlow;      // _14
-	ToeTanekira mOeKira; // _28
-	ToeKourin mOeKourin; // _44
+	int mPikiColor;        // _00
+	Vector3f* mEfxPos;     // _04
+	Vector3f* mObjPos;     // _08
+	Matrixf* mHappaJntMtx; // _0C
+	Matrixf* mObjMatrix;   // _10
+	TPkGlow1 mGlow;        // _14
+	ToeTanekira mOeKira;   // _28
+	ToeKourin mOeKourin;   // _44
 };
 
 struct TPkEffect {
 	TPkEffect()
 	    : mPikiColor(-1)
-	    , _0C(nullptr)
+	    , mStemPosition(nullptr)
 	    , mHamonPosPtr(nullptr)
-	    , _14(nullptr)
-	    , _18(nullptr)
-	    , _1C(nullptr)
+	    , mAltStemPosition(nullptr)
+	    , mHappaJointMtx(nullptr)
+	    , mBaseObjMatrix(nullptr)
 	    , mHeight(nullptr)
 	    , mMoeSmokeTimer(0)
 	{
@@ -288,20 +288,61 @@ struct TPkEffect {
 		killHamonB_();
 	}
 
+	// for start of cutscene, disable all effects
+	inline void killAllEffects()
+	{
+		if (!isFlag(PKEFF_InMovieDraw)) {
+			mBackupFlags.typeView = mFlags.typeView;
+			mFlags.clear();
+			setFlag(PKEFF_InMovieDraw);
+		}
+
+		mNageBlur.forceKill();
+		mMoeA.forceKill();
+		mBlackDown.forceKill();
+		killKourin_();
+		killDoping_();
+		killNage_();
+		killMoe_();
+		killChudoku_();
+		killMoeSmoke_();
+		killBlackDown_();
+		killWater_();
+		killHamonA_();
+		killHamonB_();
+	}
+
 	inline void doDead()
 	{
-		clear();
+		killAllEffects();
 		createSimpleDead(*mHamonPosPtr, mPikiColor);
 	}
 
-	inline void doWaterEntry()
+	inline void doWaterEntry(bool flag)
 	{
-		bool flag = isFlag(PKEFF_Drown);
 		setFlag(PKEFF_Drown);
 		updateHamon_();
 		if (!flag) {
 			createSimpleDive(mHamonPosition);
 		}
+	}
+
+	inline void doCreateWater()
+	{
+		setFlag(PKEFF_Water);
+		createWater_(mAltStemPosition);
+	}
+
+	inline void doCreateChudoku()
+	{
+		setFlag(PKEFF_Gas);
+		createChudoku_(mStemPosition);
+	}
+
+	inline void doCreateMoe()
+	{
+		setFlag(PKEFF_Fire);
+		createMoe_(mStemPosition);
 	}
 
 	inline void doWaterExit()
@@ -314,7 +355,7 @@ struct TPkEffect {
 	inline void doDoping()
 	{
 		setFlag(PKEFF_Doped);
-		createDoping_(_0C);
+		createDoping_(mStemPosition);
 		killKourin_();
 	}
 
@@ -323,7 +364,7 @@ struct TPkEffect {
 		resetFlag(PKEFF_Doped);
 		killDoping_();
 		if (isFlag(PKEFF_Light)) {
-			createKourin_(_0C);
+			createKourin_(mStemPosition);
 		}
 	}
 
@@ -331,7 +372,7 @@ struct TPkEffect {
 	{
 		setFlag(PKEFF_Light);
 		if (!isFlag(PKEFF_Doped)) {
-			createKourin_(_0C);
+			createKourin_(mStemPosition);
 		}
 	}
 
@@ -341,37 +382,51 @@ struct TPkEffect {
 		killKourin_();
 	}
 
-	inline void setMovieDraw()
+	// for following movie draw, recreate all active effects
+	inline void createAllEffects()
 	{
-		doKillDoping();
-		doDoping();
-		// needs a lot more
+		if (isFlag(PKEFF_InMovieDraw)) {
+			mFlags.typeView = mBackupFlags.typeView;
+			resetFlag(PKEFF_InMovieDraw);
+		}
+
+		if (isFlag(PKEFF_Light))
+			doLightEffect();
+		if (isFlag(PKEFF_Doped))
+			doDoping();
+		if (isFlag(PKEFF_Fire))
+			doCreateMoe();
+		if (isFlag(PKEFF_Gas))
+			doCreateChudoku();
+		if (isFlag(PKEFF_Water))
+			doCreateWater();
+		if (isFlag(PKEFF_Drown))
+			doWaterEntry(isFlag(PKEFF_Drown));
 	}
 
-	BitFlag<u32> mFlags;       // _00
-	BitFlag<u32> mBackupFlags; // _04
-	int mPikiColor;            // _08, kourin color?
-	Vector3f* _0C;             // _0C, kourin position?
-	Vector3f* mHamonPosPtr;    // _10
-	Vector3f* _14;             // _14
-	Matrixf* _18;              // _18
-	Matrixf* _1C;              // _1C
-	f32* mHeight;              // _20, unknown
-	int mMoeSmokeTimer;        // _24, unknown
-	Vector3f mHamonPosition;   // _28, dive vector?
-	TPkNageBlur mNageBlur;     // _34
-	TPkMoeA mMoeA;             // _48
-	TPkBlackDown mBlackDown;   // _5C
-	ToeKourin mOeKourin;       // _70
-	// u8 _8C[4];                 // _8C, unknown
-	ToeDoping mOeDoping;     // _90
-	ToeNagekira mOeNagekira; // _AC
-	ToeMoeBC mOeMoeBC;       // _C8
-	ToeChudoku mOeChudoku;   // _100
-	ToeWater mOeWater;       // _11C
-	ToeHamonA mOeHamonA;     // _154
-	ToeHamonB mOeHamonB;     // _170
-	ToeMoeSmoke mOeMoeSmoke; // _18C
+	BitFlag<u32> mFlags;        // _00
+	BitFlag<u32> mBackupFlags;  // _04
+	int mPikiColor;             // _08, kourin color?
+	Vector3f* mStemPosition;    // _0C, kourin position?
+	Vector3f* mHamonPosPtr;     // _10
+	Vector3f* mAltStemPosition; // _14, used for some effects
+	Matrixf* mHappaJointMtx;    // _18
+	Matrixf* mBaseObjMatrix;    // _1C
+	f32* mHeight;               // _20, unknown
+	int mMoeSmokeTimer;         // _24, unknown
+	Vector3f mHamonPosition;    // _28, dive vector?
+	TPkNageBlur mNageBlur;      // _34
+	TPkMoeA mMoeA;              // _48
+	TPkBlackDown mBlackDown;    // _5C
+	ToeKourin mOeKourin;        // _70
+	ToeDoping mOeDoping;        // _90
+	ToeNagekira mOeNagekira;    // _AC
+	ToeMoeBC mOeMoeBC;          // _C8
+	ToeChudoku mOeChudoku;      // _100
+	ToeWater mOeWater;          // _11C
+	ToeHamonA mOeHamonA;        // _154
+	ToeHamonB mOeHamonB;        // _170
+	ToeMoeSmoke mOeMoeSmoke;    // _18C
 };
 
 struct TPkEffectMgr : public JKRDisposer {
@@ -473,9 +528,9 @@ struct TParticleCallBack_Yodare {
 	void init(JPABaseEmitter*, JPABaseParticle*);
 	void execute(JPABaseEmitter*, JPABaseParticle*);
 
-	f32 _00;   // _00, just to match efxPikmin sdata2 loading
-	char* _04; // _04, just to match efxPikmin sdata2 loading
-	f32 _08;   // _08, just to match efxPikmin sdata2 loading
+	f32 _00;     // _00, just to match efxPikmin sdata2 loading
+	char* mName; // _04, just to match efxPikmin sdata2 loading
+	f32 _08;     // _08, just to match efxPikmin sdata2 loading
 };
 
 struct TTestYodareGen {

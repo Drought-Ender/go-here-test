@@ -25,12 +25,15 @@ struct TNode : public DNode {
 
 	inline int getNextIndex(int a, int b)
 	{
-		if (mQuantity < 0) {
-			return 0;
+		// this whole thing is wrong and may or may not need to exist
+		if (mPokoValue < 0) {
+			return mLostNum;
 		} else {
-			return (a + b) * mQuantity;
+			return (a + b);
 		}
 	}
+
+	inline u64 getTag() const { return mMesgTag; }
 
 	// _00     = VTBL
 	// _00-_2C = DNode

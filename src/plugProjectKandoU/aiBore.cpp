@@ -138,7 +138,7 @@ void ActRest::init(ActionArg* arg)
 {
 	mState = REST_Start;
 	sitDown();
-	mTimer = randFloat() * 4.0f + 5.0f; // 4-9s
+	mTimer = randFloat() * 4.0f + 5.0f; // 5-9s
 	mFlag.clear();
 	mParent->mAnimSpeed = 30.0f;
 }
@@ -191,18 +191,13 @@ int ActRest::exec()
 		return ACTEXEC_Success;
 	}
 
-	mParent->mVelocity = Vector3f(0.0f);
+	mParent->mTargetVelocity = Vector3f(0.0f);
 
 	if (mParent->getAnimSpeed() == 0.0f) {
 		mParent->mAnimSpeed = 30.0f;
 	}
 
-	int animIdx;
-	if (mParent->mAnimator.mSelfAnimator.mAnimInfo) {
-		animIdx = mParent->mAnimator.mSelfAnimator.mAnimInfo->mId;
-	} else {
-		animIdx = Game::IPikiAnims::NULLANIM;
-	}
+	int animIdx = mParent->mAnimator.mSelfAnimator.getAnimIndex();
 
 	if (animIdx != Game::IPikiAnims::NERU && animIdx != Game::IPikiAnims::SUWARU) {
 		return ACTEXEC_Fail;
@@ -217,13 +212,13 @@ int ActRest::exec()
 			return ACTEXEC_Success;
 		}
 
-		if (mParent->mAnimator.mSelfAnimator.mFlags & 1) {
+		if (mParent->mAnimator.mSelfAnimator.isFlag(SysShape::Animator::AnimCompleted)) {
 			resetFlag(RESTFLAG_IsIdle);
 			if (mState == REST_Sleep) {
 				mState = REST_Sit;
 				mParent->startMotion(Game::IPikiAnims::SUWARU, Game::IPikiAnims::SUWARU, this, nullptr);
-				mParent->mAnimator.mSelfAnimator.setFrameByKeyType(KEYEVENT_NULL);
-				mParent->mAnimator.mBoundAnimator.setFrameByKeyType(KEYEVENT_NULL);
+				mParent->mAnimator.mSelfAnimator.setFrameByKeyType(KEYEVENT_LOOP_START);
+				mParent->mAnimator.mBoundAnimator.setFrameByKeyType(KEYEVENT_LOOP_START);
 			}
 		}
 		return ACTEXEC_Continue;
@@ -260,7 +255,7 @@ void ActRest::cleanup() { }
 void ActRest::onKeyEvent(SysShape::KeyEvent const& event)
 {
 	switch (event.mType) {
-	case KEYEVENT_1:
+	case KEYEVENT_LOOP_END:
 		break;
 
 	case KEYEVENT_200:
@@ -282,8 +277,8 @@ void ActRest::onKeyEvent(SysShape::KeyEvent const& event)
 				resetFlag(RESTFLAG_IsIdle);
 				mState = REST_Sit;
 				mParent->startMotion(Game::IPikiAnims::SUWARU, Game::IPikiAnims::SUWARU, this, nullptr);
-				mParent->mAnimator.mSelfAnimator.setFrameByKeyType(KEYEVENT_NULL);
-				mParent->mAnimator.mBoundAnimator.setFrameByKeyType(KEYEVENT_NULL);
+				mParent->mAnimator.mSelfAnimator.setFrameByKeyType(KEYEVENT_LOOP_START);
+				mParent->mAnimator.mBoundAnimator.setFrameByKeyType(KEYEVENT_LOOP_START);
 				break;
 			}
 		}

@@ -78,7 +78,7 @@ struct Obj : public EnemyBase {
 	// _00-_2B8	= EnemyBase
 	FSM* mFsm;                          // _2BC
 	WalkSmokeEffect::Mgr mWalkSmokeMgr; // _2C0
-	f32 _2C8;                           // _2C8
+	f32 mUnusedValue;                   // _2C8
 	StateID mNextState;                 // _2CC
 	MouthSlots mMouthSlots;             // _2D0
 	Vector3f mTargetParentPosition;     // _2D8
@@ -107,7 +107,7 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mPoisonDamage(this, 'fp01', "”’ƒsƒNƒ~ƒ“", 300.0f, 0.0f, 10000.0f) // 'white pikmin'
+		    , mPoisonDamage(this, 'fp01', "ç™½ãƒ”ã‚¯ãƒŸãƒ³", 300.0f, 0.0f, 10000.0f) // 'white pikmin'
 		{
 		}
 

@@ -125,6 +125,9 @@ struct PlayCommonData {
 namespace CommonSaveData {
 // Size: 0x48
 struct Mgr : public PlayCommonData {
+
+	enum Flags { SaveFlag_SerialNoSet = 1 };
+
 	enum SoundMode { SM_Mono = 0, SM_Stereo = 1, SM_SurroundSound = 2 };
 	Mgr();
 
@@ -146,13 +149,13 @@ struct Mgr : public PlayCommonData {
 	void setDeflicker();
 	void setDeflicker(bool);
 
-	int _18;             // _18
+	int mSaveCount;      // _18, how many times the game has been saved, doesn't seem to have a purpose
 	u32 mTime;           // _1C
 	char mFileIndex;     // _20
 	char padding;        // _21
 	u16 _22;             // _22
 	u32 _24;             // _24
-	u32 _28;             // _28
+	u32 mSaveSlotIndex;  // _28
 	u32 _2C;             // _2C
 	u64 mCardSerialNo;   // _30
 	u8 mSoundMode;       // _38, TODO: Replace with Soundmode enum
@@ -164,7 +167,7 @@ struct Mgr : public PlayCommonData {
 	u8 mRegion;          // _3E
 	char _3F;            // _3F
 	BitFlag<u16> mFlags; // _40
-	bool mChallengeOpen; // _42
+	bool mDoSaveOptions; // _42
 	u32 _44;             // _44
 };
 } // namespace CommonSaveData

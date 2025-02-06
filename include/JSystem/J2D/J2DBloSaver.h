@@ -15,12 +15,9 @@ struct J2DMaterial_SaveBlock {
 
 struct J2DBloSaver {
 	// NB: almost all of this is stripped
-	struct ResFONTName {
-	};
-	struct ResTIMGName {
-	};
-	struct MaterialName {
-	};
+	struct ResFONTName { };
+	struct ResTIMGName { };
+	struct MaterialName { };
 
 	struct CTextureNameConnect {
 		struct TNC {
@@ -33,6 +30,8 @@ struct J2DBloSaver {
 			TNC* mNext;              // _08
 		};
 
+		CTextureNameConnect() { mElements = nullptr; }
+
 		~CTextureNameConnect();
 		void set(const ResTIMG* img, const char* name);
 		void clear();
@@ -40,7 +39,7 @@ struct J2DBloSaver {
 		TNC* mElements; // _00
 	};
 
-	static CTextureNameConnect* TextureNameConnect;
+	static CTextureNameConnect TextureNameConnect;
 
 	// unused/stripped functions (to spawn weak functions):
 	void writeMaterialBlock(const MaterialName*, J2DMaterial**, u16, const ResTIMGName*, u16);

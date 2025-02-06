@@ -19,24 +19,24 @@ namespace Screen {
  */
 AnimBaseBase::AnimBaseBase()
 {
-	mType         = 0;
-	mCurrentFrame = 0.0f;
-	mLastFrame    = 1.0f;
-	mSpeed        = 1.0f;
-	_24           = 1.0f;
-	mIsRepeating  = true;
-	_39           = false;
-	_2C           = 0.0f;
-	mArea         = 1.0f;
-	_34           = mArea - _2C;
-	_28           = sys->mDeltaTime / SINGLE_FRAME_LENGTH;
-	mAnm          = nullptr;
-	mResourcePath = nullptr;
-	_08           = false;
-	_0C           = 0.0f;
-	_10           = 1;
-	mAlpha        = 255;
-	mDoSetAlpha   = 0;
+	mType           = 0;
+	mCurrentFrame   = 0.0f;
+	mLastFrame      = 1.0f;
+	mSpeed          = 1.0f;
+	mSpeedSub       = 1.0f;
+	mIsRepeating    = true;
+	mUnusedFlag     = false;
+	mMinFrame       = 0.0f;
+	mArea           = 1.0f;
+	mLength         = mArea - mMinFrame;
+	mDeltaTime      = sys->mDeltaTime / SINGLE_FRAME_LENGTH;
+	mAnm            = nullptr;
+	mResourcePath   = nullptr;
+	mIsInStartDelay = false;
+	mTimer          = 0.0f;
+	mDoDelayUpdate  = 1;
+	mAlpha          = 255;
+	mDoSetAlpha     = 0;
 }
 
 /**
@@ -45,11 +45,11 @@ AnimBaseBase::AnimBaseBase()
  */
 void AnimBaseBase::setArea(f32 frame, f32 area)
 {
-	_2C           = frame;
-	mArea         = area;
-	_34           = area - frame;
-	mCurrentFrame = frame;
-	_10           = 1;
+	mMinFrame      = frame;
+	mArea          = area;
+	mLength        = area - frame;
+	mCurrentFrame  = frame;
+	mDoDelayUpdate = 1;
 }
 
 /**
@@ -66,13 +66,13 @@ void AnimBaseBase::init(JKRArchive* archive, char* resourcePath)
 	JUT_ASSERTLINE(87, resource, "no name resource (%s) \n", resourcePath);
 	mAnm = J2DAnmLoaderDataBase::load(resource);
 
-	mLastFrame = mAnm->mFrameLength - 1;
-	_2C        = 0.0f;
-	mArea      = mLastFrame;
-	_34        = mArea - _2C;
-	_08        = false;
-	_0C        = 0.0f;
-	_10        = 1;
+	mLastFrame      = mAnm->getFrameMax() - 1;
+	mMinFrame       = 0.0f;
+	mArea           = mLastFrame;
+	mLength         = mArea - mMinFrame;
+	mIsInStartDelay = false;
+	mTimer          = 0.0f;
+	mDoDelayUpdate  = 1;
 
 	OSInitFastCast();
 }
@@ -83,8 +83,8 @@ void AnimBaseBase::init(JKRArchive* archive, char* resourcePath)
  */
 void AnimBaseBase::start(f32 p1)
 {
-	_08 = true;
-	_0C = p1;
+	mIsInStartDelay = true;
+	mTimer          = p1;
 }
 
 /**
@@ -104,36 +104,36 @@ bool AnimBaseBase::updateSub()
 {
 	bool result = true;
 
-	_39 = false;
-	if (_10 != 0) {
-		_10 = 0;
+	mUnusedFlag = false;
+	if (mDoDelayUpdate != 0) {
+		mDoDelayUpdate = 0;
 	} else {
-		mCurrentFrame += mSpeed * _28 * _24;
+		mCurrentFrame += mSpeed * mDeltaTime * mSpeedSub;
 		if (mCurrentFrame > mArea) {
 			if (mIsRepeating) {
 				f32 temp = mCurrentFrame - mArea;
-				if (temp >= _34) {
+				if (temp >= mLength) {
 					temp = 0.0f;
 				}
 
-				mCurrentFrame = _2C + temp;
-				_39           = true;
+				mCurrentFrame = mMinFrame + temp;
+				mUnusedFlag   = true;
 			} else {
 				mCurrentFrame = mArea;
 				moveAnim();
 				result = false;
 			}
-		} else if (mCurrentFrame < _2C) {
+		} else if (mCurrentFrame < mMinFrame) {
 			if (mIsRepeating) {
-				f32 temp = _2C - mCurrentFrame;
-				if (temp >= _34) {
+				f32 temp = mMinFrame - mCurrentFrame;
+				if (temp >= mLength) {
 					temp = 0.0f;
 				}
 
 				mCurrentFrame = mArea - temp;
-				_39           = true;
+				mUnusedFlag   = true;
 			} else {
-				mCurrentFrame = _2C;
+				mCurrentFrame = mMinFrame;
 				moveAnim();
 				result = false;
 			}
@@ -155,11 +155,11 @@ bool AnimBaseBase::updateSub()
  */
 bool AnimBaseBase::update()
 {
-	if (_08) {
-		_0C -= sys->mDeltaTime;
-		if (_0C <= 0.0f) {
-			_08 = false;
-			_0C = 0.0f;
+	if (mIsInStartDelay) {
+		mTimer -= sys->mDeltaTime;
+		if (mTimer <= 0.0f) {
+			mIsInStartDelay = false;
+			mTimer          = 0.0f;
 			start();
 		}
 
@@ -203,9 +203,9 @@ void AnimScreen::init(JKRArchive* archive, J2DScreen* screen, char* resourcePath
 void AnimScreen::start()
 {
 	if (mScreen) {
-		_08 = false;
-		_0C = 0.0f;
-		_10 = 1;
+		mIsInStartDelay = false;
+		mTimer          = 0.0f;
+		mDoDelayUpdate  = 1;
 		update();
 	}
 }
@@ -216,7 +216,7 @@ void AnimScreen::start()
  */
 void AnimScreen::moveAnim()
 {
-	mAnm->mCurrentFrame = mCurrentFrame;
+	mAnm->setFrame(mCurrentFrame);
 	mScreen->animation();
 	if (mDoSetAlpha != 0) {
 		mScreen->setAlpha(mAlpha);
@@ -256,9 +256,9 @@ void AnimPane::init(JKRArchive* archive, J2DScreen* parentScreen, u64 tag, char*
 void AnimPane::start()
 {
 	if (mPane) {
-		_08 = false;
-		_0C = 0.0f;
-		_10 = 1;
+		mIsInStartDelay = false;
+		mTimer          = 0.0f;
+		mDoDelayUpdate  = 1;
 		update();
 	}
 }
@@ -271,7 +271,7 @@ void AnimPane::start()
  */
 void AnimPane::moveAnim()
 {
-	mAnm->mCurrentFrame = mCurrentFrame;
+	mAnm->setFrame(mCurrentFrame);
 	mPane->animationTransform();
 	if (mDoSetAlpha != 0) {
 		mPane->setAlpha(mAlpha);
@@ -294,10 +294,10 @@ AnimGroup::AnimGroup(int limit)
 		mAnimPanes[i] = nullptr;
 	}
 
-	_0C = 0;
-	_10 = 0.0f;
-	_14 = 0.0f;
-	_18 = 0.0f;
+	mNeedRestart = 0;
+	_10          = 0.0f;
+	mMinFrame    = 0.0f;
+	mMaxFrame    = 0.0f;
 }
 
 /* setAnim__Q32og6Screen9AnimGroup
@@ -346,10 +346,10 @@ bool AnimGroup::update()
 	}
 
 	// TODO: Fix naming of getVal inline when we know what _10 is in AnimGroup
-	if (_0C && (int)getFrame() == (int)getVal()) {
-		setArea(_14, _18);
+	if (mNeedRestart && (int)getFrame() == (int)getVal()) {
+		setArea(mMinFrame, mMaxFrame);
 		start();
-		_0C = 0;
+		mNeedRestart = false;
 	}
 
 	return anyUpdated;
@@ -369,8 +369,6 @@ void AnimGroup::setSpeed(f32 speed)
 				break;
 			case 2:
 				mAnimPanes[i]->mSpeed = speed;
-				break;
-			default:
 				break;
 			}
 		}
@@ -392,8 +390,6 @@ void AnimGroup::setRepeat(bool repeat)
 			case 2:
 				mAnimPanes[i]->mIsRepeating = repeat;
 				break;
-			default:
-				break;
 			}
 		}
 	}
@@ -413,8 +409,6 @@ void AnimGroup::setFrame(f32 frame)
 				break;
 			case 2:
 				mAnimPanes[i]->mCurrentFrame = frame;
-				break;
-			default:
 				break;
 			}
 		}
@@ -448,9 +442,9 @@ void AnimGroup::setAllArea()
 		AnimBaseBase* pane = mAnimPanes[i];
 
 		if (pane) {
-			pane->_2C   = 0.0f;
-			pane->mArea = pane->mLastFrame;
-			pane->_34   = pane->mArea - pane->_2C;
+			pane->mMinFrame = 0.0f;
+			pane->mArea     = pane->mLastFrame;
+			pane->mLength   = pane->mArea - pane->mMinFrame;
 		}
 	}
 }
@@ -476,18 +470,16 @@ f32 AnimGroup::getFrame()
  * @note Address: 0x80305830
  * @note Size: 0x88
  */
-void AnimGroup::setArea(f32 frame, f32 area)
+void AnimGroup::setArea(f32 min, f32 max)
 {
 	for (int i = 0; i < mPaneLimit; i++) {
 		if (mAnimPanes[i]) {
 			switch (mAnimPanes[i]->mType) {
 			case 1:
-				mAnimPanes[i]->setArea(frame, area);
+				mAnimPanes[i]->setArea(min, max);
 				break;
 			case 2:
-				mAnimPanes[i]->setArea(frame, area);
-				break;
-			default:
+				mAnimPanes[i]->setArea(min, max);
 				break;
 			}
 		}
@@ -511,8 +503,6 @@ void AnimGroup::start()
 			case 2:
 				mAnimPanes[i]->start();
 				break;
-			default:
-				break;
 			}
 		}
 	}
@@ -522,12 +512,12 @@ void AnimGroup::start()
  * @note Address: 0x80305960
  * @note Size: 0x18
  */
-void AnimGroup::reservAnim(f32 p1, f32 p2, f32 p3)
+void AnimGroup::reservAnim(f32 p1, f32 min, f32 max)
 {
-	_0C = 1;
-	_10 = p1;
-	_14 = p2;
-	_18 = p3;
+	mNeedRestart = true;
+	_10          = p1;
+	mMinFrame    = min;
+	mMaxFrame    = max;
 }
 
 /**
@@ -549,11 +539,11 @@ f32 AnimGroup::getLastFrame()
  * @note Address: 0x80305998
  * @note Size: 0x254
  */
-void registAnimGroupScreen(AnimGroup* group, JKRArchive* archive, J2DScreen* screen, char* resourcePath, f32 p5)
+void registAnimGroupScreen(AnimGroup* group, JKRArchive* archive, J2DScreen* screen, char* resourcePath, f32 speed)
 {
-	AnimScreen* newGroupScreen = new AnimScreen();
+	AnimScreen* newGroupScreen = new AnimScreen;
 	newGroupScreen->init(archive, screen, resourcePath);
-	newGroupScreen->_24 = p5;
+	newGroupScreen->mSpeedSub = speed;
 	group->setAnim(newGroupScreen);
 }
 
@@ -561,11 +551,11 @@ void registAnimGroupScreen(AnimGroup* group, JKRArchive* archive, J2DScreen* scr
  * @note Address: 0x80305BEC
  * @note Size: 0x25C
  */
-void registAnimGroupPane(AnimGroup* group, JKRArchive* archive, J2DScreen* parentScreen, u64 tag, char* resourcePath, f32 p6)
+void registAnimGroupPane(AnimGroup* group, JKRArchive* archive, J2DScreen* parentScreen, u64 tag, char* resourcePath, f32 speed)
 {
-	AnimPane* newGroupPane = new AnimPane();
+	AnimPane* newGroupPane = new AnimPane;
 	newGroupPane->init(archive, parentScreen, tag, resourcePath);
-	newGroupPane->_24 = p6;
+	newGroupPane->mSpeedSub = speed;
 	group->setAnim(newGroupPane);
 }
 

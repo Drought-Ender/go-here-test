@@ -177,7 +177,7 @@ struct Matrixf {
 	 * @param other The matrix to be added.
 	 * @return A reference to the current matrix after addition.
 	 */
-	inline Matrixf& operator+(Matrixf& other)
+	inline Matrixf operator+(Matrixf& other)
 	{
 		Matrixf concatMtx;
 		PSMTXConcat(mMatrix.mtxView, other.mMatrix.mtxView, concatMtx.mMatrix.mtxView);
@@ -190,7 +190,7 @@ struct Matrixf {
 	 * @param other The matrix to subtract.
 	 * @return A reference to the current matrix after subtraction.
 	 */
-	inline Matrixf& operator-(Matrixf& other)
+	inline Matrixf operator-(Matrixf& other)
 	{
 		Matrixf result;
 		result.mMatrix.structView.xx = mMatrix.structView.xx - other.mMatrix.structView.xx;
@@ -215,10 +215,23 @@ struct Matrixf {
 	 */
 	inline void getColumn(int index, Vector3f& out)
 	{
-		out.x = mMatrix.mtxView[0][index];
-		out.y = mMatrix.mtxView[1][index];
-		out.z = mMatrix.mtxView[2][index];
+		out.x = operator()(0, index);
+		out.y = operator()(1, index);
+		out.z = operator()(2, index);
 	}
+
+	// for navi_demoCheck.cpp
+	// getBasis(0) is for the Right Vector
+	// getBasis(1) is for the Up Vector
+	// getBasis(2) is for the Forward Vector
+	inline void getBasis(int index, Vector3f& out)
+	{
+		out.x = operator()(0, index);
+		out.y = operator()(1, index);
+		out.z = operator()(2, index);
+	}
+
+	inline Vector3f getBasis(int index) { return Vector3f(operator()(0, index), operator()(1, index), operator()(2, index)); }
 
 	/**
 	 * @brief Retrieves the column vector at the specified index.
@@ -238,6 +251,13 @@ struct Matrixf {
 	 * @param in The vector to set the column to.
 	 */
 	inline void setColumn(int index, Vector3f& in)
+	{
+		mMatrix.mtxView[0][index] = in.x;
+		mMatrix.mtxView[1][index] = in.y;
+		mMatrix.mtxView[2][index] = in.z;
+	}
+
+	inline void setColumn(int index, const Vector3f& in)
 	{
 		mMatrix.mtxView[0][index] = in.x;
 		mMatrix.mtxView[1][index] = in.y;
@@ -280,6 +300,12 @@ struct Matrixf {
 	 */
 	inline Vector3f getRow(int index) { return Vector3f(mMatrix.mtxView[index][0], mMatrix.mtxView[index][1], mMatrix.mtxView[index][2]); }
 
+	inline f32 getRowLength(int index)
+	{
+		Vector3f row = getRow(index);
+		return row.length();
+	}
+
 	/**
 	 * @brief Sets the values of a specific row in the matrix.
 	 *
@@ -313,12 +339,13 @@ struct Matrixf {
 	 *
 	 * @param out The output vector to store the translation.
 	 */
-	inline void getTranslation(Vector3f& out) { getColumn(3, out); }
+	inline void getTranslation(Vector3f& out) { getBasis(3, out); }
 
 	/**
 	 * Returns the translation vector of the matrix.
 	 *
 	 * @return The translation vector.
+	 * @note Is this even used? Most calls seem to use the above return-through-parameter. This isn't even in the map.
 	 */
 	inline Vector3f getTranslation() { return getColumn(3); }
 
@@ -337,6 +364,13 @@ struct Matrixf {
 	 */
 	inline void newTranslation(Vector3f in) { setColumn(3, in); }
 
+	inline void getSoundPosition(Vector3f& soundPos, Vector3f& newPos)
+	{
+		newPos.set(-(soundPos.x * mMatrix.mtxView[0][0] + soundPos.y * mMatrix.mtxView[0][1] + soundPos.z * mMatrix.mtxView[0][2]),
+		           -(soundPos.x * mMatrix.mtxView[1][0] + soundPos.y * mMatrix.mtxView[1][1] + soundPos.z * mMatrix.mtxView[1][2]),
+		           -(soundPos.x * mMatrix.mtxView[2][0] + soundPos.y * mMatrix.mtxView[2][1] + soundPos.z * mMatrix.mtxView[2][2]));
+	}
+
 	/**
 	 * @brief Scales the matrix by a scalar value.
 	 *
@@ -352,7 +386,7 @@ struct Matrixf {
 	 * @param other The vector to be multiplied.
 	 * @return The resulting vector after multiplication.
 	 */
-	inline Vector3f mtxMult(Vector3f& other)
+	inline Vector3f mtxMult(const Vector3f& other)
 	{
 		Vector3f outVec;
 		PSMTXMultVec(this->mMatrix.mtxView, (Vec*)&other, (Vec*)&outVec);
@@ -430,6 +464,35 @@ struct Matrixf {
 		(*this)(2, 3) = pos.z;
 	}
 
+	inline void setTransformationMtx2(Vector3f& angle, Vector3f& translation)
+	{
+		Vector3f direction(1.0f, 0.0f, 0.0f);
+		Vector3f cross;
+		cross.x = direction.y * angle.z - direction.z * angle.y;
+		cross.y = direction.z * angle.x - direction.x * angle.z;
+		cross.z = direction.x * angle.y - direction.y * angle.x;
+
+		Vector3f cross2;
+		cross2.x = angle.y * cross.z - angle.z * cross.y;
+		cross2.y = angle.z * cross.x - angle.x * cross.z;
+		cross2.z = angle.x * cross.y - angle.y * cross.x;
+
+		(*this)(0, 0) = cross2.x;
+		(*this)(0, 1) = angle.x;
+		(*this)(0, 2) = cross.x;
+		(*this)(0, 3) = translation.x;
+
+		(*this)(1, 0) = cross2.y;
+		(*this)(1, 1) = angle.y;
+		(*this)(1, 2) = cross.y;
+		(*this)(1, 3) = translation.y;
+
+		(*this)(2, 0) = cross2.z;
+		(*this)(2, 1) = angle.z;
+		(*this)(2, 2) = cross.z;
+		(*this)(2, 3) = translation.z;
+	}
+
 	/**
 	 * @brief Calculates the scaled translation of a 2D vector using the current matrix.
 	 *
@@ -450,13 +513,6 @@ struct Matrixf {
 	 */
 	union {
 		Mtx mtxView; ///< A view of the matrix as a Mtx object.
-
-		// there is NO reason vecView should exist. TODO: Purge it.
-		struct {
-			f32 x[4];
-			f32 y[4];
-			f32 z[4];
-		} vecView; ///< A view of the matrix as three 4-element arrays.
 
 		struct {
 			f32 xx, yx, zx, tx;

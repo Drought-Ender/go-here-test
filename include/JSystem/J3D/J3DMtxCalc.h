@@ -17,12 +17,33 @@ struct J3DMtxCalc {
 	virtual J3DAnmTransform* getAnmTransform() { return nullptr; }   // _10
 	virtual void setAnmTransform(u8, J3DAnmTransform*) { }           // _14
 	virtual J3DAnmTransform* getAnmTransform(u8) { return nullptr; } // _18
-	virtual void setWeight(u8, f32) { }                              // _1C
+	virtual void setWeight(u8 index, f32 weight) { }                 // _1C
 	virtual f32 getWeight(u8) const { return 0.0f; }                 // _20
 	virtual void init(const Vec&, const Mtx&) = 0;                   // _24
 	virtual void calc()                       = 0;                   // _28
 
-	static void setMtxBuffer(J3DMtxBuffer* buffer) { mMtxBuffer = buffer; }
+	static void setMtxBuffer(J3DMtxBuffer* buffer)
+	{
+		// this needs to not inline - BY FORCE IF NECESSARY
+		// clang-format off
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		(void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0; (void*)0;
+		// clang-format on
+		mMtxBuffer = buffer;
+	}
 
 	static J3DMtxBuffer* getMtxBuffer() { return mMtxBuffer; }
 	static J3DJoint* getJoint() { return mJoint; }

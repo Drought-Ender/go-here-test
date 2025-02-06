@@ -8,6 +8,8 @@
 #include "JSystem/JGeometry.h"
 #include "JSystem/JKernel/JKRArchive.h"
 #include "JSystem/JSupport/JSUList.h"
+#include "JSystem/JAudio/JAI/JAIGlobalParameter.h"
+#include "JSystem/JAudio/JAI/JAInter/BankWave.h"
 #include "types.h"
 #include "Dolphin/mtx.h"
 
@@ -23,10 +25,10 @@ enum JAISoundTrackActiveFlags {
 	SOUNDACTIVE_Unk4                 = 1 << 3,  // 0x8
 	SOUNDACTIVE_Unk5                 = 1 << 4,  // 0x10
 	SOUNDACTIVE_Unk6                 = 1 << 5,  // 0x20
-	SOUNDACTIVE_ChannelVolume        = 1 << 6,  // 0x40
-	SOUNDACTIVE_ChannelPan           = 1 << 7,  // 0x80
-	SOUNDACTIVE_Unk9                 = 1 << 8,  // 0x100
-	SOUNDACTIVE_Unk10                = 1 << 9,  // 0x200
+	SOUNDACTIVE_TrackVolume          = 1 << 6,  // 0x40
+	SOUNDACTIVE_TrackPan             = 1 << 7,  // 0x80
+	SOUNDACTIVE_TrackDolby           = 1 << 8,  // 0x100
+	SOUNDACTIVE_TrackPitch           = 1 << 9,  // 0x200
 	SOUNDACTIVE_Unk11                = 1 << 10, // 0x400
 	SOUNDACTIVE_TrackFxmix           = 1 << 11, // 0x800
 	SOUNDACTIVE_TrackPortData        = 1 << 12, // 0x1000
@@ -50,16 +52,28 @@ struct StreamUpdateData;
 struct Actor;
 struct DummyVec;
 struct SeqUpdateData;
+
+enum SoundInfoFlags {
+	SOUNDFLAG_Unk0  = 1 << 0,  // 0x1
+	SOUNDFLAG_Unk1  = 1 << 1,  // 0x2
+	SOUNDFLAG_Unk2  = 1 << 2,  // 0x4
+	SOUNDFLAG_Unk3  = 1 << 3,  // 0x8
+	SOUNDFLAG_Unk4  = 1 << 4,  // 0x10
+	SOUNDFLAG_Unk5  = 1 << 5,  // 0x20
+	SOUNDFLAG_Unk6  = 1 << 6,  // 0x40
+	SOUNDFLAG_Unk7  = 1 << 7,  // 0x80
+	SOUNDFLAG_Unk8  = 1 << 8,  // 0x100
+	SOUNDFLAG_Unk19 = 1 << 19, // 0x80000
+};
+
 struct SoundInfo {
 	u32 mFlag;     // _00
 	u8 mPriority;  // _04
 	u8 _05;        // _05
 	u16 mOffsetNo; // _06
-	u32 mPitch;    // _08
-	union volume_t {
-		u32 w;
-		u8 c;
-	} mVolume; // _0C
+	f32 mPitch;    // _08
+	u8 mVolume;    // _0C
+	u8 mFxMix;     // _0D
 };
 
 struct LinkSound {
@@ -77,8 +91,10 @@ struct LinkSound {
 
 namespace SequenceMgr {
 struct CustomHeapInfo {
-	u32 _00; // _00, unknown
-	u32 _04; // _04, unknown
+	CustomHeapInfo() { }
+
+	u8* mFilePtr; // _00, unknown
+	u8 _04;       // _04, unknown
 };
 
 typedef JAInter::SequenceMgr::CustomHeapInfo (*CustomHeapCallback)(u32, u16, JAISequence*);
@@ -125,10 +141,17 @@ extern CustomHeapCallback customHeapCallback;
 struct Actor {
 	inline Actor(void* vec1, Vec* vec2, Vec* vec3, u32 unk)
 	{
-		mObj  = vec1;
-		mVec2 = vec2;
-		mVec3 = vec3;
-		mUnk  = unk;
+		// The use in ObjSound is close to this
+		// mObj              = (!vec1) ? vec2 : vec1;
+		// mVec2             = vec2;
+		// mVec3             = -1;
+		// mUnk              = 0;
+		// mFlag.boolView[0] = true;
+
+		mObj       = vec1;
+		mVec2      = vec2;
+		mVec3      = vec3;
+		mInfoIndex = unk;
 		if (mVec2 == nullptr) {
 			mFlag.boolView[0] = true;
 		} else {
@@ -136,10 +159,23 @@ struct Actor {
 		}
 	}
 
-	void* mObj; // _00
-	Vec* mVec2; // _04
-	Vec* mVec3; // _08
-	u32 mUnk;   // _0C (might be a pointer?)
+	inline Actor(void* vec1, u32 unk)
+	{
+		mObj       = vec1;
+		mVec2      = (Vec*)vec1;
+		mVec3      = (Vec*)vec1;
+		mInfoIndex = unk;
+		if (mVec2 == nullptr || (u32)vec1 == 0xFFFFFFFF) {
+			mFlag.boolView[0] = true;
+		} else {
+			mFlag.boolView[0] = false;
+		}
+	}
+
+	void* mObj;     // _00
+	Vec* mVec2;     // _04
+	Vec* mVec3;     // _08
+	u32 mInfoIndex; // _0C (might be a pointer?)
 	// bool mFlag; // _10
 	union {
 		bool boolView[4];
@@ -181,8 +217,7 @@ struct DummyObjectMgr {
 	static DummyObject* deadObjectObject;
 };
 
-struct DummyVec {
-};
+struct DummyVec { };
 
 struct HeapBlock {
 	HeapBlock();
@@ -199,22 +234,26 @@ struct HeapBlock {
 	void setUsedHeapID(u32 id) { mUsedHeapID = id; }
 
 	// need better names
-	u32 get0C() { return _0C; }
-	void set0C(u32 c) { _0C = c; }
+	u32 getHeapCount() { return mHeapCount; }
+	void setHeapCount(u32 c) { mHeapCount = c; }
 
 	u8 mStatus;      // _00
 	void* mPointer;  // _04
 	u32 mSoundID;    // _08
-	u32 _0C;         // _0C
+	u32 mHeapCount;  // _0C
 	u32 mUsedHeapID; // _10
 };
 
 struct MuteBit {
-	MuteBit();
+	MuteBit()
+	    : _00(false)
+	    , _02(false)
+	{
+	}
 
-	u8 _0 : 1; // JAInter::SystemInterface::outerInit breaks if this is bool.
-	u8 _1 : 1;
-	u8 _2 : 1;
+	u8 _00 : 1; // NB: NOT a bool
+	u8 _01 : 1;
+	u8 _02 : 1;
 };
 
 struct PlayerParameter {
@@ -225,15 +264,15 @@ struct PlayerParameter {
 		s16* ps16;
 	};
 
-	PlayerParameter();
-	~PlayerParameter();
+	PlayerParameter() { }
+	~PlayerParameter() { }
 
-	JASTrack* _00; // _00
+	JASTrack* mTrack; // _00
 	union {
 		PortArg asArray[11];
 		JASPortArgs asStruct;
-	} mPortArgs;    // _04
-	JASPortCmd _30; // _30
+	} mPortArgs;         // _04
+	JASPortCmd mCommand; // _30
 };
 
 struct SeParameter {
@@ -248,9 +287,8 @@ struct SeParameter {
 	{
 	}
 
-	u8 _00[0x20];                    // _00 - unknown
-	s16 _20;                         // _20
-	u8 _22[0x2];                     // _22 - possibly padding
+	u16 _00[16];                     // _00, possibly not this size but definitely an array at _00 of u16s
+	u16 _20;                         // _20
 	MoveParaSet _24[16];             // _24
 	MoveParaSet mVolumes[8];         // _124
 	MoveParaSetInitHalf mPans[8];    // _1A4
@@ -269,49 +307,74 @@ struct SeParameter {
 struct SeqUpdateData {
 	SeqUpdateData();
 
-	u8 mPauseMode;          // _00 - unknown
-	u8 _01;                 // _01 - unknown
-	u8 mPrepareFlag;        // _02
-	u8 _03;                 // _03 - could be padding
-	uint _04;               // _04
-	int mActiveTrackFlag;   // _08
-	f32 _0C;                // _0C
-	f32 _10;                // _10
-	f32 _14;                // _14
-	f32 _18;                // _18
-	f32 _1C;                // _1C
-	f32 _20;                // _20
-	f32* _24;               // _24
-	f32* _28;               // _28
-	f32* _2C;               // _2C
-	f32* _30;               // _30
-	f32* _34;               // _34
-	u8 _38[8];              // _38 - unknown
-	u8* _40;                // _40
-	u32* _44;               // _44
-	JAISequence* mSequence; // _48
-	PlayerParameter* _4C;   // _4C - pointer to array of 33 parameters
+	void init()
+	{
+		mSeqVolume = 1.0f;
+		mSeqPan    = 0.5f;
+		mSeqPitch  = 1.0f;
+		mSeqFxmix  = 0.0f;
+		mSeqDolby  = 0.0f;
+		mSeqTempo  = 1.0f;
+		for (u32 j = 0; j < JAIGlobalParameter::getParamSeqTrackMax(); j++) {
+			mTrackVolumes[j] = 1.0f;
+			mTrackPans[j]    = 64.0f;
+			mTrackPitches[j] = 1.0f;
+			mTrackFxmixes[j] = 0.0f;
+			mTrackDolbys[j]  = 0.0f;
+			_44[j]           = 0;
+		}
+	}
+
+	inline JAISequence* getSequence() const { return mSequence; }
+
+	u8 mPauseMode;                  // _00
+	u8 mPauseVolume;                // _01
+	u8 mPrepareFlag;                // _02
+	u8 _03;                         // _03
+	u32 _04;                        // _04
+	u32 mActiveTrackFlag;           // _08
+	f32 mSeqVolume;                 // _0C
+	f32 mSeqPitch;                  // _10
+	f32 mSeqFxmix;                  // _14
+	f32 mSeqPan;                    // _18
+	f32 mSeqDolby;                  // _1C
+	f32 mSeqTempo;                  // _20
+	f32* mTrackVolumes;             // _24, length seqTrackMax
+	f32* mTrackPitches;             // _28, length seqTrackMax
+	f32* mTrackFxmixes;             // _2C, length seqTrackMax
+	f32* mTrackPans;                // _30, length seqTrackMax
+	f32* mTrackDolbys;              // _34, length seqTrackMax
+	u8 _38[8];                      // _38, unknown
+	u8* mFilePtr;                   // _40, pointer to a data file loaded in by getSeqData
+	u32* _44;                       // _44, length seqTrackMax + 1
+	JAISequence* mSequence;         // _48
+	PlayerParameter* mPlayerParams; // _4C, pointer to array of 33 parameters
 };
 
-struct SeqParameter : public MoveParaSet {
+struct SeqParameter {
 	~SeqParameter();
 
 	void init();
 
-	// _00-_10 = MoveParaSet
+	inline JASTrack* getTrack() { return &mTrack; }
+
+	// this name is made up, don't rely on it to name the member
+	inline u32 getSceneFlag() const { return _27C; }
+
+	MoveParaSet mTempo;                 // _00
 	MoveParaSet _10[16];                // _10
 	MoveParaSet mVolumes[20];           // _110
-	MoveParaSet* mPans;                 // _250
-	MoveParaSet* mPitches;              // _254
-	MoveParaSet* mFxmixes;              // _258
-	MoveParaSet* mDolbys;               // _25C
-	MoveParaSet* _260;                  // _260
-	MoveParaSetInitHalf* _264;          // _264
-	MoveParaSet* _268;                  // _268
-	MoveParaSetInitZero* mTrackFxmixes; // _26C
-	MoveParaSetInitZero* mTrackDolbys;  // _270
-	u16** _274;                         // _274
-	u8 _278;                            // _278 - auto heap index?
+	MoveParaSet* mPans;                 // _250, length seqParameterLines
+	MoveParaSet* mPitches;              // _254, length seqParameterLines
+	MoveParaSet* mFxmixes;              // _258, length seqParameterLines
+	MoveParaSet* mDolbys;               // _25C, length seqParameterLines
+	MoveParaSet* mTrackVolumes;         // _260, length seqTrackMax
+	MoveParaSetInitHalf* mTrackPans;    // _264, length seqTrackMax
+	MoveParaSet* mTrackPitches;         // _268, length seqTrackMax
+	MoveParaSetInitZero* mTrackFxmixes; // _26C, length seqTrackMax
+	MoveParaSetInitZero* mTrackDolbys;  // _270, length seqTrackMax
+	u16** _274;                         // _274, length 16 x seqTrackMax
+	u8 mHeapIndex;                      // _278
 	u8 mPauseMode;                      // _279
 	s16 _27A;                           // _27A
 	u32 _27C;                           // _27C
@@ -321,16 +384,16 @@ struct SeqParameter : public MoveParaSet {
 	u32 mPitchFlags;                    // _28C
 	u32 mFxmixFlags;                    // _290
 	u32 mDolbyFlags;                    // _294
-	u32 _298;                           // _298
-	u32 _29C;                           // _29C
-	u32 _2A0;                           // _2A0
+	u32 mTrackVolumeFlag;               // _298
+	u32 mTrackPanFlag;                  // _29C
+	u32 mTrackPitchFlag;                // _2A0
 	u32 mTrackFxmixFlag;                // _2A4
-	u32 _2A8;                           // _2A8
+	u32 mTrackDolbyFlag;                // _2A8
 	u32 _2AC;                           // _2AC
-	u32 _2B0;                           // _2B0
-	u32* _2B4;                          // _2B4
-	u8* mInterruptSwitches;             // _2B8
-	MuteBit* _2BC;                      // _2BC
+	u32 mTrackPortDataFlag;             // _2B0
+	u32* _2B4;                          // _2B4, length seqTrackMax
+	u8* mInterruptSwitches;             // _2B8, length seqTrackMax
+	MuteBit* mMuteBits;                 // _2BC, length seqTrackMax
 	SeqUpdateData* mUpdateData;         // _2C0
 	JASTrack mTrack;                    // _2C4
 	JASOuterParam mOuterParam;          // _62C
@@ -361,12 +424,12 @@ struct StreamParameter {
 };
 
 namespace SoundTable {
-void init(u8*, u32);
-SoundInfo* getInfoPointer(u32);
-u32 getInfoFormat(u32);
-void setInfoTrack(u32, u8);
-u8 getCategotyMax(); // [sic]
-u16 getSoundMax(u8);
+void init(u8* data, u32 size);
+SoundInfo* getInfoPointer(u32 soundID);
+u32 getInfoFormat(u32 soundID);
+void setInfoTrack(u32, u8); // unused
+u8 getCategotyMax();        // [sic]
+u16 getSoundMax(u8 category);
 void getSoundTablePointer();
 
 extern u8 mVersion;
@@ -378,11 +441,11 @@ extern u8* mAddress;
 }; // namespace SoundTable
 
 namespace SystemInterface {
-BOOL checkFileExsistence(char*);
-u8 checkSeqActiveFlag(JASTrack*);
-JASTrack* trackToSeqp(JAISequence*, u8);
-void setSeqPortargsF32(SeqUpdateData*, u32, u8, f32);
-void setSeqPortargsU32(SeqUpdateData*, u32, u8, u32);
+BOOL checkFileExsistence(char* path);
+u8 checkSeqActiveFlag(JASTrack* track);
+JASTrack* trackToSeqp(JAISequence* seq, u8 trackNo);
+void setSeqPortargsF32(SeqUpdateData* updateData, u32 playerParamIdx, u8 portArgIdx, f32 value);
+void setSeqPortargsU32(SeqUpdateData* updateData, u32 playerParamIdx, u8 portArgIdx, u32 value);
 void rootInit(SeqUpdateData*);
 void trackInit(SeqUpdateData*);
 void outerInit(SeqUpdateData*, JASTrack*, u32, u16, u8);
@@ -390,7 +453,7 @@ void setSePortParameter(JASPortArgs*);
 
 // unused/inlined:
 void setSeqPortargsPS16(JAInter::SeqUpdateData*, u32, u8, s16*);
-JASTrack* trackToSeqp(JASTrack*, u8, u32);
+JASTrack* trackToSeqp(JASTrack* track, u8 p2, u32 p3);
 void setPortParameter(JASPortArgs*, JASTrack*, u32, u32);
 void JAIouterP(void*);
 void JAIouterSW(void*);
@@ -411,8 +474,8 @@ void* getDvdThreadPointer();
 void setAudioThreadPauseFlag(bool);
 }; // namespace JAInterface
 
-#define IsJAISoundIDInUse(id)    (((id)&0x800) == 0)
-#define IsJAISoundIDFree(id)     (((id)&0x800) == 1)
+#define IsJAISoundIDInUse(id)    (((id) & 0x800) == 0)
+#define IsJAISoundIDFree(id)     (((id) & 0x800) == 1)
 #define JAISoundID_TypeMask      0xC0000000
 #define JAISoundID_Type_Se       0x00000000
 #define JAISoundID_Type_Sequence 0x80000000

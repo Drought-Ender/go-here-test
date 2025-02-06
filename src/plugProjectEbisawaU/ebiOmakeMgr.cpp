@@ -20,7 +20,7 @@ void FSMStateMachine::init(TMgr* mgr)
 	registerState(new FSMState_OmakeScreen);
 	registerState(new FSMState_CardEScreen);
 	registerState(new FSMState_SelectGame);
-	registerState(new FSMState(Movie, "Movieó‘Ô"));
+	registerState(new FSMState(Movie, "MovieçŠ¶æ…‹"));
 }
 
 /**
@@ -45,7 +45,7 @@ void FSMState_OmakeScreen::do_init(TMgr* mgr, Game::StateArg*)
 
 		Screen::ArgOpenOmake arg(sys->getPlayCommonData()->mChallengeFlags.isSet(1), sys->getPlayCommonData()->mChallengeFlags.isSet(2),
 		                         sys->getPlayCommonData()->isPerfectChallenge());
-		arg._08 = -1;
+		arg.mUnusedVal = -1;
 
 		mgr->mOmake.openScreen(&arg);
 	} else if (mgr->mOmake.mState2 == 1) {
@@ -122,12 +122,12 @@ void FSMState_SelectGame::do_exec(TMgr* mgr)
 		break;
 	case ProbeGBA:
 		if (gCardEMgr->isFinish()) {
-			if (!gCardEMgr->mEndStat) {
+			if (gCardEMgr->mEndStat == CardEReader::TMgr::Error_Success) {
 				gCardEMgr->uploadToGBA(mgr->mOmakeGame.mSelection);
 				mgr->mOmakeGame.openMsg(ebi::Screen::TOmakeGame::Transferring);
 				u32 duration = 3.0f / sys->mDeltaTime;
 				mTimer       = duration;
-				_18          = duration;
+				mTimerMax    = duration;
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_DECIDE, 0);
 				mStatus = Transferring;
 			} else {
@@ -135,7 +135,7 @@ void FSMState_SelectGame::do_exec(TMgr* mgr)
 				mgr->mOmakeGame.openMsg(ebi::Screen::TOmakeGame::TransferUnable);
 				u32 duration = 5.0f / sys->mDeltaTime;
 				mTimer       = duration;
-				_18          = duration;
+				mTimerMax    = duration;
 				mStatus      = Error;
 			}
 		}
@@ -146,29 +146,29 @@ void FSMState_SelectGame::do_exec(TMgr* mgr)
 		PSSystem::spSysIF->playSystemSe(PSSE_SY_MEMORYCARD_ACCESS, 0);
 		if (gCardEMgr->isFinish() && !mTimer) {
 			switch (gCardEMgr->mEndStat) {
-			case 0:
+			case CardEReader::TMgr::Error_Success:
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MEMORYCARD_OK, 0);
 				mgr->mOmakeGame.openMsg(ebi::Screen::TOmakeGame::TransferFinished);
 				u32 duration = 5.0f / sys->mDeltaTime;
 				mTimer       = duration;
-				_18          = duration;
+				mTimerMax    = duration;
 				mStatus      = Finish;
 				break;
-			case 1:
+			case CardEReader::TMgr::Error_UnableToTransfer:
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MEMORYCARD_ERROR, 0);
 				mgr->mOmakeGame.openMsg(ebi::Screen::TOmakeGame::TransferUnable);
-				duration = 5.0f / sys->mDeltaTime;
-				mTimer   = duration;
-				_18      = duration;
-				mStatus  = Error;
+				duration  = 5.0f / sys->mDeltaTime;
+				mTimer    = duration;
+				mTimerMax = duration;
+				mStatus   = Error;
 				break;
-			case 2:
+			case CardEReader::TMgr::Error_TransferFailed:
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MEMORYCARD_ERROR, 0);
 				mgr->mOmakeGame.openMsg(ebi::Screen::TOmakeGame::TransferFailed);
-				duration = 5.0f / sys->mDeltaTime;
-				mTimer   = duration;
-				_18      = duration;
-				mStatus  = Error;
+				duration  = 5.0f / sys->mDeltaTime;
+				mTimer    = duration;
+				mTimerMax = duration;
+				mStatus   = Error;
 				break;
 			}
 		}
@@ -181,10 +181,10 @@ void FSMState_SelectGame::do_exec(TMgr* mgr)
 			mgr->mOmakeGame.setSelfControl();
 			mStatus = Idle;
 		}
-		if (mTimer > 2 && mgr->mController->mButton.mButtonDown & Controller::PRESS_B) {
+		if (mTimer > 2 && mgr->mController->getButtonDown() & Controller::PRESS_B) {
 			PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_CANCEL, 0);
-			mTimer = 1;
-			_18    = 1;
+			mTimer    = 1;
+			mTimerMax = 1;
 		}
 		break;
 	case Finish:
@@ -220,7 +220,7 @@ void TMgr::loadResource()
 {
 	sys->heapStatusStart("TOmakeMgr::loadResource", nullptr);
 
-	char buf[256];
+	char buf[PATH_MAX];
 	og::newScreen::makeLanguageResName(buf, "omake.szs");
 	JKRArchive* arc = JKRMountArchive(buf, JKRArchive::EMM_Mem, nullptr, JKRArchive::EMD_Head);
 	P2ASSERTLINE(271, arc);

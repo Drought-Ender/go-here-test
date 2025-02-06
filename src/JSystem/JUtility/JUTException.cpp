@@ -206,7 +206,7 @@ void JUTException::showFloatSub(int reg, f32 flt)
 	if (fpclassify(flt) == 1) {
 		sConsole->print_f("F%02d: Nan      ", reg);
 	} else if (fpclassify(flt) == 2) {
-		if (ispositive(flt)) {
+		if (IS_POSITIVE(flt)) {
 			sConsole->print_f("F%02d:+Inf     ", reg);
 		} else {
 			sConsole->print_f("F%02d:-Inf     ", reg);
@@ -819,7 +819,7 @@ void JUTException::waitTime(s32 timeout_ms)
 		do {
 			OSTime end_time = OSGetTime();
 			OSTime ticks    = end_time - start_time;
-			ms              = ticks / (OS_TIMER_CLOCK / 1000);
+			ms              = OSTicksToMilliseconds(ticks);
 		} while (ms < timeout_ms);
 	}
 }

@@ -55,14 +55,14 @@ void TitleState::init(VsGameSection* section, StateArg* arg)
 	section->mCurrentFloor = 0;
 
 	TitleArg* titleArg = static_cast<TitleArg*>(arg);
-	if (titleArg && titleArg->_00) {
+	if (titleArg && titleArg->mDoNeedClearHeap) {
 		section->clearHeap();
 	}
 
-	section->_205           = true;
-	section->mDeadPikiCount = false;
-	mHeap                   = nullptr;
-	mExpHeap                = nullptr;
+	section->mIsChallengePerfect = true;
+	section->mDeadPikiCount      = false;
+	mHeap                        = nullptr;
+	mExpHeap                     = nullptr;
 
 	mTitleStage = VSTITLE_PrepareInfo;
 	_2C         = 0;
@@ -81,7 +81,7 @@ void TitleState::init(VsGameSection* section, StateArg* arg)
 	section->mVsStageData        = nullptr;
 }
 
-static const char unusedVsTitleString[] = "ÉRÉìÉNÉäÅ[Ég"; // 'concrete'
+static const char unusedVsTitleString[] = "„Ç≥„É≥„ÇØ„É™„Éº„Éà"; // 'concrete'
 
 /**
  * @note Address: 0x80228554
@@ -96,24 +96,19 @@ void TitleState::dvdload()
 		scene.mSceneType = PSGame::SceneInfo::VERSUS_MENU;
 	}
 	scene.mCameras = 0;
+
 	static_cast<PSGame::PikSceneMgr*>(PSSystem::getSceneMgr())->newAndSetCurrentScene(scene);
+	PSSystem::getSceneMgr()->doFirstLoad();
+	PSSystem::getSceneMgr()->doStartMainSeq();
 
-	PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-	sceneMgr->checkScene();
-	sceneMgr->mScenes->mChild->scene1stLoadSync();
-
-	sceneMgr = PSSystem::getSceneMgr();
-	sceneMgr->checkScene();
-	sceneMgr->mScenes->mChild->startMainSeq();
-
-	mChallengeTitleInfo = new Challenge2D_TitleInfo(getChallengeStageNum());
+	mChallengeTitleInfo = new Challenge2D_TitleInfo(CHALLENGE_COURSE_COUNT);
 	mVsTitleInfo        = new Vs2D_TitleInfo(getVsStageNum());
 
 	for (int i = 0; i < 5; i++) {
 		sys->getPlayCommonData()->challenge_get_CourseState(i);
 	}
 
-	for (int i = 0; i < getChallengeStageNum(); i++) {
+	for (int i = 0; i < CHALLENGE_COURSE_COUNT; i++) {
 		PlayChallengeGameData::CourseState* scores = sys->getPlayCommonData()->challenge_get_CourseState(i);
 		Challenge2D_TitleInfo::Info* displayData   = (*mChallengeTitleInfo)(i);
 		ChallengeGame::StageData* fileData         = mSection->mChallengeStageList->getStageData(i);
@@ -158,7 +153,7 @@ void TitleState::dvdload()
 		Vs2D_TitleInfo::Info* displayData = (*mVsTitleInfo)(i);
 		VsGame::StageData* fileData       = mSection->mVsStageList->getStageData(i);
 		if (fileData) {
-			displayData->mInfo = fileData->mIndex2D;
+			displayData->mIndex = fileData->mIndex2D;
 		}
 	}
 }
@@ -195,7 +190,7 @@ void TitleState::execChallenge(VsGameSection* section)
 		return;
 
 	case VSTITLE_PrepareDisp:
-		if (section->mDvdThreadCommand.mMode == 2) {
+		if (section->mDvdThreadCommand.mMode == DvdThreadCommand::CM_Completed) {
 			mTitleStage = VSTITLE_Display;
 
 			Morimura::DispMemberChallengeSelect select;
@@ -214,11 +209,11 @@ void TitleState::execChallenge(VsGameSection* section)
 		int playType;
 		int check = Screen::gGame2DMgr->check_ChallengeSelect(stageNumber, playType);
 		switch (check) {
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_ChallengeSelect_CancelToTitle:
 			section->mIsMenuRunning = true;
 			return;
 
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_ChallengeSelect_ExitFinished:
 			OSReport("from Morimun:STATE_GO:stageNo=%d:playType=%d\n", stageNumber, playType);
 
 			if (section->mIsVersusMode) {
@@ -238,7 +233,7 @@ void TitleState::execChallenge(VsGameSection* section)
 
 			strcpy(section->mCaveInfoFilename, data->mCaveInfoFilename);
 
-			load._04             = 0; // why...
+			load.mGameLoadType   = 0; // why...
 			section->mContainer1 = data->mPikiContainer;
 
 			playData->setDopeCount(0, data->mStartNumSpicy);
@@ -278,7 +273,7 @@ void TitleState::execVs(VsGameSection* section)
 		return;
 
 	case VSTITLE_PrepareDisp:
-		if (section->mDvdThreadCommand.mMode == 2) {
+		if (section->mDvdThreadCommand.mMode == DvdThreadCommand::CM_Completed) {
 			mTitleStage = VSTITLE_Display;
 
 			Morimura::DispMemberVsSelect select;
@@ -315,7 +310,7 @@ void TitleState::execVs(VsGameSection* section)
 			f32 highest     = 0.0f;
 			int vsEditIndex = 0;
 			for (int i = 0; i < 4; i++) {
-				f32 stickWeight = dot(directions[i], stickPos);
+				f32 stickWeight = directions[i].dot(stickPos);
 				if (stickWeight > highest) {
 					highest     = stickWeight;
 					vsEditIndex = i; // up = 0, right = 1, down = 2, left = 3
@@ -330,10 +325,10 @@ void TitleState::execVs(VsGameSection* section)
 		int stageNumber;
 		int check = Screen::gGame2DMgr->check_VsSelect(stageNumber, section->mOlimarHandicap, section->mLouieHandicap);
 		switch (check) {
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_VsSelect_CancelToTitle:
 			section->mIsMenuRunning = true;
 			return;
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_VsSelect_ExitFinished:
 			gameSystem->mMode = GSM_VERSUS_MODE;
 
 			LoadArg load(0, 0, 0);
@@ -346,7 +341,7 @@ void TitleState::execVs(VsGameSection* section)
 			strcpy(section->mCaveInfoFilename, data->mCaveInfoFilename);
 			strcpy(section->mEditFilename, data->mStageLayoutFilePath);
 
-			load._04             = 0; // why...
+			load.mGameLoadType   = 0; // why...
 			section->mContainer1 = data->mPikiContainer;
 
 			playData->setDopeCount(0, data->mStartNumSpicy);
@@ -391,9 +386,7 @@ void TitleState::draw(VsGameSection* section, Graphics& gfx)
  */
 void TitleState::cleanup(VsGameSection* section)
 {
-	PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(sceneMgr);
-	sceneMgr->deleteCurrentScene();
+	PSMGetSceneMgrCheck()->deleteCurrentScene();
 
 	particle2dMgr->killAll();
 

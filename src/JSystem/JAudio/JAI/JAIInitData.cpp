@@ -7,44 +7,6 @@
 #include "JSystem/JAudio/JAI/JAIStream.h"
 #include "JSystem/JAudio/JAS/JASHeap.h"
 #include "Dolphin/stl.h"
-#include "types.h"
-
-/*
-    Generated from dpostproc
-
-    .section .data, "wa"  # 0x8049E220 - 0x804EFC20
-    .global lbl_804A62A0
-    lbl_804A62A0:
-        .4byte lbl_800ADCFC
-        .4byte lbl_800ADD04
-        .4byte lbl_800ADD48
-        .4byte lbl_800ADD5C
-        .4byte lbl_800ADD70
-        .4byte lbl_800ADD7C
-        .4byte lbl_800ADDD4
-        .4byte lbl_800ADE48
-        .4byte lbl_800ADE74
-        .4byte 0x00000000
-
-    .section .sdata, "wa"  # 0x80514680 - 0x80514D80
-    .global wsInitCallback__Q27JAInter8InitData
-    wsInitCallback__Q27JAInter8InitData:
-        .4byte initWsList__Q27JAInter8InitDataFPUl
-    .global bnkInitCallback__Q27JAInter8InitData
-    bnkInitCallback__Q27JAInter8InitData:
-        .4byte initBnkList__Q27JAInter8InitDataFPUl
-
-    .section .sbss # 0x80514D80 - 0x80516360
-    .global aafPointer__Q27JAInter8InitData
-    aafPointer__Q27JAInter8InitData:
-        .skip 0x8
-
-    .section .sdata2, "a"     # 0x80516360 - 0x80520E40
-    .global lbl_80516F40
-    lbl_80516F40:
-        .asciz "%s%s%c"
-        .skip 1
-*/
 
 u32* JAInter::InitData::aafPointer;
 JAInter::InitData::InitCallback JAInter::InitData::wsInitCallback  = initWsList;
@@ -139,7 +101,7 @@ void JAInter::InitData::checkInitDataOnMemory()
 			break;
 		case 8: {
 			u8* tmp = transInitDataFile((u8*)aafPointer + aafPointer[r30], (aafPointer[r30 + 1] & 0xFFF0) + 16); // aaaaaaaaaaaaa
-			JAIBasic::getInterface()->_18 = (u32)tmp;
+			JAIBasic::getInterface()->mRawDataPtr = tmp;
 			r30 += 3;
 			break;
 		}
@@ -356,7 +318,8 @@ void JAInter::InitData::initBnkList(u32* p1)
 	for (; aafPointer[offset + count] != 0; count += 3) { }
 	BankWave::initOnCodeBnk = (BankWave::TCodeBnk*)transInitDataFile(start, (count / 3) * 0xC + 4);
 	while ((aafPointer)[*p1] != 0) {
-		BankWave::initOnCodeBnk[val31]._00 = (int*)((u32) reinterpret_cast<int*>(aafPointer) + (u32)BankWave::initOnCodeBnk[val31]._00);
+		BankWave::initOnCodeBnk[val31].mBankData
+		    = (int*)((u32) reinterpret_cast<int*>(aafPointer) + (u32)BankWave::initOnCodeBnk[val31].mBankData);
 		*p1 += 3;
 		val31++;
 	}
@@ -367,19 +330,24 @@ void JAInter::InitData::initBnkList(u32* p1)
  * @note Address: 0x800ADFC8
  * @note Size: 0xD8
  */
-void JAInter::InitData::initWsList(u32* p1)
+void JAInter::InitData::initWsList(u32* data)
 {
-	u32 count  = 0;
-	u8 val31   = 0;
-	int offset = *p1;
-	u8* start  = (u8*)&(aafPointer[offset]);
-	for (; aafPointer[offset + count] != 0; count += 3) { }
-	BankWave::initOnCodeWs = (BankWave::TCodeWS*)transInitDataFile(start, (count / 3) * 0xC + 4);
-	while ((aafPointer)[*p1] != 0) {
-		BankWave::initOnCodeWs[val31]._00 = (int*)((u32) reinterpret_cast<int*>(aafPointer) + (u32)BankWave::initOnCodeWs[val31]._00);
+	u32 waveformCount = 0;
+	u8 waveformIndex  = 0;
+	int offset        = *data;
+	u8* start         = (u8*)&(aafPointer[offset]);
+
+	for (; aafPointer[offset + waveformCount] != 0; waveformCount += 3) { }
+
+	BankWave::initOnCodeWs = (BankWave::TCodeWS*)transInitDataFile(start, (waveformCount / 3) * 0xC + 4);
+
+	while ((aafPointer)[*data] != 0) {
+		BankWave::initOnCodeWs[waveformIndex]._00
+		    = (int*)((u32) reinterpret_cast<int*>(aafPointer) + (u32)BankWave::initOnCodeWs[waveformIndex]._00);
 		BankWave::wsMax++;
-		*p1 += 3;
-		val31++;
+		*data += 3;
+		waveformIndex++;
 	}
-	*p1 += 1;
+
+	*data += 1;
 }

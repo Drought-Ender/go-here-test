@@ -7,6 +7,7 @@
 #include "Game/updateMgr.h"
 #include "BitFlag.h"
 #include "ObjectTypes.h"
+#include "Game/P2JST/ObjectActor.h"
 #include "trig.h"
 
 // Shorthand cast to obj-specific 'parms'
@@ -67,10 +68,10 @@ struct WaterBox;
 struct LifeGaugeParam {
 	LifeGaugeParam() { mIsGaugeShown = false; }
 
-	Vector3f mPosition;       // _00
-	f32 mCurHealthPercentage; // _0C
-	f32 mRadius;              // _10
-	bool mIsGaugeShown;       // _14
+	Vector3f mPosition;   // _00
+	f32 mCurrHealthRatio; // _0C, between 0 and 1
+	f32 mRadius;          // _10
+	bool mIsGaugeShown;   // _14
 };
 
 enum CreatureFlags {
@@ -115,6 +116,16 @@ struct CreatureInitArg {
 	// _00 VTBL
 };
 
+enum CreatureKillFlags {
+	CKILL_NULL                = 0,
+	CKILL_DontCountAsDeath    = 1,          // for sprouts <-> pikis, force kills, entering onyons etc
+	CKILL_Unk17               = 0x10000,    // unknown, set by some piki deaths but doesn't seem to be used
+	CKILL_DisableDeathEffects = 0x10000000, // enemy died to kill plane, force kill, end of day etc - don't do ghost
+	CKILL_LeaveNoCarcass      = 0x20000000, // enemy died to kill plane, force kill, end of day etc - don't leave a body
+	CKILL_NotKilledByPlayer   = 0x40000000, // disables bitter drop checking, corpse creation and setting of zukan/piklopedia flags
+	CKILL_VsChargePiki        = 0x80000000, // set vs onyon to charge a piki
+};
+
 struct CreatureKillArg {
 	inline CreatureKillArg(int flags)
 	    : mFlags(flags)
@@ -133,13 +144,6 @@ struct CreatureKillArg {
 	// _00 VTBL
 	int mFlags; // _04
 };
-
-#define CKILL_NULL  (0)
-#define CKILL_Unk1  (0x1)
-#define CKILL_Unk29 (0x10000000)
-#define CKILL_Unk30 (0x20000000)
-#define CKILL_Unk31 (0x40000000)
-#define CKILL_Unk32 (0x80000000)
 
 #define CREATURE_HELL_ALIVE    (0)
 #define CREATURE_HELL_BELOWMAP (1)
@@ -349,8 +353,6 @@ struct Creature : public CellObject {
 
 	inline bool isCreatureFlag(u32 flag) const { return mFlags.typeView & flag; }
 
-	inline void killInline(CreatureKillArg* arg);
-
 	/**
 	 * Calculates the angular distance between this creature and another creature.
 	 *
@@ -407,6 +409,31 @@ struct Creature : public CellObject {
 		return Vector3f(x, y, z);
 	}
 
+	inline f32 getSquarePositionTo(Vector3f& pos)
+	{
+		f32 z       = getPosition().z;
+		f32 x       = getPosition().x;
+		f32 targetZ = pos.z;
+		f32 targetX = pos.x;
+		f32 diffZ   = targetZ - z;
+		f32 diffX   = targetX - x;
+		return SQUARE(diffX) + SQUARE(diffZ);
+	}
+
+	inline f32 getPositionTo(Vector3f& pos)
+	{
+		Vector3f sep = pos - Vector3f(getPosition().x, 0.0f, getPosition().z);
+		// f32 z = getPosition().z;
+		// f32 x = getPosition().x;
+		// f32 targetZ = pos.z;
+		// f32 targetX = pos.x;
+		// f32 diffZ = targetZ - z;
+		// f32 diffX = targetX - x;
+		f32 sqrDist = SQUARE(sep.x) + SQUARE(sep.z);
+		return sqrtf(sqrDist);
+		// return sqrDist;
+	}
+
 	void applyAirDrag(f32 drag, f32 horizontalDrag, f32 verticalDrag);
 	f32 calcSphereDistance(Creature* other);
 	int checkHell(Creature::CheckHellArg& hellArg);
@@ -444,30 +471,30 @@ struct Creature : public CellObject {
 	static bool usePacketCulling;
 	static Creature* currOp;
 
-	Matrixf* mCaptureMatrix;        // _0B8
-	BitFlag<u32> mFlags;            // _0BC
-	void* mParms;                   // _0C0
-	Generator* mGenerator;          // _0C4
-	Sys::Triangle* mBounceTriangle; // _0C8
-	Vector3f mCollisionPosition;    // _0CC
-	AILOD mLod;                     // _0D8
-	int mCellLayerIndex;            // _0DC
-	Recti mCellRect;                // _0E0
-	Creature* mSticked;             // _0F0
-	Creature* mSticker;             // _0F4
-	CollPart* mStuckCollPart;       // _0F8
-	Creature* mCaptured;            // _0FC
-	Creature* mCapture;             // _100
-	Vector3f mClimbingPosition;     // _104
-	s16 mStickSlot;                 // _110
-	CollTree* mCollTree;            // _114
-	f32 mMass;                      // _118
-	Vector3f mAcceleration;         // _11C
-	u16 mObjectTypeID;              // _128
-	UpdateContext mUpdateContext;   // _12C
-	Matrixf mBaseTrMatrix;          // _138
-	Vector3f mScale;                // _168 /* Not sure if just model scale. */
-	SysShape::Model* mModel;        // _174
+	Matrixf* mCaptureMatrix;       // _0B8
+	BitFlag<u32> mFlags;           // _0BC
+	void* mParms;                  // _0C0
+	Generator* mGenerator;         // _0C4
+	Sys::Triangle* mFloorTriangle; // _0C8, triangle below creature (if on ground, nullptr if in air)
+	Vector3f mFloorNormal;         // _0CC, normal vector from floor triangle; is (0.0f, 1.0f, 0.0f) if flat ground
+	AILOD mLod;                    // _0D8
+	int mCellLayerIndex;           // _0DC
+	Recti mCellRect;               // _0E0
+	Creature* mSticked;            // _0F0
+	Creature* mSticker;            // _0F4
+	CollPart* mStuckCollPart;      // _0F8
+	Creature* mCaptured;           // _0FC
+	Creature* mCapture;            // _100
+	Vector3f mClimbingPosition;    // _104
+	s16 mStickSlot;                // _110
+	CollTree* mCollTree;           // _114
+	f32 mMass;                     // _118
+	Vector3f mAcceleration;        // _11C
+	u16 mObjectTypeID;             // _128
+	UpdateContext mUpdateContext;  // _12C
+	Matrixf mBaseTrMatrix;         // _138
+	Vector3f mScale;               // _168 /* Not sure if just model scale. */
+	SysShape::Model* mModel;       // _174
 };
 
 extern Creature* currOp;

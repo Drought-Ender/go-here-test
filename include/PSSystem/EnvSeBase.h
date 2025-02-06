@@ -5,23 +5,24 @@
 #include "PSSystem/Reservator.h"
 #include "JSystem/JSupport/JSUList.h"
 #include "SoundID.h"
+#include "P2Macros.h"
 
 struct JAISound;
 
 namespace PSSystem {
 struct MoveParamSet {
-	inline MoveParamSet(f32 p1, u32 p2, int p3, u8 p4)
-	    : _00(p1)
-	    , _04(p2)
-	    , _08(p3)
-	    , _0C(p4)
+	inline MoveParamSet(f32 value, u32 time, int type, u8 soundType)
+	    : mValue(value)
+	    , mMoveTime(time)
+	    , mParamType(type)
+	    , mSoundType(soundType)
 	{
 	}
 
-	f32 _00; // _00
-	u32 _04; // _04
-	int _08; // _08
-	u8 _0C;  // _0C
+	f32 mValue;     // _00
+	u32 mMoveTime;  // _04
+	int mParamType; // _08, see JASTrack::ParamType enum
+	u8 mSoundType;  // _0C, see JAISoundType enum
 };
 
 struct EnvSeBase : public JSULink<EnvSeBase> {
@@ -43,7 +44,7 @@ struct EnvSeBase : public JSULink<EnvSeBase> {
 	MoveParamSet mMoveParam; // _14
 	SoundID mSoundID;        // _24
 	f32 mVolume;             // _28
-	f32 _2C;                 // _2C, also a volume?
+	f32 mVolume2;            // _2C, also a volume?
 	f32 _30;                 // _30, fx mix value?
 	JAISound* mSound;        // _34
 	u8 mPauseFlag;           // _38
@@ -52,7 +53,11 @@ struct EnvSeBase : public JSULink<EnvSeBase> {
 };
 
 struct EnvSeMgr {
-	EnvSeMgr() { }
+	EnvSeMgr()
+	{
+		mReservator.mMgr = this;
+		FORCE_DONT_INLINE;
+	}
 
 	void setAllPauseFlag(u8);
 	void on();

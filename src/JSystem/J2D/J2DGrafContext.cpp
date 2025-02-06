@@ -244,7 +244,7 @@ void J2DGrafContext::drawFrame(const JGeometry::TBox2f& box)
  * @note Address: --------
  * @note Size: 0xe0
  */
-void J2DGrafContext::line(JGeometry::TVec2f start, JGeometry::TVec2f end)
+inline void J2DGrafContext::line(JGeometry::TVec2f start, JGeometry::TVec2f end)
 {
 	GXSetBlendMode((GXBlendMode)mLinePart.mType, (GXBlendFactor)mLinePart.mSrcFactor, (GXBlendFactor)mLinePart.mDestFactor, GX_LO_SET);
 	GXLoadPosMtxImm(mPosMtx, 0);

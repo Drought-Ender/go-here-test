@@ -50,6 +50,8 @@ struct CullFrustum : public CullPlane {
 	Vector3f getUpVector();
 	Vector3f getViewVector();
 
+	inline f32 getFOV(f32 viewAngle) { return (f32)atan(mAspectRatio * (f32)tan(viewAngle)); }
+
 	// CullPlane _00 - _24
 	f32 mViewAngle;       // _28
 	f32 mAspectRatio;     // _2C
@@ -60,12 +62,15 @@ struct CullFrustum : public CullPlane {
 struct Camera : public CullFrustum {
 	Camera();
 
-	virtual ~Camera() { }                                     // _08 (weak)
-	virtual Matrixf* getViewMatrix(bool);                     // _48
-	virtual Vector3f getPosition();                           // _4C
-	virtual void updatePlanes();                              // _50
-	virtual void updateScreenConstants();                     // _54
-	virtual Vector3f getLookAtPosition_();                    // _58 (weak)
+	virtual ~Camera() { }                 // _08 (weak)
+	virtual Matrixf* getViewMatrix(bool); // _48
+	virtual Vector3f getPosition();       // _4C
+	virtual void updatePlanes();          // _50
+	virtual void updateScreenConstants(); // _54
+	virtual Vector3f getLookAtPosition_() // _58 (weak)
+	{
+		return Vector3f::zero;
+	}
 	virtual f32 getTargetDistance() { return 0.0f; }          // _5C (weak)
 	virtual Vector3f* getPositionPtr();                       // _60
 	virtual Vector3f* on_getPositionPtr() { return nullptr; } // _64 (weak)
@@ -87,10 +92,9 @@ struct Camera : public CullFrustum {
 	f32 getFar();
 	Vector3f getLookAtPosition();
 	f32 getNear();
-	void setFixNearFar(bool, f32, f32);
+	void setFixNearFar(bool isFixed, f32 nearZ, f32 farZ);
 	void setProjection();
 	void update();
-	// void updatePlanes();
 	void updateSoundCamera(f32);
 
 	inline bool isRunning() { return (mJstObject && mJstObject->isRunning()); }
@@ -105,16 +109,16 @@ struct Camera : public CullFrustum {
 	Matrixf mCurViewMatrix;                // _034
 	f32 mNear;                             // _064 - distance to 'near' plane
 	f32 mFar;                              // _068 - distance to 'far' plane
-	bool mIsFixed;                         // _06C
+	bool mIsFixed;                         // _06C - determines which near/far values should be used
 	f32 mProjectionNear;                   // _070 - projected distance to 'near' plane when not in fixed camera
 	f32 mProjectionFar;                    // _074 - projected distance to 'far' plane when not in fixed camera
 	Vector3f mSoundPosition;               // _078
 	Matrixf mSoundMatrix;                  // _084
 	Mtx44 mProjectionMtx;                  // _0B4
-	Mtx44 _F4;                             // _0F4
-	f32 _134;                              // _134
-	f32 _138;                              // _138
-	f32 _13C;                              // _13C
+	Mtx44 mBackupMtx;                      // _0F4
+	f32 mFieldOfViewRatio;                 // _134, from 0.0 when FOV is 0, to 1.0 when FOV is 180
+	f32 mFieldOfViewTangent;               // _138, tangent from cos/sin of mFieldOfViewRatio
+	f32 mCameraSizeModifier;               // _13C, used for detecting when things are far away? Stays very close to -0.5
 	Game::P2JST::ObjectCamera* mJstObject; // _140
 };
 
@@ -126,6 +130,8 @@ struct LookAtCamera : public Camera {
 	virtual Vector3f* on_getPositionPtr() { return &mPosition; }      // _64 (weak)
 	virtual void updateMatrix();                                      // _74
 	virtual void startVibration(int) { }                              // _7C (weak)
+
+	inline void setPosition(Vector3f& pos) { mPosition = pos; }
 
 	// Camera _00 - _144
 	Matrixf mLookMatrix;      // _144

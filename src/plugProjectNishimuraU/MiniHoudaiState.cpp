@@ -58,8 +58,8 @@ void StateDead::exec(EnemyBase* enemy)
 			mini->getJAIObject()->startSound(PSSE_EN_MINIHOU_BOMB, 0);
 
 			Vector3f pos = mini->getPosition();
-			cameraMgr->startVibration(28, pos, 2);
-			rumbleMgr->startRumble(11, pos, 2);
+			cameraMgr->startVibration(VIBTYPE_Boom, pos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed11, pos, RUMBLEID_Both);
 
 		} else if (mini->mCurAnim->mType == KEYEVENT_3) {
 			mini->createDownEffect(0.75f);
@@ -261,7 +261,7 @@ void StateAttack::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	Obj* mini               = OBJ(enemy);
 	mini->mNextState        = MINIHOUDAI_NULL;
-	mini->_2CC              = 0.0f;
+	mini->mAttackWaitTimer  = 0.0f;
 	mini->mHealthGaugeTimer = 0.0f;
 	mini->mTargetVelocity   = Vector3f(0.0f);
 	mini->setEmotionExcitement();
@@ -277,12 +277,12 @@ void StateAttack::exec(EnemyBase* enemy)
 	Obj* mini = OBJ(enemy);
 	if (mini->isStopMotion()) {
 		if (mini->isFinishShotGun()) {
-			if (mini->isShotGunLockOn() && mini->_2CC > 0.0f) {
-				mini->_2CC = 0.0f;
+			if (mini->isShotGunLockOn() && mini->mAttackWaitTimer > 0.0f) {
+				mini->mAttackWaitTimer = 0.0f;
 				mini->startMotion();
 			}
-		} else if (mini->isShotGunLockOn() && mini->_2CC > 0.0f) {
-			mini->_2CC = 0.0f;
+		} else if (mini->isShotGunLockOn() && mini->mAttackWaitTimer > 0.0f) {
+			mini->mAttackWaitTimer = 0.0f;
 			mini->startMotion();
 		}
 	}
@@ -291,7 +291,7 @@ void StateAttack::exec(EnemyBase* enemy)
 		mini->setShotGunTargetPosition();
 	}
 
-	mini->_2CC += sys->mDeltaTime;
+	mini->mAttackWaitTimer += sys->mDeltaTime;
 
 	if (mini->mHealth <= 0.0f) {
 		if (mini->isStopMotion()) {
@@ -308,7 +308,7 @@ void StateAttack::exec(EnemyBase* enemy)
 
 	if (mini->mCurAnim->mIsPlaying) {
 		if (mini->mCurAnim->mType == KEYEVENT_2) {
-			mini->_2CC = 0.0f;
+			mini->mAttackWaitTimer = 0.0f;
 			mini->stopMotion();
 			mini->startShotGunRotation();
 			mini->startChargeEffect();
@@ -322,7 +322,7 @@ void StateAttack::exec(EnemyBase* enemy)
 			}
 
 		} else if (mini->mCurAnim->mType == KEYEVENT_5) {
-			mini->_2CC = 0.0f;
+			mini->mAttackWaitTimer = 0.0f;
 			mini->stopMotion();
 			mini->finishShotGunRotation();
 
@@ -537,8 +537,8 @@ void StateTurn::exec(EnemyBase* enemy)
 		if (target) {
 			mini->mHealthGaugeTimer = 0.0f;
 			f32 angleSep            = mini->turnToTarget(target, CG_GENERALPARMS(mini).mTurnSpeed(), CG_GENERALPARMS(mini).mMaxTurnAngle());
-			if (mini->isTargetOutOfRange(target, angleSep, CG_GENERALPARMS(mini).mPrivateRadius(), CG_GENERALPARMS(mini).mSightRadius(),
-			                             CG_GENERALPARMS(mini).mFov(), mini->getViewAngle())) {
+			if (mini->isTargetWithinRange(target, angleSep, CG_GENERALPARMS(mini).mPrivateRadius(), CG_GENERALPARMS(mini).mSightRadius(),
+			                              CG_GENERALPARMS(mini).mFov(), mini->getViewAngle())) {
 				mini->mNextState = MINIHOUDAI_Lost;
 				mini->finishMotion();
 			} else {
@@ -1222,8 +1222,8 @@ void StateWalk::exec(EnemyBase* enemy)
 			if (target) {
 				mini->mHealthGaugeTimer = 0.0f;
 				f32 angleSep            = mini->turnToTarget(target, turnSpeed, maxTurnAngle);
-				if (mini->isTargetOutOfRange(target, angleSep, CG_GENERALPARMS(mini).mPrivateRadius(), CG_GENERALPARMS(mini).mSightRadius(),
-				                             CG_GENERALPARMS(mini).mFov(), mini->getViewAngle())) {
+				if (mini->isTargetWithinRange(target, angleSep, CG_GENERALPARMS(mini).mPrivateRadius(),
+				                              CG_GENERALPARMS(mini).mSightRadius(), CG_GENERALPARMS(mini).mFov(), mini->getViewAngle())) {
 					mini->mNextState = MINIHOUDAI_Lost;
 					mini->finishMotion();
 				} else {
@@ -1267,7 +1267,7 @@ void StateWalk::exec(EnemyBase* enemy)
 	}
 
 	if (mini->mCurAnim->mIsPlaying) {
-		if (mini->mCurAnim->mType == KEYEVENT_NULL) {
+		if (mini->mCurAnim->mType == KEYEVENT_LOOP_START) {
 			mini->createSmokeSmallEffect(true);
 
 		} else if (mini->mCurAnim->mType == KEYEVENT_2) {
@@ -1927,7 +1927,7 @@ void StateWalkHome::exec(EnemyBase* enemy)
 	sys->updateTimer(mini->mUpdateTimer, 1.0f); // dumb way to get an fmadd with 1.0f as the multiplier
 
 	if (mini->mCurAnim->mIsPlaying) {
-		if (mini->mCurAnim->mType == KEYEVENT_NULL) {
+		if (mini->mCurAnim->mType == KEYEVENT_LOOP_START) {
 			mini->createSmokeSmallEffect(true);
 
 		} else if (mini->mCurAnim->mType == KEYEVENT_2) {
@@ -2014,7 +2014,7 @@ void StateWalkPath::exec(EnemyBase* enemy)
 	mini->mUpdateTimer += 0.5f * sys->mDeltaTime;
 
 	if (mini->mCurAnim->mIsPlaying) {
-		if (mini->mCurAnim->mType == KEYEVENT_NULL) {
+		if (mini->mCurAnim->mType == KEYEVENT_LOOP_START) {
 			mini->createSmokeSmallEffect(true);
 
 		} else if (mini->mCurAnim->mType == KEYEVENT_2) {

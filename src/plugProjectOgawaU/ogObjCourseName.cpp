@@ -28,7 +28,7 @@ ObjCourseName::ObjCourseName(char const* name)
 	mScreen = nullptr;
 	mAnims  = nullptr;
 
-	mTimer = msVal._0C;
+	mTimer = msVal.mFinishWaitTime;
 	mState = 0;
 
 	mColor.set(0, 0, 0, 255);
@@ -56,7 +56,7 @@ void ObjCourseName::doCreate(JKRArchive* arc)
 		mDisp = new og::Screen::DispMemberCourseName;
 
 	} else {
-		JUT_PANICLINE(101, "ERR! in ObjCourseName Createé∏îsÅI\n");
+		JUT_PANICLINE(101, "ERR! in ObjCourseName CreateÂ§±ÊïóÔºÅ\n");
 	}
 
 	CourseName* owner = static_cast<CourseName*>(getOwner());
@@ -76,7 +76,7 @@ void ObjCourseName::doCreate(JKRArchive* arc)
 	og::Screen::setAlphaScreen(mScreen);
 
 	u64 tags[4] = { 'nuki_tex', 'efect_00', 'efect_01', 0 };
-	J2DBlendInfo info(1, 7, 6, 0);
+	J2DBlend info(1, 7, 6, 0);
 	mScreen->setBlendInfo(info, tags);
 
 	J2DPane* pane = mScreen->search('nuki_tex');
@@ -204,11 +204,11 @@ bool ObjCourseName::doUpdateFadein()
 {
 	bool check = false;
 	mFadeLevel += sys->mDeltaTime;
-	if (mFadeLevel > msVal._04) {
-		mFadeLevel = msVal._04;
+	if (mFadeLevel > msVal.mFadeinTime) {
+		mFadeLevel = msVal.mFadeinTime;
 		check      = true;
 	}
-	mAlpha = mFadeLevel / msVal._04;
+	mAlpha = mFadeLevel / msVal.mFadeinTime;
 	commonUpdate();
 	return check;
 }
@@ -221,13 +221,13 @@ bool ObjCourseName::doUpdateFadeout()
 {
 	bool check = false;
 	mFadeLevel += sys->mDeltaTime;
-	if (mFadeLevel > msVal._08) {
-		mFadeLevel = msVal._08;
+	if (mFadeLevel > msVal.mFadeoutTime) {
+		mFadeLevel = msVal.mFadeoutTime;
 		if (!mDoEnd) {
 			check = true;
 		}
 	}
-	mAlpha = 1.0f - mFadeLevel / msVal._08;
+	mAlpha = 1.0f - mFadeLevel / msVal.mFadeoutTime;
 	commonUpdate();
 	return check;
 }
@@ -241,7 +241,7 @@ void ObjCourseName::drawBG(Graphics& gfx)
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
 	if (mDoEnd) {
 		mBackgroundAlpha += sys->mDeltaTime;
-		f32 temp = 1.0f - mBackgroundAlpha / msVal._00;
+		f32 temp = 1.0f - mBackgroundAlpha / msVal.mBgAlphaFadeTime;
 		if (temp > 0.0f) {
 			mColor.a = temp * 255.0f;
 		} else {

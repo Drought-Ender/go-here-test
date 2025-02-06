@@ -1,8 +1,11 @@
 #include "Game/P2JST/ObjectSystem.h"
-#include "nans.h"
+#include "Game/P2JST/ObjectActor.h"
+#include "Game/P2JST/ObjectCamera.h"
 
 namespace Game {
 namespace P2JST {
+
+// NB: this file probably gets significantly closer if we work out JGadget::TList<>::iterator.
 
 /**
  * @note Address: N/A
@@ -19,98 +22,15 @@ namespace P2JST {
  */
 ObjectSystem::ObjectSystem(char const* name, MoviePlayer* player)
     : ObjectBase(name, player)
+    , mObjListPointer(JGadget::TVoidAllocator())
 {
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	lis      r6, __vt__Q26JStage7TObject@ha
-	li       r8, 0
-	stw      r0, 0x24(r1)
-	addi     r0, r6, __vt__Q26JStage7TObject@l
-	lis      r6, __vt__Q34Game5P2JST10ObjectBase@ha
-	addi     r9, r1, 8
-	stw      r31, 0x1c(r1)
-	mr       r31, r3
-	mr       r7, r31
-	lis      r3, __vt__Q26JStage7TSystem@ha
-	stw      r0, 0(r31)
-	addi     r0, r3, __vt__Q26JStage7TSystem@l
-	li       r7, -1
-	lis      r3, __vt__Q34Game5P2JST12ObjectSystem@ha
-	stw      r0, 0(r31)
-	addi     r0, r6, __vt__Q34Game5P2JST10ObjectBase@l
-	addi     r6, r3, __vt__Q34Game5P2JST12ObjectSystem@l
-	addi     r3, r31, 0x20
-	stw      r0, 4(r31)
-	addi     r0, r6, 0x50
-	stw      r5, 8(r31)
-	stw      r4, 0xc(r31)
-	mr       r4, r9
-	stw      r8, 0x10(r31)
-	stw      r7, 0x14(r31)
-	stw      r8, 0x18(r31)
-	stw      r8, 0x1c(r31)
-	stw      r6, 0(r31)
-	stw      r0, 4(r31)
-	lbz      r0, lbl_805161F8@sda21(r13)
-	stb      r0, 8(r1)
-	bl       "__ct__Q27JGadget18TList_pointer_voidFRCQ27JGadget14TAllocator<Pv>"
-	lwz      r0, 0x24(r1)
-	mr       r3, r31
-	lwz      r31, 0x1c(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
 }
 
 /**
  * @note Address: 0x804309F4
  * @note Size: 0x84
  */
-ObjectSystem::~ObjectSystem()
-{
-	destroyObjectAll();
-	/*
-	stwu     r1, -0x10(r1)
-	mflr     r0
-	stw      r0, 0x14(r1)
-	stw      r31, 0xc(r1)
-	mr       r31, r4
-	stw      r30, 8(r1)
-	or.      r30, r3, r3
-	beq      lbl_80430A5C
-	lis      r4, __vt__Q34Game5P2JST12ObjectSystem@ha
-	addi     r4, r4, __vt__Q34Game5P2JST12ObjectSystem@l
-	stw      r4, 0(r30)
-	addi     r0, r4, 0x50
-	stw      r0, 4(r30)
-	bl       destroyObjectAll__Q34Game5P2JST12ObjectSystemFv
-	addic.   r0, r30, 0x20
-	beq      lbl_80430A40
-	addi     r3, r30, 0x20
-	li       r4, 0
-	bl       __dt__Q27JGadget18TList_pointer_voidFv
-
-lbl_80430A40:
-	mr       r3, r30
-	li       r4, 0
-	bl       __dt__Q26JStage7TSystemFv
-	extsh.   r0, r31
-	ble      lbl_80430A5C
-	mr       r3, r30
-	bl       __dl__FPv
-
-lbl_80430A5C:
-	lwz      r0, 0x14(r1)
-	mr       r3, r30
-	lwz      r31, 0xc(r1)
-	lwz      r30, 8(r1)
-	mtlr     r0
-	addi     r1, r1, 0x10
-	blr
-	*/
-}
+ObjectSystem::~ObjectSystem() { destroyObjectAll(); }
 
 /**
  * @note Address: 0x80430A78
@@ -118,6 +38,14 @@ lbl_80430A5C:
  */
 void ObjectSystem::destroyObjectAll()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (!mObjListPointer.empty()) {
+		JGadget::TList<void*, JGadget::TVoidAllocator>::TNode_* prev = iterStart.mNode->mPrev;
+		delete static_cast<JStage::TObject*>(prev->mElement);
+		prev->mElement = nullptr;
+		erase(iterStart.mNode->mPrev);
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -177,6 +105,28 @@ lbl_80430AF4:
  */
 void ObjectSystem::reset()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+		switch (obj->JSGFGetType()) {
+		case JStage::TEO_Camera:
+			static_cast<ObjectCamera*>(obj)->reset();
+			break;
+		case JStage::TEO_Actor:
+			static_cast<ObjectActor*>(obj)->reset();
+			break;
+		default:
+			obj->JSGFGetType(); // debug probably
+			break;
+		case JStage::TEO_AmbientLight:
+		case JStage::TEO_Light:
+		case JStage::TEO_Fog:
+			break;
+		}
+
+		++iterStart; // probably something like this
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -262,6 +212,18 @@ lbl_80430BEC:
  */
 void ObjectSystem::entry()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+		switch (obj->JSGFGetType()) {
+		case JStage::TEO_Actor:
+			static_cast<ObjectActor*>(obj)->entry();
+			break;
+		}
+
+		++iterStart; // probably something like this
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -323,6 +285,24 @@ lbl_80430C98:
  */
 void ObjectSystem::update()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+		switch (obj->JSGFGetType()) {
+		default:
+			// probably some DEBUG thing to make this spawn
+			break;
+		case JStage::TEO_Actor:
+			static_cast<ObjectActor*>(obj)->update();
+			break;
+		case JStage::TEO_Camera:
+			static_cast<ObjectCamera*>(obj)->update();
+			break;
+		}
+
+		++iterStart; // probably something like this
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -396,6 +376,24 @@ lbl_80430D6C:
  */
 void ObjectSystem::start()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+		switch (obj->JSGFGetType()) {
+		default:
+			// probably some DEBUG thing to make this spawn
+			break;
+		case JStage::TEO_Actor:
+			static_cast<ObjectActor*>(obj)->start();
+			break;
+		case JStage::TEO_Camera:
+			static_cast<ObjectCamera*>(obj)->start();
+			break;
+		}
+
+		++iterStart; // probably something like this
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -469,6 +467,24 @@ lbl_80430E40:
  */
 void ObjectSystem::stop()
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+		switch (obj->JSGFGetType()) {
+		default:
+			// probably some DEBUG thing to make this spawn
+			break;
+		case JStage::TEO_Actor:
+			static_cast<ObjectActor*>(obj)->stop();
+			break;
+		case JStage::TEO_Camera:
+			static_cast<ObjectCamera*>(obj)->stop();
+			break;
+		}
+
+		++iterStart; // probably something like this
+	}
 	/*
 	stwu     r1, -0x30(r1)
 	mflr     r0
@@ -540,8 +556,33 @@ lbl_80430F14:
  * @note Address: 0x80430F3C
  * @note Size: 0xFC
  */
-ObjectBase* ObjectSystem::findObject(char const*, JStage::TEObject) const
+JStage::TObject* ObjectSystem::findObject(const char* name, JStage::TEObject type) const
 {
+	JGadget::TList<void*, JGadget::TVoidAllocator>::const_iterator iterStart(&mObjListPointer.mNode);
+	JGadget::TList<void*, JGadget::TVoidAllocator>::const_iterator iterEnd(mObjListPointer.mNode.mNext);
+	while (iterStart != iterEnd) {
+		++iterStart; // probably
+
+		if (iterStart != iterEnd) {
+			JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+			bool check;
+			if (!obj) {
+				check = false;
+			} else {
+				check = (strcmp(obj->JSGGetName(), name) == 0);
+			}
+			if (check) {
+				continue;
+			}
+		}
+		break;
+	}
+
+	if (iterStart != iterEnd) {
+		return static_cast<JStage::TObject*>(*iterStart);
+	}
+
+	return nullptr;
 	/*
 	stwu     r1, -0x60(r1)
 	mflr     r0
@@ -627,9 +668,63 @@ lbl_80431020:
  * @note Address: 0x80431038
  * @note Size: 0x310
  */
-int ObjectSystem::JSGFindObject(JStage::TObject**, char const*, JStage::TEObject) const
+int ObjectSystem::JSGFindObject(JStage::TObject** outObject, const char* name, JStage::TEObject type) const
 {
-	JUT_PANICLINE(449, "JSGFindObject---- %d not found\n");
+	JStage::TObject* obj = findObject(name, type);
+	const void* newObj   = obj;
+	if (obj) {
+		*outObject = obj;
+		return 0;
+	}
+
+	switch (type) {
+	case JStage::TEO_Actor:
+		if (name[0] == '@') {
+			newObj = new ObjectParticleActor(name, mMoviePlayer, nullptr);
+		} else if (name[0] == '+') {
+			newObj = new ObjectSpecialActor(name, mMoviePlayer);
+		} else if (name[0] == '*') {
+			Creature* actor = findCreature(name);
+			if (actor) {
+				newObj = new ObjectGameActor(name, mMoviePlayer, actor);
+			}
+		} else if (name[0] == 'p') {
+			newObj = new ObjectActor(name, mMoviePlayer);
+		}
+		break;
+	case JStage::TEO_Camera:
+		newObj = new ObjectCamera(name, mMoviePlayer);
+		break;
+	default:
+		JGadget::TList<void*, JGadget::TVoidAllocator>::const_iterator iterStart(&mObjListPointer.mNode);
+		JGadget::TList<void*, JGadget::TVoidAllocator>::const_iterator iterEnd(mObjListPointer.mNode.mNext);
+		while (iterStart != iterEnd) {
+			JStage::TObject* obj = static_cast<JStage::TObject*>(*iterStart);
+			obj->JSGGetName(); // debug probably
+
+			++iterStart; // probably, eventually
+		}
+		JUT_PANICLINE(449, "JSGFindObject---- %d not found\n");
+		break;
+	case JStage::TEO_AmbientLight:
+	case JStage::TEO_Light:
+	case JStage::TEO_Fog:
+		break;
+	}
+
+	if (newObj) {
+		JGadget::TList<void*, JGadget::TVoidAllocator>::iterator iterStart(
+		    const_cast<JGadget::TList<void*>::TNode_*>(&mObjListPointer.mNode));
+		void* const& val = &newObj;
+		// mObjListPointer.insert(iterStart, 0, val);
+	}
+
+	*outObject = *(JStage::TObject**)newObj;
+	if (!*(JStage::TObject**)newObj) {
+		return 2;
+	}
+
+	return 0;
 	/*
 	.loc_0x0:
 	  stwu      r1, -0xB0(r1)
@@ -893,7 +988,7 @@ char* ObjectSystem::JSGGetName() const { return const_cast<char*>(mName); }
  * @note Address: 0x80431350
  * @note Size: 0x8
  */
-void ObjectSystem::JSGSetFlag(u32 a1) { mFlags = a1; }
+void ObjectSystem::JSGSetFlag(u32 flag) { mFlags = flag; }
 
 /**
  * @note Address: 0x80431358
@@ -914,3 +1009,5 @@ void ObjectSystem::JSGSetData(u32 d1, void const* d2, u32 d3)
 
 } // namespace P2JST
 } // namespace Game
+
+#include "nans.h"

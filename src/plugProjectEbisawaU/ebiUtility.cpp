@@ -1,5 +1,4 @@
 #include "ebi/Utility.h"
-#include "System.h"
 
 namespace ebi {
 
@@ -18,7 +17,7 @@ void EUTPadInterface_countNum::init(Controller* controller, s32 min, s32 max, s3
 	mTimeFactor1 = timeFactor1;
 	mTimeFactor2 = timeFactor2;
 	mCounter     = 0;
-	_08          = 0;
+	mCounterMax  = 0;
 
 	if (*mSelIndex < min) {
 		*mSelIndex = min;
@@ -38,7 +37,7 @@ void EUTPadInterface_countNum::update()
 	if (mCounter) {
 		mCounter--;
 	}
-	_0D = 0;
+	mSelectionChanged = 0;
 
 	bool isForwards;
 	bool isBackwards;
@@ -68,17 +67,17 @@ void EUTPadInterface_countNum::update()
 			if (*mSelIndex < mMaxSel) {
 				mLastIndex = *mSelIndex;
 				*mSelIndex += 1;
-				_0D = 1;
+				mSelectionChanged = 1;
 				if (!mIsChanging) {
 					mIsChanging = true;
 					f32 time    = (mTimeFactor1 / sys->mDeltaTime);
 					mCounter    = time;
-					_08         = time;
+					mCounterMax = time;
 					return;
 				}
-				f32 time = (mTimeFactor2 / sys->mDeltaTime);
-				mCounter = time;
-				_08      = time;
+				f32 time    = (mTimeFactor2 / sys->mDeltaTime);
+				mCounter    = time;
+				mCounterMax = time;
 			}
 		}
 	} else if (isBackwards) {
@@ -86,23 +85,23 @@ void EUTPadInterface_countNum::update()
 			if (*mSelIndex > mMinSel) {
 				mLastIndex = *mSelIndex;
 				*mSelIndex -= 1;
-				_0D = 1;
+				mSelectionChanged = 1;
 				if (!mIsChanging) {
 					mIsChanging = true;
 					f32 time    = (mTimeFactor1 / sys->mDeltaTime);
 					mCounter    = time;
-					_08         = time;
+					mCounterMax = time;
 					return;
 				}
-				f32 time = (mTimeFactor2 / sys->mDeltaTime);
-				mCounter = time;
-				_08      = time;
+				f32 time    = (mTimeFactor2 / sys->mDeltaTime);
+				mCounter    = time;
+				mCounterMax = time;
 			}
 		}
 	} else {
 		mIsChanging = false;
 		mCounter    = 0;
-		_08         = 0;
+		mCounterMax = 0;
 	}
 }
 

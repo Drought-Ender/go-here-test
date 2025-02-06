@@ -62,9 +62,10 @@ struct TAdaptor_actor : public JStudio::TAdaptor_actor {
 		typedef f32 (JStage::TActor::*Getter)() const;
 		typedef f32 (JStage::TActor::*MaxGetter)() const;
 
-		TVVOutput_ANIMATION_FRAME_(int valueIndex, Setter setter, Getter getter, MaxGetter maxGetter)
+		TVVOutput_ANIMATION_FRAME_(int valueIndex, u32 val, Setter setter, Getter getter, MaxGetter maxGetter)
 		    : TOutput()
 		    , mValueIndex(valueIndex)
+		    , _08(val)
 		    , mSetter(setter)
 		    , mGetter(getter)
 		    , mMaxGetter(maxGetter)
@@ -74,6 +75,7 @@ struct TAdaptor_actor : public JStudio::TAdaptor_actor {
 		virtual void operator()(f32, JStudio::TAdaptor*) const; // _08
 		virtual ~TVVOutput_ANIMATION_FRAME_() { }               // _0C (weak)
 
+		// _00 = VTBL
 		int mValueIndex;      // _04
 		u32 _08;              // _08
 		Setter mSetter;       // _0C
@@ -108,6 +110,12 @@ struct TAdaptor_actor : public JStudio::TAdaptor_actor {
 	void setJSG_SRT_(const JStudio::TControl*);
 	void getJSG_SRT_(const JStudio::TControl*);
 
+	inline JStage::TActor* get_pJSG() { return mObject; }
+
+	static const TVVOutputObject saoVVOutput_[2];
+	static const TVVOutput_ANIMATION_FRAME_ saoVVOutput_ANIMATION_FRAME_[3];
+
+	// _00 = VTBL
 	const JStage::TSystem* mSystem; // _124
 	JStage::TActor* mObject;        // _128
 	u32 _12C;                       // _12C
@@ -118,9 +126,6 @@ struct TAdaptor_actor : public JStudio::TAdaptor_actor {
 	u8 _140;                        // _140
 	JStage::TObject* _144;          // _144
 	u32 _148;                       // _148
-
-	static const TVVOutputObject saoVVOutput_[2];
-	static const TVVOutput_ANIMATION_FRAME_ saoVVOutput_ANIMATION_FRAME_[3];
 };
 
 struct TAdaptor_ambientLight : public JStudio::TAdaptor_ambientLight {
@@ -161,6 +166,8 @@ struct TAdaptor_camera : public JStudio::TAdaptor_camera {
 	void getJSG_position_(const JStudio::TControl*);
 	void setJSG_targetPosition_(const JStudio::TControl*);
 	void getJSG_targetPosition_(const JStudio::TControl*);
+
+	inline JStage::TCamera* get_pJSG() { return mObject; }
 
 	const JStage::TSystem* mSystem; // _FC
 	JStage::TCamera* mObject;       // _100
@@ -220,19 +227,21 @@ struct TAdaptor_light : public JStudio::TAdaptor_light {
 	virtual void adaptor_do_ENABLE(JStudio::data::TEOperationData, const void*, u32);          // _20
 	virtual void adaptor_do_FACULTY(JStudio::data::TEOperationData, const void*, u32);         // _24
 
+	static TVVOutput_direction_ saoVVOutput_direction_[6];
+
+	inline JStage::TLight* get_pJSG_() { return mObject; }
+
+	// _00      = VTBL
+	// _00-_110 = JStudio::TAdaptor_light
 	const JStage::TSystem* mSystem; // _110
 	JStage::TLight* mObject;        // _114
-	int _118;
-
-	static const TVVOutput_direction_ saoVVOutput_direction[6];
+	int _118;                       // _118
 };
 
-bool transform_toGlobalFromLocal(f32 (*)[4], const JStudio::TControl::TTransform_translation_rotation_scaling&, const JStage::TObject*,
-                                 u32);
-bool transform_toGlobalFromLocal(f32 (*)[4], const JStudio::TControl::TTransform_position&, const JStage::TObject*, u32);
-bool transform_toLocalFromGlobal(f32 (*)[4], const JStudio::TControl::TTransform_translation_rotation_scaling&, const JStage::TObject*,
-                                 u32);
-bool transform_toLocalFromGlobal(f32 (*)[4], const JStudio::TControl::TTransform_position&, const JStage::TObject*, u32);
+bool transform_toGlobalFromLocal(Mtx, const JStudio::TControl::TTransform_translation_rotation_scaling&, const JStage::TObject*, u32);
+bool transform_toGlobalFromLocal(Mtx, const JStudio::TControl::TTransform_position&, const JStage::TObject*, u32);
+bool transform_toLocalFromGlobal(Mtx, const JStudio::TControl::TTransform_translation_rotation_scaling&, const JStage::TObject*, u32);
+bool transform_toLocalFromGlobal(Mtx, const JStudio::TControl::TTransform_position&, const JStage::TObject*, u32);
 } // namespace JStudio_JStage
 
 #endif

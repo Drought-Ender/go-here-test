@@ -56,25 +56,13 @@ void FileState::dvdload()
 	info.mCameras   = 0;
 
 	static_cast<PSGame::PikSceneMgr*>(PSSystem::getSceneMgr())->newAndSetCurrentScene(info);
+	PSSystem::getSceneMgr()->doFirstLoad();
+	PSSystem::getSceneMgr()->doStartMainSeq();
 
-	PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-	sceneMgr->checkScene();
-	sceneMgr->mScenes->mChild->scene1stLoadSync();
+	mFSMgr = ebi::FileSelect::TMgr::createInstance();
+	mFSMgr->doLoadMenuResource();
+	mFSMgr->setControllers(mMainController);
 
-	sceneMgr = PSSystem::getSceneMgr();
-	sceneMgr->checkScene();
-	sceneMgr->mScenes->mChild->startMainSeq();
-
-	mFSMgr                      = ebi::FileSelect::TMgr::createInstance();
-	ebi::FileSelect::TMgr* tmgr = mFSMgr;
-	tmgr->mMgrFS.mMainScreen.loadResource();
-	JKRHeap* heap = JKRGetCurrentHeap();
-	tmgr->mCardErrorMgr.mScreen.loadResource(heap);
-	static_cast<Game::MemoryCard::Mgr*>(sys->mCardMgr)->loadResource(heap);
-	Controller* input            = mMainController;
-	ebi::FileSelect::TMgr* tmgr2 = mFSMgr;
-	tmgr2->mMgrFS.setController(input);
-	tmgr2->mCardErrorMgr.mScreen.mController = input;
 	playData->reset();
 }
 
@@ -103,17 +91,17 @@ void FileState::exec(SingleGameSection* game)
 		mFSMgr->update();
 
 		if (mFSMgr->isFinish()) {
-			switch (mFSMgr->mState) {
-			case 2:
+			switch (mFSMgr->mEndState) {
+			case ebi::FileSelect::TMgr::End_StartGame:
 				startGame(game);
 				break;
 
-			case 1:
+			case ebi::FileSelect::TMgr::End_StartNewGame:
 				gameSystem->mTimeMgr->mDayCount = 0;
 				startGame(game);
 				break;
 
-			case 3:
+			case ebi::FileSelect::TMgr::End_ReturnToTitle:
 				game->flow_goto_title();
 			}
 		}
@@ -149,11 +137,11 @@ void FileState::startGame(SingleGameSection* game)
 		game->mCurrentCourseInfo = playData->getCurrentCourse();
 		P2ASSERTLINE(469, game->mCurrentCourseInfo);
 
-		u16 flag = 1;
+		u16 loadtype = MapEnter_CaveGeyser;
 		if (playData->mDeadNaviID & 1 && playData->mDeadNaviID & 2) {
-			flag = 2;
+			loadtype = MapEnter_CaveNavisDown;
 		}
-		LoadArg arg(flag, false, true, false);
+		LoadArg arg(loadtype, false, true, false);
 		transit(game, SGS_Load, &arg);
 		break;
 	}
@@ -170,13 +158,14 @@ void FileState::startGame(SingleGameSection* game)
 		game->mCaveID            = id;
 		strcpy(game->mCaveFilename, info->getCaveinfoFilename_FromID(id));
 		game->loadMainMapSituation();
-		LoadArg arg(0, 1, 1, 0);
+		// MapEnter type isnt used when loading into caves
+		LoadArg arg(MapEnter_NewDay, true, true, false);
 		transit(game, SGS_Load, &arg);
 		break;
 	}
 
 	case STORYSAVE_DebtPaid: {
-		EndingArg arg(1);
+		EndingArg arg(EndingState::Ending_SkipMovie);
 		transit(game, SGS_Ending, &arg);
 		break;
 	}
@@ -211,7 +200,7 @@ void FileState::draw(SingleGameSection* game, Graphics& gfx)
 void FileState::cleanup(SingleGameSection* game)
 {
 	PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(sceneMgr);
+	PSSystem::validateSceneMgr(sceneMgr);
 	sceneMgr->deleteCurrentScene();
 	mFSMgr->forceQuit();
 	mMainHeap->freeAll();

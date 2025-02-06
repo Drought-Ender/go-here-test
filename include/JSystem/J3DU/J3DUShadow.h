@@ -24,8 +24,7 @@ struct J3DUShadowInfo {
 	void getTexMtxForGX(f32 (*)[4]) const;
 };
 
-struct J3DUShadowTextureSizeRatioCalcBase {
-};
+struct J3DUShadowTextureSizeRatioCalcBase { };
 
 struct J3DUShadowTextureSizeRatioCalcDefault : J3DUShadowTextureSizeRatioCalcBase {
 	void operator()(const Vec&, J3DUShadowInfo*);
@@ -42,7 +41,7 @@ struct J3DUMultiTexture {
 	void allocateTexture(u8, u16, u16, _GXTexFmt);
 	void draw(u8, u32, u32, _GXTevColorArg, u32, u32) const;
 
-#ifdef MATCHING
+#if MATCHING
 	// The following is purely made up for the sake of matching.
 	// We have no idea what the structure actually looked like.
 	u32 mCount;
@@ -58,7 +57,7 @@ struct J3DUShadowManager {
 	void calc(const Vec&, J3DUShadowTextureSizeRatioCalcBase*);
 	void capture();
 
-#ifdef MATCHING
+#if MATCHING
 	// The following is purely made up for the sake of matching.
 	// We have no idea what the structure actually looked like.
 	J3DUMultiTexture mMultiTexture;

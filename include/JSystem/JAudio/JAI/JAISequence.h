@@ -74,7 +74,7 @@ struct JAISequence : public JAISound {
 	}
 	virtual void setTempoProportion(f32 value, u32 moveTime) // _44 (weak)
 	{
-		mSeqParameter.set(value, moveTime);
+		mSeqParameter.mTempo.set(value, moveTime);
 		if (mSeqParameter.mUpdateData) {
 			mSeqParameter.mUpdateData->mActiveTrackFlag |= JAInter::SOUNDACTIVE_TempoProportion;
 		}
@@ -82,7 +82,7 @@ struct JAISequence : public JAISound {
 	virtual f32 getTempoProportion() // _48 (weak)
 	{
 		if (mState == SOUNDSTATE_Playing || mState == SOUNDSTATE_Fadeout) {
-			return mSeqParameter.mCurrentValue;
+			return mSeqParameter.mTempo.mCurrentValue;
 		}
 		return -1.0f;
 	}
@@ -173,6 +173,8 @@ struct JAISequence : public JAISound {
 	void getTrackParameterU7(u8, char);
 	void getTrackParameterF32(u8, char);
 	void getTrackPortData(u8, u8);
+
+	inline JASTrack* getTrack() { return &mSeqParameter.mTrack; }
 
 	JAInter::SeqParameter mSeqParameter; // _48
 };

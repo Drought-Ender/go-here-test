@@ -204,7 +204,7 @@ void Obj::collisionCallback(CollEvent& event)
 {
 	if (!isEvent(0, EB_Bittered)) {
 		Creature* creature = event.mCollidingCreature;
-		if (creature && event.mCollisionObj && creature->isAlive() && creature->mBounceTriangle) {
+		if (creature && event.mCollisionObj && creature->isAlive() && creature->mFloorTriangle) {
 			if (creature->isNavi() || creature->isPiki()) {
 				if (isCollisionCheck(event.mHitPart)) {
 					InteractPress press(this, C_GENERALPARMS.mAttackDamage.mValue, nullptr);
@@ -330,7 +330,7 @@ void Obj::getTargetPosition()
 			} else if (sqrDistanceXZ(mPosition, mTargetPosition) < 625.0f) {
 				f32 range    = (C_GENERALPARMS.mTerritoryRadius.mValue - C_GENERALPARMS.mHomeRadius.mValue);
 				f32 randDist = C_GENERALPARMS.mHomeRadius.mValue + randWeightFloat(range);
-				f32 ang2     = JMath::atanTable_.atan2_(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
+				f32 ang2     = JMAAtan2Radian(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
 				f32 ang1     = randWeightFloat(PI);
 
 				f32 ang3      = HALF_PI;
@@ -603,7 +603,8 @@ void Obj::createItemAndEnemy()
 			birthArg.mFaceDir = mFaceDir;
 			getThrowupItemPosition(&birthArg.mPosition);
 			Vector3f velocity = Vector3f(0.0f);
-			mititeMgr->createGroupByBigFoot(birthArg, 30, velocity, 100.0f);
+			mititeMgr->createGroupByBigFoot(birthArg, TAMAGOMUSHI_GROUP_COUNT, velocity,
+			                                100.0f); // spread fall speeds randomly by up to +/- 100
 		}
 	}
 }
@@ -615,7 +616,7 @@ void Obj::createItemAndEnemy()
 void Obj::startBossChargeBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_AttackPrep);
 }
 
@@ -626,7 +627,7 @@ void Obj::startBossChargeBGM()
 void Obj::startBossAttackLoopBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_AttackLong);
 }
 
@@ -637,7 +638,7 @@ void Obj::startBossAttackLoopBGM()
 void Obj::finishBossAttackLoopBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 }
 
@@ -649,7 +650,7 @@ void Obj::startStoneStateBossAttackLoopBGM()
 {
 	if (mIsEnraged) {
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-		PSM::checkBoss(soundObj);
+		PSM::assertIsBoss(soundObj);
 		soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 	}
 }
@@ -662,7 +663,7 @@ void Obj::finishStoneStateBossAttackLoopBGM()
 {
 	if (mIsEnraged) {
 		PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-		PSM::checkBoss(soundObj);
+		PSM::assertIsBoss(soundObj);
 		soundObj->jumpRequest(PSM::EnemyMidBoss::BossBgm_AttackLong);
 	}
 }
@@ -674,7 +675,7 @@ void Obj::finishStoneStateBossAttackLoopBGM()
 void Obj::updateBossBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	if (mStuckPikminCount) {
 		soundObj->postPikiAttack(true);
@@ -690,7 +691,7 @@ void Obj::updateBossBGM()
 void Obj::resetBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(false);
 }
 
@@ -701,7 +702,7 @@ void Obj::resetBossAppearBGM()
 void Obj::setBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(true);
 }
 
@@ -788,7 +789,7 @@ void Obj::createOnGroundEffect(int footIdx, WaterBox* wbox)
 		waterWalk.create(&fxArg);
 		PSM::SeSound* sound = PSStartSoundVec(PSSE_EV_ITEM_LAND_WATER1_XL, (Vec*)&mJointPositions[footIdx][3]);
 		if (sound) {
-			sound->setPitch(0.8f, 0, 0);
+			sound->setPitch(0.8f, 0, SOUNDPARAM_Unk0);
 		}
 
 	} else {
@@ -805,8 +806,8 @@ void Obj::createOnGroundEffect(int footIdx, WaterBox* wbox)
 	}
 
 	PSStartSoundVec(PSSE_EN_BIGFOOT_WALK, (Vec*)&mJointPositions[footIdx][3]);
-	cameraMgr->startVibration(6, effectPos, 2);
-	rumbleMgr->startRumble(14, effectPos, RUMBLEID_Both);
+	cameraMgr->startVibration(VIBTYPE_LightFastShort, effectPos, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, effectPos, RUMBLEID_Both);
 }
 
 /**

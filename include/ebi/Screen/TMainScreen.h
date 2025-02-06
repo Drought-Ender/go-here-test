@@ -34,7 +34,12 @@ struct TMainScreen : public TScreenBase {
 		FileSelectScreen_Decided   = 8
 	};
 
-	~TMainScreen() { }
+	enum State {
+		State_FadeIn  = 1,
+		State_FadeOut = 2,
+	};
+
+	// ~TMainScreen() { }
 
 	virtual void doSetArchive(JKRArchive*);           // _24
 	virtual void doOpenScreen(ArgOpen*);              // _28
@@ -95,6 +100,11 @@ struct TMainScreen : public TScreenBase {
 		return false;
 	}
 
+	void setTevColor(J2DTevBlock* paneIconTev, J2DGXColorS10& newColor)
+	{
+		newColor.a = (u16)paneIconTev->getTevColor(0)->a;
+		paneIconTev->setTevColor(0, newColor);
+	}
 	// _00     = VTBL
 	// _00-_0C = TScreenBase
 	P2DScreen::Mgr_tuning* mMainScreen;              // _00C

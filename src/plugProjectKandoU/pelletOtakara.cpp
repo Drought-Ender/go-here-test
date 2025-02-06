@@ -32,7 +32,7 @@ void Object::constructor()
  */
 void Object::do_onInit(CreatureInitArg*)
 {
-	P2ASSERTLINE(171, mSoundMgr->getCastType() == 12);
+	P2ASSERTLINE(171, mSoundMgr->getCastType() == PSM::CCT_PelletOtakara);
 	PSM::PelletOtakara* psm = static_cast<PSM::PelletOtakara*>(mSoundMgr);
 	psm->mBedamaType        = 0;
 	if (gameSystem->isVersusMode()) {
@@ -67,27 +67,27 @@ void Object::getShadowParam(ShadowParam& shadowParam) { Pellet::getShadowParam(s
  */
 void Object::sound_otakaraEventStart()
 {
-	P2ASSERTLINE(253, mSoundMgr->getCastType() == 12);
+	P2ASSERTLINE(253, mSoundMgr->getCastType() == PSM::CCT_PelletOtakara);
 
 	PSM::PelletOtakara* psm = static_cast<PSM::PelletOtakara*>(mSoundMgr);
 	if (gameSystem->isVersusMode()) {
 		int color = mCarryColor;
 		int id    = -1;
-		if (color == Blue) {
-			id = 0;
-		} else if (color == Red) {
-			id = 1;
+		if (color == CINFOCOLOR_Blue) {
+			id = ONYON_TYPE_BLUE;
+		} else if (color == CINFOCOLOR_Red) {
+			id = ONYON_TYPE_RED;
 		}
 
 		if (id != -1) {
 			Onyon* goal = ItemOnyon::mgr->getOnyon(id);
 
 			if (mPelletFlag == FLAG_VS_BEDAMA_RED) {
-				if (id != Blue) {
+				if (id != ONYON_TYPE_BLUE) {
 					goal = nullptr;
 				}
 			} else if (mPelletFlag == FLAG_VS_BEDAMA_BLUE) {
-				if (id != Red) {
+				if (id != ONYON_TYPE_RED) {
 					goal = nullptr;
 				}
 			} else if (mPelletFlag != FLAG_VS_CHERRY && mPelletFlag != FLAG_VS_BEDAMA_YELLOW) {
@@ -110,16 +110,16 @@ void Object::sound_otakaraEventStart()
  */
 void Object::sound_otakaraEventRestart()
 {
-	P2ASSERTLINE(309, mSoundMgr->getCastType() == 12);
+	P2ASSERTLINE(309, mSoundMgr->getCastType() == PSM::CCT_PelletOtakara);
 
 	PSM::PelletOtakara* psm = static_cast<PSM::PelletOtakara*>(mSoundMgr);
 	if (gameSystem->isVersusMode()) {
 		int color = mCarryColor;
 		int id    = -1;
-		if (color == Blue) {
-			id = 0;
-		} else if (color == Red) {
-			id = 1;
+		if (color == CINFOCOLOR_Blue) {
+			id = ONYON_TYPE_BLUE;
+		} else if (color == CINFOCOLOR_Red) {
+			id = ONYON_TYPE_RED;
 		}
 
 		if (id != -1) {
@@ -153,7 +153,7 @@ void Object::sound_otakaraEventRestart()
  */
 void Object::sound_otakaraEventStop()
 {
-	P2ASSERTLINE(360, mSoundMgr->getCastType() == 12);
+	P2ASSERTLINE(360, mSoundMgr->getCastType() == PSM::CCT_PelletOtakara);
 
 	PSM::PelletOtakara* psm = static_cast<PSM::PelletOtakara*>(mSoundMgr);
 	psm->otakaraEventStop();
@@ -165,7 +165,7 @@ void Object::sound_otakaraEventStop()
  */
 void Object::sound_otakaraEventFinish()
 {
-	P2ASSERTLINE(373, mSoundMgr->getCastType() == 12);
+	P2ASSERTLINE(373, mSoundMgr->getCastType() == PSM::CCT_PelletOtakara);
 
 	PSM::PelletOtakara* psm = static_cast<PSM::PelletOtakara*>(mSoundMgr);
 	psm->otakaraEventFinish();
@@ -202,9 +202,9 @@ void Object::theEntry()
 {
 	BaseGameSection* game = gameSystem->mSection;
 	if (game->mDraw2DCreature != this && mConfig->mParams.mIndirectState == PelletConfig::Indirect_Yes) {
-		game->setDrawBuffer(8);
+		game->setDrawBuffer(DB_ObjectLastLayer);
 		mModel->mJ3dModel->entry();
-		game->setDrawBuffer(0);
+		game->setDrawBuffer(DB_NormalLayer);
 	} else {
 		mModel->mJ3dModel->entry();
 	}
@@ -233,30 +233,9 @@ void Object::changeMaterial()
 
 		mModel->mJ3dModel->calcMaterial();
 
-		J3DTexMtx* texMtx                    = mFbMaterial->mTexGenBlock->getTexMtx(1);
-		texMtx->mTexMtxInfo.mEffectMtx[0][0] = copyMatrix[0][0];
-		texMtx->mTexMtxInfo.mEffectMtx[0][1] = copyMatrix[0][1];
-		texMtx->mTexMtxInfo.mEffectMtx[0][2] = copyMatrix[0][2];
-		texMtx->mTexMtxInfo.mEffectMtx[0][3] = copyMatrix[0][3];
-		texMtx->mTexMtxInfo.mEffectMtx[1][0] = copyMatrix[1][0];
-		texMtx->mTexMtxInfo.mEffectMtx[1][1] = copyMatrix[1][1];
-		texMtx->mTexMtxInfo.mEffectMtx[1][2] = copyMatrix[1][2];
-		texMtx->mTexMtxInfo.mEffectMtx[1][3] = copyMatrix[1][3];
-		texMtx->mTexMtxInfo.mEffectMtx[2][0] = copyMatrix[2][0];
-		texMtx->mTexMtxInfo.mEffectMtx[2][1] = copyMatrix[2][1];
-		texMtx->mTexMtxInfo.mEffectMtx[2][2] = copyMatrix[2][2];
-		texMtx->mTexMtxInfo.mEffectMtx[2][3] = copyMatrix[2][3];
-		texMtx->mTexMtxInfo.mEffectMtx[3][0] = texMtx->mTexMtxInfo.mEffectMtx[3][1] = texMtx->mTexMtxInfo.mEffectMtx[3][2] = 0.0f;
-		texMtx->mTexMtxInfo.mEffectMtx[3][3]                                                                               = 1.0f;
+		mFbMaterial->getTexGenBlock()->getTexMtx(1)->getTexMtxInfo().setMtx(copyMatrix);
 
-		u16 id              = mFbTextureID;
-		const ResTIMG* xfb  = gameSystem->getXfbTexture()->getTexInfo();
-		J3DTexture* texData = mModel->mJ3dModel->mModelData->getTexture();
-
-		*texData->getResTIMG(id) = *xfb;
-
-		texData->setImageOffset((u32)xfb, id);
-		texData->setPaletteOffset((u32)xfb, id);
+		mModel->getJ3DModel()->getModelData()->getTexture()->changeImage(gameSystem->getXfbTexture()->getTexInfo(), mFbTextureID);
 	}
 }
 
@@ -265,7 +244,7 @@ void Object::changeMaterial()
  * @note Size: 0xB0
  */
 Mgr::Mgr()
-    : FixedSizePelletMgr<Object>(PelletList::OTAKARA)
+    : FixedSizePelletMgr<Object>(PelletList::PLK_Otakara)
 {
 }
 
@@ -297,7 +276,7 @@ Pellet* Mgr::generatorBirth(Vector3f& pos, Vector3f& rot, GenPelletParm* genParm
 	PelletConfig* config = mgr->getPelletConfig(genParm->mIndex);
 	PelletInitArg arg;
 	arg.mTextIdentifier = config->mParams.mName.mData;
-	arg.mPelletType     = PELTYPE_TREASURE;
+	arg.mPelletType     = PelletType::Treasure;
 	arg.mPelletIndex    = genParm->mIndex;
 	arg.mPelView        = nullptr;
 

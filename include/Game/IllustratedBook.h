@@ -54,54 +54,54 @@ struct Camera : public LookAtCamera {
 
 	// _00      = VTBL
 	// _00-_198 = LookAtCamera
-	Controller* mController;    // _198
-	Creature* mTargetObject;    // _19C
-	Vector3f _1A0;              // _1A0
-	Vector3f _1AC;              // _1AC
-	Vector3f _1B8;              // _1B8
-	f32 mHorizontalAngle;       // _1C4
-	f32 mObjectRadius;          // _1C8
-	f32 mCurrentHeight;         // _1CC
-	f32 mMinHeight;             // _1D0
-	f32 mMaxHeight;             // _1D4
-	Vector3f mGoalPosition;     // _1D8
-	Vector3f mObjectOffset;     // _1E4
-	Vector3f _1F0;              // _1F0
-	Vector3f mPositionList[10]; // _1FC
-	int mCurrentPositionIndex;  // _274
-	f32 _278;                   // _278
-	f32 _27C;                   // _27C
-	f32 _280;                   // _280
-	f32 _284;                   // _284
-	f32 mCurrViewAngle;         // _288
-	f32 mMinViewAngle;          // _28C
-	f32 mMaxViewAngle;          // _290
-	f32 mFocusLevel;            // _294
-	f32 _298;                   // _298
-	f32 _29C;                   // _29C
-	Vector3f _2A0;              // _2A0
-	Vector3f _2AC;              // _2AC
-	Vector3f _2B8;              // _2B8
-	Vector3f _2C4;              // _2C4
-	Vector3f mVibrationForce;   // _2D0
-	f32 _2DC;                   // _2DC
-	f32 _2E0;                   // _2E0
-	f32 _2E4;                   // _2E4
-	f32 _2E8;                   // _2E8
-	f32 _2EC;                   // _2EC
-	f32 _2F0;                   // _2F0
-	f32 _2F4;                   // _2F4
-	f32 _2F8;                   // _2F8
-	f32 _2FC;                   // _2FC
-	f32 _300;                   // _300
-	f32 mFovChangeSpeed;        // _304
-	f32 _308;                   // _308
-	f32 _30C;                   // _30C
-	f32 _310;                   // _310
-	f32 _314;                   // _314
-	f32 _318;                   // _318
-	f32 _31C;                   // _31C
-	f32 _320;                   // _320
+	Controller* mController;          // _198
+	Creature* mTargetObject;          // _19C
+	Vector3f mBasePhysicalPosition;   // _1A0 - current true position of camera, not accounting for random movement
+	Vector3f mTrueCurrentPhysicalPos; // _1AC - true position, including the random swaying
+	Vector3f mCameraLastMoveDest;     // _1B8 - set to position of target when initially loading an enemy/pellet, still gets used after
+	f32 mHorizontalAngle;             // _1C4
+	f32 mObjectRadius;                // _1C8
+	f32 mCurrentHeight;               // _1CC
+	f32 mMinHeight;                   // _1D0
+	f32 mMaxHeight;                   // _1D4
+	Vector3f mGoalPosition;           // _1D8
+	Vector3f mObjectOffset;           // _1E4
+	Vector3f mMovementVelocity;       // _1F0 - used to control speed of camera movement
+	Vector3f mPositionList[10];       // _1FC
+	int mCurrentPositionIndex;        // _274
+	f32 mHorizontalInputDampened;     // _278 - moves toward value below, with a curve to the rate of change
+	f32 mCurrentHorizontalInput;      // _27C - ranges from -100 to 100 based directly on analog input
+	f32 mVerticalInputDampened;       // _280
+	f32 mCurrentVerticalInput;        // _284
+	f32 mCurrViewAngle;               // _288
+	f32 mMinViewAngle;                // _28C
+	f32 mMaxViewAngle;                // _290
+	f32 mFocusLevel;                  // _294
+	f32 mCurrentBlurLevel;            // _298
+	f32 mDefaultMaxFocus;             // _29C
+	Vector3f mCurrentShakeMagnitude;  // _2A0
+	Vector3f mShakeTargetPosition;    // _2AC
+	Vector3f mShakeUpdateVelocity;    // _2B8
+	Vector3f mCameraShakeOffsetPos;   // _2C4
+	Vector3f mVibrationForce;         // _2D0
+	f32 mCameraShakeFrequency;        // _2DC - how often should random small camera shakes happen
+	f32 mCameraShakeBaseMagnitude;    // _2E0 - how strong should random small camera shakes be
+	f32 mPassiveShakeBlurLevel;       // _2E4 - how much to blur the camera when doing random shakes
+	f32 mStrongShakeChance;           // _2E8 - chance for a random camera shake to be boosted
+	f32 mStrongShakePower;            // _2EC - how much stronger should a random super-shake be
+	f32 mShakeAccelRate;              // _2F0 - how fast shakes generally move
+	f32 mShakeDecelRate;              // _2F4 - how fast shakes lose their momentum
+	f32 mCStickMoveModifierX;         // _2F8 - how fast the camera should turn with cstick, horizontal
+	f32 mCStickMoveModifierY;         // _2FC - how fast the camera should turn with cstick, vertical
+	f32 mCStickMoveAccelRate;         // _300 - how fast the cstick rotation accels/decels
+	f32 mFovChangeSpeed;              // _304 - how fast the FOV changes with the dpad
+	f32 mFovChangeAccel;              // _308 - how fast FOV change accels/decels
+	f32 mAnalogMoveSpeed;             // _30C - how fast to move to follow analog stick input
+	f32 mAnalogMoveAccel;             // _310 - how fast moving the view accels/decels
+	f32 mVibrationForceMultiplier;    // _314
+	f32 mVibrationModX;               // _318
+	f32 mVibrationModY;               // _31C
+	f32 mVibrationModZ;               // _320
 };
 
 struct EnemyTexMgr : public IconTexture::Mgr {
@@ -119,17 +119,17 @@ struct CameraParms {
 	struct Parms : public Parameters {
 		Parms()
 		    : Parameters(nullptr, "cameraParms")
-		    , mRadius(this, 'f000', "”¼Œa", 350.0f, 0.0f, 2000.0f)                // 'radius'
-		    , mInitialHeight(this, 'f001', "‚‚³@‰Šú’l", 500.0f, 0.0f, 1000.0f) // 'height initial value'
-		    , mMinHeight(this, 'f002', "‚‚³@Å¬’l", 0.0f, 0.0f, 1000.0f)       // 'height min value'
-		    , mMaxHeight(this, 'f003', "‚‚³@Å‘å’l", 700.0f, 0.0f, 1000.0f)     // 'height max value'
-		    , mOffsetX(this, 'f004', "ƒIƒtƒZƒbƒg@‚˜", 0.0f, -500.0f, 500.0f)     // 'offset X'
-		    , mOffsetY(this, 'f005', "ƒIƒtƒZƒbƒg@‚™", 0.0f, -500.0f, 500.0f)     // 'offset Y'
-		    , mOffsetZ(this, 'f006', "ƒIƒtƒZƒbƒg@‚š", 0.0f, -500.0f, 500.0f)     // 'offset Z'
-		    , mInitialViewAngle(this, 'f009', "‰æŠp@‰Šú’l", 30.0f, 0.0f, 90.0f) // 'view angle initial value'
-		    , mMinViewAngle(this, 'f007', "‰æŠp@Å¬’l", 0.1f, 0.0f, 90.0f)      // 'view angle min value'
-		    , mMaxViewAngle(this, 'f008', "‰æŠp@Å‘å’l", 90.0f, 0.0f, 90.0f)     // 'view angle max value'
-		    , mInitialRotation(this, 'f010', "‰ñ“]@‰Šú’l", 0.0f, 0.0f, 360.0f)  // 'rotation initial value'
+		    , mRadius(this, 'f000', "åŠå¾„", 350.0f, 0.0f, 2000.0f)                // 'radius'
+		    , mInitialHeight(this, 'f001', "é«˜ã•ã€€åˆæœŸå€¤", 500.0f, 0.0f, 1000.0f) // 'height initial value'
+		    , mMinHeight(this, 'f002', "é«˜ã•ã€€æœ€å°å€¤", 0.0f, 0.0f, 1000.0f)       // 'height min value'
+		    , mMaxHeight(this, 'f003', "é«˜ã•ã€€æœ€å¤§å€¤", 700.0f, 0.0f, 1000.0f)     // 'height max value'
+		    , mOffsetX(this, 'f004', "ã‚ªãƒ•ã‚»ãƒƒãƒˆã€€ï½˜", 0.0f, -500.0f, 500.0f)     // 'offset X'
+		    , mOffsetY(this, 'f005', "ã‚ªãƒ•ã‚»ãƒƒãƒˆã€€ï½™", 0.0f, -500.0f, 500.0f)     // 'offset Y'
+		    , mOffsetZ(this, 'f006', "ã‚ªãƒ•ã‚»ãƒƒãƒˆã€€ï½š", 0.0f, -500.0f, 500.0f)     // 'offset Z'
+		    , mInitialViewAngle(this, 'f009', "ç”»è§’ã€€åˆæœŸå€¤", 30.0f, 0.0f, 90.0f) // 'view angle initial value'
+		    , mMinViewAngle(this, 'f007', "ç”»è§’ã€€æœ€å°å€¤", 0.1f, 0.0f, 90.0f)      // 'view angle min value'
+		    , mMaxViewAngle(this, 'f008', "ç”»è§’ã€€æœ€å¤§å€¤", 90.0f, 0.0f, 90.0f)     // 'view angle max value'
+		    , mInitialRotation(this, 'f010', "å›è»¢ã€€åˆæœŸå€¤", 0.0f, 0.0f, 360.0f)  // 'rotation initial value'
 		{
 		}
 
@@ -165,13 +165,27 @@ struct ColorSetting : public CNode {
 
 	void update();
 
+	JUtility::TColor getActiveColorA()
+	{
+		JUtility::TColor outColor;
+		outColor.set(mActiveColorA.r, mActiveColorA.g, mActiveColorA.b, mActiveColorA.a);
+		return outColor;
+	}
+
+	JUtility::TColor getActiveColorB()
+	{
+		JUtility::TColor outColor;
+		outColor.set(mActiveColorB.r, mActiveColorB.g, mActiveColorB.b, mActiveColorB.a);
+		return outColor;
+	}
+
 	// _00     = VTBL
 	// _00-_18 = CNode
-	Color4 _18[5][2]; // _18
-	Color4 _40[5];    // _40
-	GXColor _54;      // _54
-	GXColor _58;      // _58
-	Color4 _5C;       // _5C
+	Color4 mColorListA[5][2]; // _18
+	Color4 mColorListB[5];    // _40
+	GXColor mActiveColorA;    // _54
+	GXColor mActiveColorB;    // _58
+	Color4 mActiveColorC;     // _5C
 };
 
 struct DebugParms : public CNode {
@@ -191,9 +205,9 @@ struct PositionParms : public CNode {
 	struct Parms : public Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "PositionParms")
-		    , mAppearPosX(this, 'f000', "oŒ»ˆÊ’u@‚˜", 0.0f, -10000.0f, 10000.0f) // 'appearance position X'
-		    , mAppearPosY(this, 'f001', "oŒ»ˆÊ’u@‚™", 0.0f, -10000.0f, 10000.0f) // 'appearance position Y'
-		    , mAppearPosZ(this, 'f002', "oŒ»ˆÊ’u@‚š", 0.0f, -10000.0f, 10000.0f) // 'appearance position Z'
+		    , mAppearPosX(this, 'f000', "å‡ºç¾ä½ç½®ã€€ï½˜", 0.0f, -10000.0f, 10000.0f) // 'appearance position X'
+		    , mAppearPosY(this, 'f001', "å‡ºç¾ä½ç½®ã€€ï½™", 0.0f, -10000.0f, 10000.0f) // 'appearance position Y'
+		    , mAppearPosZ(this, 'f002', "å‡ºç¾ä½ç½®ã€€ï½š", 0.0f, -10000.0f, 10000.0f) // 'appearance position Z'
 		{
 		}
 
@@ -228,9 +242,9 @@ struct EnemyParms : public CNode {
 	struct Parms : public Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "enemyParms")
-		    , mSize(this, 'f001', "‘å‚«‚³", 10.0f, 0.0f, 1000.0f)         // 'size'
-		    , mAppearRange(this, 'f000', "oŒ»”ÍˆÍ", 0.0f, 0.0f, 1000.0f) // 'occurence range'
-		    , mAppearNum(this, 'i000', "oŒ»”", 1, 1, 99)
+		    , mSize(this, 'f001', "å¤§ãã•", 10.0f, 0.0f, 1000.0f)         // 'size'
+		    , mAppearRange(this, 'f000', "å‡ºç¾ç¯„å›²", 0.0f, 0.0f, 1000.0f) // 'occurence range'
+		    , mAppearNum(this, 'i000', "å‡ºç¾æ•°", 1, 1, 99)
 		{
 		}
 
@@ -267,9 +281,9 @@ struct ItemParms : public CNode {
 	struct Parms : public Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "enemyParms")
-		    , mOffsetX(this, 'f000', "ƒIƒtƒZƒbƒg‚˜", 0.0f, -10000.0f, 10000.0f)
-		    , mOffsetY(this, 'f001', "ƒIƒtƒZƒbƒg‚™", 0.0f, -10000.0f, 10000.0f)
-		    , mOffsetZ(this, 'f002', "ƒIƒtƒZƒbƒg‚š", 0.0f, -10000.0f, 10000.0f)
+		    , mOffsetX(this, 'f000', "ã‚ªãƒ•ã‚»ãƒƒãƒˆï½˜", 0.0f, -10000.0f, 10000.0f)
+		    , mOffsetY(this, 'f001', "ã‚ªãƒ•ã‚»ãƒƒãƒˆï½™", 0.0f, -10000.0f, 10000.0f)
+		    , mOffsetZ(this, 'f002', "ã‚ªãƒ•ã‚»ãƒƒãƒˆï½š", 0.0f, -10000.0f, 10000.0f)
 		{
 		}
 

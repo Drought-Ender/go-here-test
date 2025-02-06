@@ -112,19 +112,19 @@ struct Obj : public EnemyBase {
 
 	// _00 		= VTBL
 	// _00-_2BC	= EnemyBase
-	FSM* mFsm;              // _2BC
-	StateID mNextState;     // _2C0
-	f32 _2C4;               // _2C4, timer?
-	f32 _2C8;               // _2C8
-	f32 mEscapeSfxTimer;    // _2CC
-	u8 _2D0;                // _2D0
-	Vector3f mMovePosition; // _2D4
-	Creature* mTreasure;    // _2E0
-	f32 mTreasureHealth;    // _2E4
-	f32 _2E8;               // _2E8, timer?
-	f32 mBodyHeightOffset;  // _2EC
-	f32 mCellRadius;        // _2F0
-	                        // _2F4 = PelletView
+	FSM* mFsm;                 // _2BC
+	StateID mNextState;        // _2C0
+	f32 mAttackWaitTimer;      // _2C4
+	f32 mAttackActiveTimer;    // _2C8
+	f32 mEscapeSfxTimer;       // _2CC
+	u8 mIsAttackCharging;      // _2D0
+	Vector3f mMovePosition;    // _2D4
+	Creature* mTreasure;       // _2E0
+	f32 mTreasureHealth;       // _2E4
+	f32 mItemSearchDelayTimer; // _2E8
+	f32 mBodyHeightOffset;     // _2EC
+	f32 mCellRadius;           // _2F0
+	                           // _2F4 = PelletView
 };
 
 struct Mgr : public EnemyMgrBase {
@@ -150,10 +150,10 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "OtakaraBaseParms")
-		    , mOtakaraLife(this, 'fp01', "ƒIƒ^ƒJƒ‰ƒ‰ƒCƒt", 100.0f, 0.0f, 10000.0f) // 'otakara life'
-		    , mNormalAttack(this, 'fp10', "ƒm[ƒ}ƒ‹ƒAƒ^ƒbƒN", 1.0f, 0.0f, 10.0f)   // 'normal attack'
-		    , mOtakaraAttack(this, 'fp11', "ƒIƒ^ƒJƒ‰ƒAƒ^ƒbƒN", 1.25f, 0.0f, 10.0f) // 'otakara attack'
-		    , mTreasureCatch(this, 'fp21', "ƒIƒ^ƒJƒ‰ƒLƒƒƒbƒ`", 2.5f, 0.0f, 10.0f)  // 'treasure catch'
+		    , mOtakaraLife(this, 'fp01', "ã‚ªã‚¿ã‚«ãƒ©ãƒ©ã‚¤ãƒ•", 100.0f, 0.0f, 10000.0f) // 'otakara life'
+		    , mNormalAttack(this, 'fp10', "ãƒãƒ¼ãƒãƒ«ã‚¢ã‚¿ãƒƒã‚¯", 1.0f, 0.0f, 10.0f)   // 'normal attack'
+		    , mOtakaraAttack(this, 'fp11', "ã‚ªã‚¿ã‚«ãƒ©ã‚¢ã‚¿ãƒƒã‚¯", 1.25f, 0.0f, 10.0f) // 'otakara attack'
+		    , mTreasureCatch(this, 'fp21', "ã‚ªã‚¿ã‚«ãƒ©ã‚­ãƒ£ãƒƒãƒ", 2.5f, 0.0f, 10.0f)  // 'treasure catch'
 		{
 		}
 

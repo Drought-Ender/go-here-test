@@ -18,16 +18,16 @@ namespace Farm {
  */
 FarmMgr::FarmMgr(u32 farmType)
     : GenericObjectMgr()
-    , CNode("”_kƒ}ƒl[ƒWƒƒ")
+    , CNode("è¾²è€•ãƒžãƒãƒ¼ã‚¸ãƒ£")
     , mModelType(farmType)
-    , mFarmsRootNode("”_kƒ|ƒCƒ“ƒg")
+    , mFarmsRootNode("è¾²è€•ãƒã‚¤ãƒ³ãƒˆ")
     , mDirectorUpdator(nullptr)
-    , _3C(0)
-    , _3D(0)
+    , mUnused1(0)
+    , mUnused2(0)
 {
 	add(&mFarmsRootNode);
-	_3C = 0;
-	_3D = 0;
+	mUnused1 = 0;
+	mUnused2 = 0;
 }
 
 /**
@@ -82,11 +82,11 @@ void FarmMgr::doAnimation()
  */
 void FarmMgr::doEntry()
 {
-	gameSystem->setDrawBuffer(9);
+	gameSystem->setDrawBuffer(DB_FarmLayer);
 	if (mFarmsRootNode.mChild) {
 		FOREACH_NODE(Farm, mFarmsRootNode.mChild, farm) { farm->doEntry(); }
 	}
-	gameSystem->setDrawBuffer(0);
+	gameSystem->setDrawBuffer(DB_NormalLayer);
 }
 
 /**

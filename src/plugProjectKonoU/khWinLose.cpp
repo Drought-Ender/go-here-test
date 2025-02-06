@@ -4,6 +4,7 @@
 #include "JSystem/JKernel/JKRArchive.h"
 #include "utilityU.h"
 #include "JSystem/J2D/J2DAnmLoader.h"
+#include "Screen/Game2DMgr.h"
 
 static void _Print(char* format, ...) { OSReport(format, __FILE__); }
 
@@ -157,8 +158,8 @@ bool ObjWinLose::updateAnimation()
 	// Loop through each screen
 	for (int i = 0; i < mScreenNum; i++) {
 		if (mScreenA[i]) {
-			mAnim1[i]->mCurrentFrame = mAnimTime1[i];
-			mAnim3[i]->mCurrentFrame = mAnimTime3[i];
+			mAnim1[i]->setFrame(mAnimTime1[i]);
+			mAnim3[i]->setFrame(mAnimTime3[i]);
 
 			mScreenA[i]->animation();
 
@@ -171,7 +172,7 @@ bool ObjWinLose::updateAnimation()
 			}
 
 			// Check if the animation has finished for both the first and third animations
-			if (mAnimTime1[i] >= mAnim1[i]->mFrameLength || mAnimTime3[i] >= mAnim3[i]->mFrameLength) {
+			if (mAnimTime1[i] >= mAnim1[i]->getFrameMax() || mAnimTime3[i] >= mAnim3[i]->getFrameMax()) {
 				mAnimTime3[i] = 0.0f;
 				mAnimTime1[i] = 0.0f;
 
@@ -184,8 +185,8 @@ bool ObjWinLose::updateAnimation()
 
 		// Check if it's time to update the second and fourth animations
 		if (mDoUpdateAnim) {
-			mAnim2[i]->mCurrentFrame = mAnimTime2[i];
-			mAnim4[i]->mCurrentFrame = mAnimTime4[i];
+			mAnim2[i]->setFrame(mAnimTime2[i]);
+			mAnim4[i]->setFrame(mAnimTime4[i]);
 
 			mScreenB[i]->animation();
 
@@ -193,10 +194,10 @@ bool ObjWinLose::updateAnimation()
 			mAnimTime4[i] += 1.0f;
 
 			// Check if the animation has finished for both the second and fourth animations
-			if (mAnimTime2[i] >= mAnim2[i]->mFrameLength) {
+			if (mAnimTime2[i] >= mAnim2[i]->getFrameMax()) {
 				mAnimTime2[i] = 0.0f;
 			}
-			if (mAnimTime4[i] >= mAnim4[i]->mFrameLength) {
+			if (mAnimTime4[i] >= mAnim4[i]->getFrameMax()) {
 				mAnimTime4[i] = 0.0f;
 			}
 
@@ -224,11 +225,11 @@ bool ObjWinLose::updateAnimation()
 
 	// Check if it's time to stop playing BGM and SEs
 	if (old > msVal.mEndBGMFrame) {
-		disp->_0C = 3;
+		disp->mStatus = ::Screen::Game2DMgr::CHECK2D_WinLose_Finished;
 		PSStop2DStream();
 		PSMuteOffSE_on2D();
 	} else if (mFrameTimer > msVal.mFinishFrame) {
-		disp->_0C = 2;
+		disp->mStatus = ::Screen::Game2DMgr::CHECK2D_WinLose_AnimDone;
 	}
 
 	return false;

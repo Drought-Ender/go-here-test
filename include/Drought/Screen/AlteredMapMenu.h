@@ -1,84 +1,85 @@
 #ifndef _DROUGHT_SCREEN_ALTEREDMAPMENU_H
 #define _DROUGHT_SCREEN_ALTEREDMAPMENU_H
 
+#include "og/Screen/ogScreen.h"
 #include "og/newScreen/SMenu.h"
-#include "Game/routeMgr.h"
 #include "Drought/Pathfinder.h"
+#include "Game/routeMgr.h"
+#include "Sys/Triangle.h"
 
-namespace Drought
-{
+namespace Drought {
 
-namespace Screen
-{
+namespace Screen {
 
-struct AlteredMapMenu : public og::newScreen::ObjSMenuMap
-{
-    AlteredMapMenu(const char*);
-    virtual void doDraw(Graphics& gfx);
-    virtual bool doUpdate();
-    virtual bool doStart(const ::Screen::StartSceneArg*);
-    virtual void doCreate(JKRArchive*);
-    virtual void commonUpdate();
-    virtual bool doEnd(const ::Screen::EndSceneArg*);
+struct GoHereMapMenu : public og::newScreen::ObjSMenuMap {
+	GoHereMapMenu(const char* name)
+	    : og::newScreen::ObjSMenuMap(name)
+	{
+		mStartIndex = -1;
+	}
 
-    void PathfindUpdate();
-    void OnPathfindDone();
-    void PathfindCleanup();
-    void drawPath(Graphics& gfx);
+	virtual void doDraw(Graphics& gfx);
+	virtual bool doUpdate();
+	virtual bool doStart(const ::Screen::StartSceneArg*);
+	virtual void doCreate(JKRArchive*);
 
-    bool CheckMapMove();
+	void PathfindUpdate();
+	void OnPathfindDone();
+	void RenderPath(Graphics& gfx);
 
-    void NodeCleanup();
+	bool HasMapInputChanged();
 
-    Vector3f GetPositionFromTex(f32 x, f32 y);
-    Vector2f GetPositionOnTex(Vector3f& pos);
+	inline Vector2f GetTargetPosition2D()
+	{
+		Vector2f center;
+		og::Screen::calcGlbCenter(mMapAreaPane, &center);
+		return center;
+	}
 
-    static bool CheckCanStartPathfind(Game::Navi* navi);
+	inline Vector3f GetTargetPosition3D() { return GetPositionFromTex(GetTargetPosition2D()); }
 
-    void setupTextureDraw(Graphics& gfx);
+	Vector3f GetPositionFromTex(const Vector2f& pos);
+	Vector2f GetPositionOnTex(const Vector3f& pos);
 
-    void drawArrow(Graphics& gfx);
-    void drawButton(Graphics& gfx);
+	static bool IsPathfindingAllowed(Game::Navi* navi);
 
+	void setupTextureDraw(Graphics& gfx);
 
-    void initPathfinding(bool);
-    int execPathfinding();
+	void drawArrow(Graphics& gfx);
+	void drawButton(Graphics& gfx);
 
-    enum PathfindState {
-        PATHFIND_INACTIVE = -1,
-        PATHFIND_AWAITING = 0,
-        PATHFIND_DONE     = 1,
-        PATHFIND_GOHERE   = 2
-    };
+	void initPathfinding();
+	void execPathfinding();
+	bool validateDestinationReachable();
 
-    bool mCanStartPathfind;
-    bool mHasNoPath;
-    bool mPathfindBlue;
-    bool mAllPikisBlue;
-    s16 mStartWPIndex;
-    s16 mGoalWPIndex;
-    int mStartPathFindCounter;
-    PathfindState mPathfindState;
-    u32 mWayPointCount;
-    Path* mPath;
+	enum PathfindState {
+		PATHFIND_INACTIVE    = -1,
+		PATHFIND_IN_PROGRESS = 0,
+		PATHFIND_FINISHED    = 1,
+		PATHFIND_GOHERE      = 2,
+		PATHFIND_WAITING     = 3,
+	};
 
-    ResTIMG* mAButtonTex;
-    ResTIMG* mArrowTex;
-    ResTIMG* mArrowRedTex;
+	bool mCanStartPathfind;
+	bool mFoundPath;
+	bool mUseWaterNodes;
+	s16 mStartIndex;
+	s16 mDestinationIndex;
+	bool mDesperatePathfind;
+	PathfindState mPathfindState;
+	Path mPath;
 
-    JUTTexture* mArrowPicture;
-    JUTTexture* mArrowRedPicture;
-    JUTTexture* mAButton;
+	ResTIMG* mAButtonTex;
+	ResTIMG* mArrowTex;
+	ResTIMG* mArrowRedTex;
+
+	JUTTexture* mArrowPicture;
+	JUTTexture* mArrowRedPicture;
+	JUTTexture* mAButton;
 };
-
-
 
 } // namespace Screen
 
-
-
 } // namespace Drought
-
-
 
 #endif

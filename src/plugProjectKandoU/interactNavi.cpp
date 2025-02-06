@@ -44,7 +44,7 @@ bool InteractSarai::actNavi(Game::Navi* navi)
  */
 bool InteractBomb::actNavi(Game::Navi* navi)
 {
-	if ((gameSystem->isFlag(GAMESYS_IsGameWorldActive)) == FALSE) {
+	if (!gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
 		return false;
 	}
 
@@ -248,15 +248,15 @@ bool InteractFue::actNavi(Game::Navi* navi)
 	}
 
 	if (navi->getStateID() != NSID_Follow) {
-		NaviFollowArg followArg(_09);
+		NaviFollowArg followArg(mIsNewToParty);
 		navi->transit(NSID_Follow, &followArg);
 
-		Navi* otherNavi = naviMgr->getAt(1 - navi->mNaviIndex);
-		InteractFue fue(otherNavi, true, true);
+		Navi* otherNavi = naviMgr->getAt(GET_OTHER_NAVI(navi));
+		InteractFue fue(otherNavi, true, true); // DO combine parties, is new to party
 
 		Iterator<Creature> cellIt((Container<Creature>*)navi->mCPlateMgr);
 
-		Creature* entities[110];
+		Creature* entities[MAX_PIKI_COUNT + 10];
 
 		int index = 0;
 		CI_LOOP(cellIt) { entities[index++] = *cellIt; }

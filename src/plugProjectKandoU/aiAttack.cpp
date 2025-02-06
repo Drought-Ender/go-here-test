@@ -148,7 +148,7 @@ void ActAttack::initJump()
 	mAttackID    = ATTACK_Jump;
 	Vector3f sep = mAttackSphere.mPosition - mParent->getPosition();
 	sep.normalise();
-	mParent->mSimVelocity = Vector3f(sep.x * 100.0f, 200.0f, sep.z * 100.0f);
+	mParent->mVelocity = Vector3f(sep.x * 100.0f, 200.0f, sep.z * 100.0f);
 }
 
 /**
@@ -170,7 +170,7 @@ void ActAttack::calcAttackPos()
 		FindCollPartArg findArg;
 		FindCondition condition;
 		findArg.mCondition = &condition;
-		mParent->getBoundingSphere(findArg.mPosition);
+		mParent->getBoundingSphere(findArg.mHitSphere);
 		CollPart* part = mCreature->mCollTree->findCollPart(findArg);
 		if (part) {
 			mAttackSphere.mPosition = part->mPosition;
@@ -242,7 +242,7 @@ int ActAttack::exec()
 	} break;
 
 	case ATTACK_Jump:
-		if (mParent->mBounceTriangle) {
+		if (mParent->mFloorTriangle) {
 			initAdjust();
 		}
 		break;
@@ -251,7 +251,7 @@ int ActAttack::exec()
 		if (!mParent->assertMotion(mSearchAnimIdx)) {
 			mIsSearchAnimFinished = true;
 		}
-		mParent->mVelocity = 0.0f;
+		mParent->mTargetVelocity = 0.0f;
 		if (mIsSearchAnimFinished) {
 			return ACTEXEC_Fail;
 		}
@@ -266,7 +266,7 @@ int ActAttack::exec()
  */
 void ActAttack::cleanup()
 {
-	mParent->mVelocity = 0.0f;
+	mParent->mTargetVelocity = 0.0f;
 	switch (mAttackID) {
 	case ATTACK_Stick:
 		mStickAttack->cleanup();

@@ -1,19 +1,10 @@
-#include "Dolphin/dvd.h"
-#include "Dolphin/pad.h"
 #include "DvdStatus.h"
-#include "JSystem/JUtility/JUTException.h"
 #include "JSystem/JFramework/JFWDisplay.h"
-#include "System.h"
-#include "types.h"
-#include "Graphics.h"
-#include "JSystem/JUtility/JUTVideo.h"
 #include "JSystem/J2D/J2DPrint.h"
-#include "P2JME/P2JME.h"
 #include "Game/MemoryCard/Mgr.h"
+#include "P2JME/P2JME.h"
 
 extern P2JME::Mgr* gP2JMEMgr;
-
-enum LanguageID { LANG_ENGLISH = 0, LANG_FRENCH, LANG_GERMAN, LANG_HOL_UNUSED, LANG_ITALIAN, LANG_JAPANESE, LANG_SPANISH };
 
 const char* filler1 = "dvdStatus";
 
@@ -23,22 +14,15 @@ const char* filler1 = "dvdStatus";
  */
 DvdStatus::DvdStatus()
 {
-	mFader = nullptr;
-	_00    = -1;
+	mFader      = nullptr;
+	mErrorIndex = -1;
 }
 
 /**
  * @note Address: 0x8042A328
  * @note Size: 0x2C
  */
-bool DvdStatus::isErrorOccured()
-{
-	bool retval = false;
-	if (!((mFader == nullptr) || (sys->mCardMgr->mFlags.typeView & 1))) {
-		retval = true;
-	}
-	return retval;
-}
+bool DvdStatus::isErrorOccured() { return mFader && !sys->mCardMgr->isFlag(Game::MemoryCard::MCMFLAG_IsWriting); }
 
 /**
  * @note Address: 0x8042A354
@@ -47,23 +31,24 @@ bool DvdStatus::isErrorOccured()
 bool DvdStatus::update()
 {
 	int status = DVDGetDriveStatus();
-	if (status == -1)
-		_00 = 1;
-	else if (status == 11)
-		_00 = 2;
-	else if (status == 4)
-		_00 = 3;
-	else if (status == 5)
-		_00 = 4;
-	else if (status == 6)
-		_00 = 5;
-	else if (_00 != -1 && status == 1) {
-		_00 = 0;
+	if (status == DVD_STATE_FATAL_ERROR) {
+		mErrorIndex = DvdError_ErrorOccured;
+	} else if (status == DVD_STATE_RETRY) {
+		mErrorIndex = DvdError_DiscReadError;
+	} else if (status == DVD_STATE_NO_DISK) {
+		mErrorIndex = DvdError_InsertDisc;
+	} else if (status == DVD_STATE_COVER_OPEN) {
+		mErrorIndex = DvdError_TrayOpen;
+	} else if (status == DVD_STATE_WRONG_DISK) {
+		mErrorIndex = DvdError_WrongDisc;
+	} else if (mErrorIndex != -1 && status == DVD_STATE_BUSY) {
+		mErrorIndex = DvdError_Loading;
 	} else {
-		_00 = -1;
+		mErrorIndex = DvdError_None;
 	}
+
 	if (mFader == nullptr) {
-		if (0 < _00) {
+		if (DvdError_Loading < mErrorIndex) {
 			JFWDisplay* display = sys->mDisplay;
 
 			if (display) {
@@ -72,29 +57,31 @@ bool DvdStatus::update()
 			} else {
 				JUT_PANICLINE(170, "no display.\n");
 			}
-			PADControlMotor(0, 2);
-			PADControlMotor(1, 2);
-			PADControlMotor(2, 2);
-			PADControlMotor(3, 2);
-			_08 = sys->disableCPULockDetector();
+
+			PADControlMotor(PAD_CHAN0, PAD_MOTOR_STOP_HARD);
+			PADControlMotor(PAD_CHAN1, PAD_MOTOR_STOP_HARD);
+			PADControlMotor(PAD_CHAN2, PAD_MOTOR_STOP_HARD);
+			PADControlMotor(PAD_CHAN3, PAD_MOTOR_STOP_HARD);
+			mCPULockNum = sys->disableCPULockDetector();
 			ebi::FileSelect::TMgr::onDvdErrorOccured();
 			ebi::Save::TMgr::onDvdErrorOccured();
 		}
-	} else {
-		if (_00 == -1) {
-			JFWDisplay* display = sys->mDisplay;
-			if (display) {
-				JUT_ASSERTLINE(197, display->mFader == nullptr, "display changed !\n");
-				display->mFader = mFader;
-				mFader          = nullptr;
-			} else {
-				JUT_PANICLINE(204, "no display.\n");
-			}
-			sys->enableCPULockDetector(_08);
-			ebi::FileSelect::TMgr::onDvdErrorRecovered();
-			ebi::Save::TMgr::onDvdErrorRecovered();
+	} else if (mErrorIndex == DvdError_None) {
+
+		JFWDisplay* display = sys->mDisplay;
+		if (display) {
+			JUT_ASSERTLINE(197, display->mFader == nullptr, "display changed !\n");
+			display->mFader = mFader;
+			mFader          = nullptr;
+		} else {
+			JUT_PANICLINE(204, "no display.\n");
 		}
+
+		sys->enableCPULockDetector(mCPULockNum);
+		ebi::FileSelect::TMgr::onDvdErrorRecovered();
+		ebi::Save::TMgr::onDvdErrorRecovered();
 	}
+
 	return mFader != nullptr;
 }
 
@@ -112,33 +99,33 @@ void DvdStatus::draw()
 		           JUtility::TColor(0, 0, 0x80, 0xFF));
 		J2DPrint print(nullptr, 0.0f);
 
-		if (gP2JMEMgr && gP2JMEMgr->_28) {
-			print.setFont((JUTFont*)gP2JMEMgr->mFont);
+		if (gP2JMEMgr && gP2JMEMgr->mIsLoaded) {
+			print.setFont(gP2JMEMgr->mFont);
 		} else if (sys->mRomFont) {
-			print.setFont((JUTFont*)sys->mRomFont);
+			print.setFont(sys->mRomFont);
 		} else {
-			JUT_ASSERTLINE(279, false, "no ROM font\n");
+			JUT_PANICLINE(279, "no ROM font\n");
 		}
 
 		char** errorMsgSet;
 		if (print.mFont) {
 			switch (sys->mRegion) {
-			case LANG_ENGLISH:
+			case System::LANG_English:
 				errorMsgSet = DvdError::gMessage_eng;
 				break;
-			case LANG_FRENCH:
+			case System::LANG_French:
 				errorMsgSet = DvdError::gMessage_fra;
 				break;
-			case LANG_GERMAN:
+			case System::LANG_German:
 				errorMsgSet = DvdError::gMessage_ger;
 				break;
-			case LANG_ITALIAN:
+			case System::LANG_Italian:
 				errorMsgSet = DvdError::gMessage_ita;
 				break;
-			case LANG_JAPANESE:
+			case System::LANG_Japanese:
 				errorMsgSet = DvdError::gMessage_jpn;
 				break;
-			case LANG_SPANISH:
+			case System::LANG_Spanish:
 				errorMsgSet = DvdError::gMessage_spa;
 				break;
 			default:
@@ -151,7 +138,7 @@ void DvdStatus::draw()
 			print.mCharColor.set(TCOLOR_WHITE_U8);
 			print.mGradientColor.set(TCOLOR_WHITE_U8);
 
-			print.print(40.0f, 200.0f, errorMsgSet[_00]);
+			print.print(40.0f, 200.0f, errorMsgSet[mErrorIndex]);
 		}
 	}
 }

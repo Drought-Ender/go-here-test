@@ -17,17 +17,15 @@ enum PathFindState {
 };
 
 enum PathFindFlags {
-	PATHFLAG_Unk1             = 0x1,
-	PATHFLAG_PathThroughWater = 0x2,
-	PATHFLAG_Unk3             = 0x4,
-	PATHFLAG_Unk4             = 0x8,
-	PATHFLAG_VsRed            = 0x10,
-	PATHFLAG_VsBlue           = 0x20,
-	PATHFLAG_InVersusMode     = 0x40,
+	PATHFLAG_RequireOpen               = 0x1,
+	PATHFLAG_PathThroughWater          = 0x2,
+	PATHFLAG_DisallowUnfinishedBridges = 0x4,
+	PATHFLAG_Unk4                      = 0x8,
+	PATHFLAG_DisallowVsRed             = 0x10,
+	PATHFLAG_DisallowVsBlue            = 0x20,
+	PATHFLAG_AllowUnvisited            = 0x40,
+	PATHFLAG_TwoWayPathing             = 0x80 // used for Panmodoki and BlackMan
 };
-
-
-
 
 namespace PathfindContext {
 extern Game::RouteMgr* routeMgr;
@@ -60,7 +58,7 @@ struct PathNode {
 	PathNode* mParent;   // _10
 	PathNode* mSibling;  // _14
 	PathNode* mPrevious; // _18
-	PathNode* _1C;       // _1C
+	PathNode* mRootNode; // _1C
 	s16 mWpIndex;        // _20
 	u8 _22;              // _22
 };
@@ -89,16 +87,16 @@ struct AStarContext {
 
 	bool checkContext() { return mHandleIdx != 0 && mState == PATHFIND_Busy; }
 
-	s16 mStartWPID;     // _00
-	s16 mEndWPID;       // _02
-	u8 mRequestFlag;    // _04
-	PathNode _08[2];    // _08
-	s16 mUsedNodeCount; // 50
-	s16 mWpNum;         // _52
-	u8 mState;          // _54, see PathFindState enum
-	PathNode* _58;      // _58, guess
-	PathNode* mNode;    // _5C
-	u32 mHandleIdx;     // _60
+	s16 mStartWPID;         // _00
+	s16 mEndWPID;           // _02
+	u8 mRequestFlag;        // _04
+	PathNode mNodeLists[2]; // _08, only the first seems to be used for anything
+	s16 mUsedNodeCount;     // 50
+	s16 mWpNum;             // _52
+	u8 mState;              // _54, see PathFindState enum
+	PathNode* _58;          // _58, guess
+	PathNode* mNode;        // _5C
+	u32 mHandleIdx;         // _60
 };
 
 struct AStarPathfinder {

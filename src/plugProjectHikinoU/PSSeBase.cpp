@@ -17,7 +17,7 @@ EnvSeBase::EnvSeBase(u32 soundID, f32 volume)
     , mMoveParam(0.0f, 0, 2, 0)
     , mSoundID((SoundID)soundID)
     , mVolume(volume)
-    , _2C(0.0f)
+    , mVolume2(0.0f)
     , _30(0.3f)
     , mSound(nullptr)
     , mPauseFlag(1)
@@ -38,25 +38,26 @@ void EnvSeBase::requestMoveParam(MoveParamSet param) { mMoveParam = param; }
  */
 void EnvSeBase::doMoveParamRequest()
 {
-	if (mMoveParam._08 == 2) {
+	if (mMoveParam.mParamType == JASTrack::JASParam_Null) {
 		return;
 	}
-	switch (mMoveParam._08) {
-	case 0:
-		mSound->setVolume(mMoveParam._00, mMoveParam._04, mMoveParam._0C);
+
+	switch (mMoveParam.mParamType) {
+	case JASTrack::JASParam_Volume:
+		mSound->setVolume(mMoveParam.mValue, mMoveParam.mMoveTime, mMoveParam.mSoundType);
 		break;
-	case 1:
-		mSound->setPitch(mMoveParam._00, mMoveParam._04, mMoveParam._0C);
+	case JASTrack::JASParam_Pitch:
+		mSound->setPitch(mMoveParam.mValue, mMoveParam.mMoveTime, mMoveParam.mSoundType);
 		break;
 
 	default:
 		P2ASSERTLINE(62, false);
 	}
 
-	mMoveParam._00 = 0.0f;
-	mMoveParam._04 = 0;
-	mMoveParam._08 = 2;
-	mMoveParam._0C = 0;
+	mMoveParam.mValue     = 0.0f;
+	mMoveParam.mMoveTime  = 0;
+	mMoveParam.mParamType = JASTrack::JASParam_Null;
+	mMoveParam.mSoundType = SOUNDPARAM_Unk0;
 }
 
 /**
@@ -79,7 +80,7 @@ void EnvSeBase::exec()
 {
 	if (!mIsOn) {
 		if (mSound) {
-			mSound->setVolume(0.0f, 0, 5);
+			mSound->setVolume(0.0f, 0, SOUNDPARAM_Unk5);
 		}
 		return;
 	}
@@ -91,10 +92,10 @@ void EnvSeBase::exec()
 		JAISound* sound = play();
 		if (sound) {
 			setPanAndDolby(sound);
-			sound->setVolume(mVolume, 0, 0);
-			sound->setFxmix(0.4f, 0, 0);
-			sound->setVolume(1.0f, 20, 5);
-			sound->setFxmix(_30, 0, 0);
+			sound->setVolume(mVolume, 0, SOUNDPARAM_Unk0);
+			sound->setFxmix(0.4f, 0, SOUNDPARAM_Unk0);
+			sound->setVolume(1.0f, 20, SOUNDPARAM_Unk5);
+			sound->setFxmix(_30, 0, SOUNDPARAM_Unk0);
 
 			doMoveParamRequest();
 		}
@@ -105,10 +106,10 @@ void EnvSeBase::exec()
 		JAISound* sound = play();
 		if (sound) {
 			setPanAndDolby(sound);
-			sound->setVolume(mVolume, 0, 0);
-			sound->setFxmix(0.4f, 0, 0);
-			sound->setVolume(_2C, 0, 5);
-			sound->setFxmix(_30, 0, 0);
+			sound->setVolume(mVolume, 0, SOUNDPARAM_Unk0);
+			sound->setFxmix(0.4f, 0, SOUNDPARAM_Unk0);
+			sound->setVolume(mVolume2, 0, SOUNDPARAM_Unk5);
+			sound->setFxmix(_30, 0, SOUNDPARAM_Unk0);
 
 			doMoveParamRequest();
 		}
@@ -198,11 +199,11 @@ void EnvSeMgr::reservePauseOff() { mReservator.mState = 31; }
  * @note Address: 0x80340DA0
  * @note Size: 0x70
  */
-void EnvSeMgr::setVolumeRequest(f32 p1, u32 p2, u8 p3)
+void EnvSeMgr::setVolumeRequest(f32 value, u32 time, u8 index)
 {
 	for (JSULink<EnvSeBase>* link = mEnvList.getFirst(); link; link = link->getNext()) {
 		if (link->getObject()) {
-			MoveParamSet param(p1, p2, 0, p3);
+			MoveParamSet param(value, time, JASTrack::JASParam_Volume, index);
 			link->getObject()->requestMoveParam(param);
 		}
 	}
@@ -237,11 +238,11 @@ void EnvSe_PauseOffReservator::reservatorTask() { mMgr->setAllPauseFlag(0); }
  */
 ClusterSe::PartInitArg::PartInitArg()
 {
-	_00      = 0xff;
-	_01      = 0xff;
-	_02      = 0xff;
-	_03      = 0xff;
-	mSoundID = PSSE_NULL;
+	mMaxEnemyCount           = 255;
+	mMinEnemyCount           = 255;
+	mVolumeDecreaseThreshold = 255;
+	mVolumeIncreaseThreshold = 255;
+	mSoundID                 = PSSE_NULL;
 }
 
 /**
@@ -250,14 +251,14 @@ ClusterSe::PartInitArg::PartInitArg()
  */
 void ClusterSe::PartInitArg::check()
 {
-	P2ASSERTBOOLLINE(368, _00 != 0 && _00 != 255);
-	P2ASSERTBOOLLINE(369, _01 != 255 && _00 > _01);
-	P2ASSERTLINE(370, _02 != 255);
-	P2ASSERTLINE(371, _03 != 255);
+	P2ASSERTBOOLLINE(368, mMaxEnemyCount != 0 && mMaxEnemyCount != 255);
+	P2ASSERTBOOLLINE(369, mMinEnemyCount != 255 && mMaxEnemyCount > mMinEnemyCount);
+	P2ASSERTLINE(370, mVolumeDecreaseThreshold != 255);
+	P2ASSERTLINE(371, mVolumeIncreaseThreshold != 255);
 
-	P2ASSERTLINE(373, _00 >= _02);
-	P2ASSERTLINE(374, _02 > _03);
-	P2ASSERTLINE(375, _03 >= _01);
+	P2ASSERTLINE(373, mMaxEnemyCount >= mVolumeDecreaseThreshold);
+	P2ASSERTLINE(374, mVolumeDecreaseThreshold > mVolumeIncreaseThreshold);
+	P2ASSERTLINE(375, mVolumeIncreaseThreshold >= mMinEnemyCount);
 
 	P2ASSERTLINE(377, mSoundID != 0xFFFFFFFF);
 }
@@ -281,12 +282,12 @@ void ClusterSe::Part::identify(PartInitArg initArg)
 	mInitArg = initArg;
 }
 
-void ClusterSe::Part::play(u8 p1, JAInter::Object* obj)
+void ClusterSe::Part::play(u8 count, JAInter::Object* obj)
 {
-	if (p1 > mInitArg._00) {
+	if (count > mInitArg.mMaxEnemyCount) {
 		return;
 	}
-	if (p1 < mInitArg._01) {
+	if (count < mInitArg.mMinEnemyCount) {
 		return;
 	}
 
@@ -296,14 +297,14 @@ void ClusterSe::Part::play(u8 p1, JAInter::Object* obj)
 	}
 
 	f32 val = 1.0f;
-	if (p1 > mInitArg._02) {
-		val = JALCalc::linearTransform(p1, mInitArg._00, mInitArg._02, 0.0f, val, true);
-	} else if (mInitArg._03 > p1) {
-		val = JALCalc::linearTransform(p1, mInitArg._03, mInitArg._01, val, 0.0f, true);
+	if (count > mInitArg.mVolumeDecreaseThreshold) {
+		val = JALCalc::linearTransform(count, mInitArg.mMaxEnemyCount, mInitArg.mVolumeDecreaseThreshold, 0.0f, val, true);
+	} else if (mInitArg.mVolumeIncreaseThreshold > count) {
+		val = JALCalc::linearTransform(count, mInitArg.mVolumeIncreaseThreshold, mInitArg.mMinEnemyCount, val, 0.0f, true);
 	}
 
 	if (val != 1.0f) {
-		sound->setVolume(val, 0, 0);
+		sound->setVolume(val, 0, SOUNDPARAM_Unk0);
 	}
 }
 
@@ -353,11 +354,11 @@ void ClusterSe::Mgr::constructParts(PSSystem::ClusterSe::Factory& factory)
  * @note Address: 0x803412D8
  * @note Size: 0x1A4
  */
-void ClusterSe::Mgr::play(u8 p1, JAInter::Object* obj)
+void ClusterSe::Mgr::play(u8 count, JAInter::Object* obj)
 {
 	P2ASSERTLINE(522, obj);
 	for (u8 i = 0; i < mCount; i++) {
-		mParts[i].play(p1, obj);
+		mParts[i].play(count, obj);
 	}
 }
 } // namespace PSSystem

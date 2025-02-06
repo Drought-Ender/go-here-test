@@ -30,7 +30,7 @@ static const char formationName[]      = "actFormation";
  */
 ActFormation::ActFormation(Game::Piki* p)
     : Action(p)
-    , mInitArg(nullptr, 0)
+    , mInitArg(static_cast<Game::Creature*>(nullptr))
 {
 	mName   = "Formation";
 	mCPlate = nullptr;
@@ -64,29 +64,29 @@ void ActFormation::init(ActionArg* initArg)
 
 	mNavi = mParent->mNavi;
 	Game::GameStat::formationPikis.inc(mParent);
-	mInitArg.mCreature = formationArg->mCreature;
-	mInitArg._08       = formationArg->_08;
-	mInitArg._09       = formationArg->_09;
+	mInitArg.mCreature           = formationArg->mCreature;
+	mInitArg.mIsDemoFollow       = formationArg->mIsDemoFollow;
+	mInitArg.mDoUseTouchCooldown = formationArg->mDoUseTouchCooldown;
 
-	if (mInitArg._09) {
+	if (mInitArg.mDoUseTouchCooldown) {
 		mTouchingNaviCooldownTimer = 45;
 	} else {
 		mTouchingNaviCooldownTimer = 0;
 	}
 
 	Game::Navi* initNavi = static_cast<Game::Navi*>(formationArg->mCreature);
-	bool initCheck       = formationArg->_08;
+	bool initCheck       = formationArg->mIsDemoFollow;
 
 	if (!initNavi) {
 		mSlotID = -1;
 		return;
 	}
 
-	mDistanceType    = 5;
-	mOldDistanceType = 5;
-	mDistanceCounter = 0;
-	_60              = false;
-	_61              = false;
+	mDistanceType         = 5;
+	mOldDistanceType      = 5;
+	mDistanceCounter      = 0;
+	mHasLostNumbness      = false;
+	mHadNumbnessLastFrame = false;
 
 	mCPlate = initNavi->mCPlateMgr;
 	mSlotID = mCPlate->getSlot(mParent, this, initCheck);
@@ -96,13 +96,13 @@ void ActFormation::init(ActionArg* initArg)
 
 	mParent->startMotion(Game::IPikiAnims::RUN2, Game::IPikiAnims::RUN2, nullptr, nullptr);
 
-	_30             = 0;
-	_31             = 0;
-	mSortState      = 0;
-	mAnimationTimer = 0;
-	_50             = 0.0f;
-	mIsAnimating    = 0;
-	mFootmark       = nullptr;
+	mHasReleasedSlot   = false;
+	mUnusedVal         = 0;
+	mSortState         = 0;
+	mAnimationTimer    = 0;
+	mTripCheckMoveDist = 0.0f;
+	mIsAnimating       = 0;
+	mFootmark          = nullptr;
 
 	mParent->setPastel(false);
 	mTouchingWallTimer = 0;
@@ -154,8 +154,7 @@ void ActFormation::setFormed()
 		Game::playData->setDemoFlag(Game::DEMO_Meet_Red_Pikmin);
 
 		Game::MoviePlayArg playArg("x02_watch_red_pikmin", nullptr, nullptr, 0);
-		playArg.mOrigin                  = navi->getPosition();
-		playArg.mAngle                   = navi->getFaceDir();
+		playArg.setTarget(navi);
 		Game::moviePlayer->mTargetObject = navi;
 
 		Game::moviePlayer->play(playArg);
@@ -208,17 +207,17 @@ void ActFormation::onKeyEvent(SysShape::KeyEvent const& keyEvent)
 	switch (keyEvent.mType) {
 	case KEYEVENT_2:
 		if (mIsAnimating) {
-			mParent->mSimVelocity = Vector3f(0.0f);
-			mParent->mVelocity    = Vector3f(0.0f);
+			mParent->mVelocity       = Vector3f(0.0f);
+			mParent->mTargetVelocity = Vector3f(0.0f);
 		}
 		break;
 
-	case KEYEVENT_1:
+	case KEYEVENT_LOOP_END:
 		if (mIsAnimating) {
 			mAnimationTimer--;
 			if (mAnimationTimer <= 0) {
-				mParent->mAnimator.mSelfAnimator.mFlags |= EANIM_FLAG_FINISHED;
-				mParent->mAnimator.mBoundAnimator.mFlags |= EANIM_FLAG_FINISHED;
+				mParent->mAnimator.mSelfAnimator.setFlag(SysShape::Animator::AnimFinishMotion);
+				mParent->mAnimator.mBoundAnimator.setFlag(SysShape::Animator::AnimFinishMotion);
 			}
 		}
 		break;
@@ -269,7 +268,7 @@ int PikiAI::ActFormation::exec()
 		return ACTEXEC_Fail;
 	}
 
-	if (!mInitArg._08 && mNavi && mNavi->mPellet) {
+	if (!mInitArg.mIsDemoFollow && mNavi && mNavi->mPellet) {
 		return ACTEXEC_Fail;
 	}
 
@@ -277,7 +276,7 @@ int PikiAI::ActFormation::exec()
 		return ACTEXEC_Fail;
 	}
 
-	if (!mInitArg._08 && !Game::gameSystem->isMultiplayerMode() && mNavi && !mNavi->mController1
+	if (!mInitArg.mIsDemoFollow && !Game::gameSystem->isMultiplayerMode() && mNavi && !mNavi->mController1
 	    && mNavi->getStateID() == Game::NSID_Follow) {
 		mNextAIType = ACT_Formation;
 		mParent->getCreatureID();
@@ -288,23 +287,17 @@ int PikiAI::ActFormation::exec()
 	mOldDistanceType = mDistanceType;
 	mDistanceType    = 5;
 	if (mIsAnimating) {
-		int animId;
-		if (mParent->mAnimator.mSelfAnimator.mAnimInfo) {
-			animId = mParent->mAnimator.mSelfAnimator.mAnimInfo->mId;
-		} else {
-			animId = -1;
-		}
-
+		int animId = mParent->mAnimator.mSelfAnimator.getAnimIndex();
 		if (animId != Game::IPikiAnims::KOROBU) {
 			mIsAnimating = 0;
 			mParent->startMotion(Game::IPikiAnims::WALK, Game::IPikiAnims::WALK, nullptr, nullptr);
 		}
 
-		mParent->mVelocity = mParent->mVelocity * 0.955f;
+		mParent->mTargetVelocity = mParent->mTargetVelocity * 0.955f;
 		return ACTEXEC_Continue;
 	}
 
-	_61 = _60;
+	mHadNumbnessLastFrame = mHasLostNumbness;
 	if (!mParent->mNavi) {
 		return ACTEXEC_Fail;
 	}
@@ -341,19 +334,22 @@ int PikiAI::ActFormation::exec()
 		mFootmarkFlags     = -1;
 	}
 
-	Vector3f movieSep = mParent->mPositionBeforeMovie - mParent->getPosition();
-	_50 += movieSep.length();
+	// add to how much the piki has moved since the last trip, if it exceeds 100
+	// and the piki is currently at 110+ speed, do a rng check to trip
+	// whether it passes the rng or not, reset the move distance each time
+	Vector3f moveSep = mParent->mPreviousPosition - mParent->getPosition();
+	mTripCheckMoveDist += moveSep.length();
 
-	if (mParent->getKind() != Game::Bulbmin && _50 >= 100.0f && mParent->mSimVelocity.length() > 110.0f) {
+	if (mParent->getKind() != Game::Bulbmin && mTripCheckMoveDist >= 100.0f && mParent->mVelocity.length() > 110.0f) {
 		if (randFloat() >= 0.99f && randFloat() > 0.7f) {
 			if (mParent->getStateID() == Game::PIKISTATE_Walk) {
 				mParent->mFsm->transit(mParent, Game::PIKISTATE_Koke, nullptr);
 			}
-			_50 = 0.0f;
+			mTripCheckMoveDist = 0.0f;
 			return ACTEXEC_Continue;
 		}
 
-		_50 = 0.0f;
+		mTripCheckMoveDist = 0.0f;
 	}
 
 	Vector3f sep = slotPos - mParent->getPosition(); // 0x114
@@ -362,10 +358,10 @@ int PikiAI::ActFormation::exec()
 	sep.normalise();
 
 	if (dist < 60.0f && mParent->mNavi->mCommandOn1 && mSortState != FORMATION_SORT_STARTED) {
-		if (!_60
+		if (!mHasLostNumbness
 		    && (mParent->mNavi->mSceneAnimationTimer - 2.0f * randFloat())
 		           >= static_cast<Game::NaviParms*>(mParent->mNavi->mParms)->mNaviParms.mPikiLoseNumbnessTime.mValue) {
-			_60 = true;
+			mHasLostNumbness = true;
 			return ACTEXEC_Continue;
 		}
 
@@ -379,7 +375,7 @@ int PikiAI::ActFormation::exec()
 			}
 
 			slotPos              = mParent->mNavi->getPosition(); // 0x138
-			_60                  = false;
+			mHasLostNumbness     = false;
 			Vector3f naviPikiDir = slotPos - mParent->getPosition(); // 0xf8
 			naviPikiDir.normalise();
 
@@ -389,7 +385,8 @@ int PikiAI::ActFormation::exec()
 				}
 			} else {
 				mParent->setSpeed(1.0f, naviPikiDir);
-				if (_61 && !_60) {
+				// if the piki lost numbness last frame, but not this frame, start the walk anim
+				if (mHadNumbnessLastFrame && !mHasLostNumbness) {
 					mParent->startMotion(Game::IPikiAnims::WALK, Game::IPikiAnims::WALK, nullptr, nullptr);
 				}
 			}
@@ -397,10 +394,10 @@ int PikiAI::ActFormation::exec()
 			return ACTEXEC_Continue;
 		}
 
-		mDistanceType        = 1;
-		mParent->mVelocity   = Vector3f(0.0f);
-		Vector3f naviPikiSep = mParent->mNavi->getPosition() - mParent->getPosition();
-		f32 angle            = JMAAtan2Radian(naviPikiSep.x, naviPikiSep.z); // f26
+		mDistanceType            = 1;
+		mParent->mTargetVelocity = Vector3f(0.0f);
+		Vector3f naviPikiSep     = mParent->mNavi->getPosition() - mParent->getPosition();
+		f32 angle                = JMAAtan2Radian(naviPikiSep.x, naviPikiSep.z); // f26
 		mParent->setMoveRotation(false);
 		mParent->mFaceDir += 0.3f * angDist(angle, mParent->mFaceDir);
 		return ACTEXEC_Continue;
@@ -422,8 +419,8 @@ int PikiAI::ActFormation::exec()
 	}
 
 	if (dist <= 7.0f || (mDistanceCounter < 6 && dist <= 15.0f)) {
-		mDistanceType      = 2;
-		mParent->mVelocity = Vector3f(0.0f);
+		mDistanceType            = 2;
+		mParent->mTargetVelocity = Vector3f(0.0f);
 
 		sep = mParent->mNavi->getPosition() - mParent->getPosition(); // 0x114
 
@@ -438,36 +435,36 @@ int PikiAI::ActFormation::exec()
 		mDistanceType = 3;
 		mParent->setMoveRotation(false);
 
-		if (_60 && dist < 10.0f) {
-			_60 = true; // this has to be true to get... set to true lol
+		if (mHasLostNumbness && dist < 10.0f) {
+			mHasLostNumbness = true; // this has to be true to get... set to true lol
 		}
 
 		f32 factor  = 10.0f / static_cast<Game::PikiParms*>(mParent->mParms)->mCreatureProps.mProps.mAccel.mValue; // f26
 		f32 speed   = mParent->getSpeed(1.0f);                                                                     // f1
 		f32 factor2 = (0.5f * (speed / factor)) * speed;                                                           // f7
 
-		f32 simSpeed = mParent->mSimVelocity.length(); // f3
+		f32 simSpeed = mParent->mVelocity.length(); // f3
 		f32 factor3  = (0.5f * (simSpeed / factor)) * simSpeed;
 
 		if (dist < factor3) {
-			mParent->mVelocity = Vector3f(0.0f);
-			sep                = mParent->mNavi->getPosition() - mParent->getPosition();   // 0x114
-			f32 angle          = angDist(JMAAtan2Radian(sep.x, sep.z), mParent->mFaceDir); // f26
+			mParent->mTargetVelocity = Vector3f(0.0f);
+			sep                      = mParent->mNavi->getPosition() - mParent->getPosition();   // 0x114
+			f32 angle                = angDist(JMAAtan2Radian(sep.x, sep.z), mParent->mFaceDir); // f26
 			mParent->setMoveRotation(false);
 			mParent->mFaceDir += 0.3f * angle;
 		} else if (dist < factor2) {
-			f32 val            = SQUARE(simSpeed) + (8.0f * factor) * dist;
-			f32 val2           = 0.5f * _sqrtf2(val) + simSpeed;
-			mParent->mVelocity = sep * val2;
+			f32 val                  = SQUARE(simSpeed) + (8.0f * factor) * dist;
+			f32 val2                 = 0.5f * _sqrtf2(val) + simSpeed;
+			mParent->mTargetVelocity = sep * val2;
 		} else {
 			mParent->setSpeed(1.0f, sep);
 		}
 
 		Vector3f naviPikiSep = mParent->getPosition() - mParent->mNavi->getPosition(); // f30, f29, f28
-		Vector3f plateSep    = mParent->mNavi->getPosition() - mCPlate->_A4;
+		Vector3f plateSep    = mParent->mNavi->getPosition() - mCPlate->mMaxPositionOffset;
 		plateSep.normalise();
 
-		if (dot(plateSep, naviPikiSep) > 0.0f) {
+		if (plateSep.dot(naviPikiSep) > 0.0f) {
 			Vector3f impulse = Vector3f(-naviPikiSep.z, 0.0f, naviPikiSep.x); // f29, f27, f30
 			if (mSlotID & 1) {
 				impulse.negate();
@@ -479,21 +476,21 @@ int PikiAI::ActFormation::exec()
 				impulse = Vector3f(0.0f);
 			}
 
-			f32 currSpeed = mParent->mVelocity.length(); // f28
+			f32 currSpeed = mParent->mTargetVelocity.length(); // f28
 
-			mParent->mVelocity += impulse * mParent->getSpeed(1.0f);
-			mParent->mVelocity.normalise();
-			mParent->mVelocity *= currSpeed;
+			mParent->mTargetVelocity += impulse * mParent->getSpeed(1.0f);
+			mParent->mTargetVelocity.normalise();
+			mParent->mTargetVelocity *= currSpeed;
 		}
 	} else {
 		mDistanceType = 4;
 		mParent->setSpeed(1.0f, sep);
 
 		Vector3f naviPikiSep = mParent->getPosition() - mParent->mNavi->getPosition(); // f30, f29, f28
-		Vector3f plateSep    = mParent->mNavi->getPosition() - mCPlate->_A4;
+		Vector3f plateSep    = mParent->mNavi->getPosition() - mCPlate->mMaxPositionOffset;
 		plateSep.normalise();
 
-		if (dot(plateSep, naviPikiSep) > 0.0f) {
+		if (plateSep.dot(naviPikiSep) > 0.0f) {
 			Vector3f impulse = Vector3f(-naviPikiSep.z, 0.0f, naviPikiSep.x); // f29, f27, f30
 			if (mSlotID & 1) {
 				impulse.negate();
@@ -505,36 +502,37 @@ int PikiAI::ActFormation::exec()
 				impulse = Vector3f(0.0f);
 			}
 
-			f32 currSpeed = mParent->mVelocity.length(); // f28
+			f32 currSpeed = mParent->mTargetVelocity.length(); // f28
 
-			mParent->mVelocity += impulse * mParent->getSpeed(1.0f);
-			mParent->mVelocity.normalise();
-			mParent->mVelocity *= currSpeed;
+			mParent->mTargetVelocity += impulse * mParent->getSpeed(1.0f);
+			mParent->mTargetVelocity.normalise();
+			mParent->mTargetVelocity *= currSpeed;
 		}
 	}
 
 	if (dist < static_cast<Game::PikiParms*>(mParent->mParms)->mPikiParms.mWhiteDistance.mValue) {
-		mLostPikiTimer = 0.0f;
-		_30            = 0;
+		mLostPikiTimer   = 0.0f;
+		mHasReleasedSlot = false;
 	} else if (dist < static_cast<Game::PikiParms*>(mParent->mParms)->mPikiParms.mGrayDistance.mValue) {
 		mLostPikiTimer += sys->mDeltaTime;
-		if (!_30) {
+		if (!mHasReleasedSlot) {
 			if (mSlotID != -1) {
 				mCPlate->releaseSlot(mParent, mSlotID);
 				mSlotID = mCPlate->getSlot(mParent, this, false);
 			}
-			_30 = 1;
+			mHasReleasedSlot = true;
 		}
-		if ((!mInitArg._08 && mSlotID == -1)
+		if ((!mInitArg.mIsDemoFollow && mSlotID == -1)
 		    || mLostPikiTimer > static_cast<Game::PikiParms*>(mParent->mParms)->mPikiParms.mLostChildTime.mValue) {
 			return ACTEXEC_Fail;
 		}
 
-	} else if (!mInitArg._08) {
+	} else if (!mInitArg.mIsDemoFollow) {
 		return ACTEXEC_Fail;
 	}
 
-	if (_61 && !_60) {
+	// if the piki lost numbness last frame, but not this frame, start the walk anim
+	if (mHadNumbnessLastFrame && !mHasLostNumbness) {
 		mParent->startMotion(Game::IPikiAnims::WALK, Game::IPikiAnims::WALK, nullptr, nullptr);
 	}
 

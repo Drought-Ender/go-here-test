@@ -3,11 +3,11 @@
 
 #include "JSystem/JAudio/JAI/JAInter/Object.h"
 #include "JSystem/JUtility/TColor.h"
-
 #include "PSM/Piki.h"
-
 #include "Game/FakePiki.h"
 #include "Game/StateMachine.h"
+
+#define MAX_PIKI_COUNT (100) // Maximum number of pikmin allowed out of the onyon/in a cave
 
 namespace efx {
 struct Context;
@@ -39,11 +39,12 @@ struct PikiState;
 struct PikiParms;
 
 typedef enum EPikiKind {
-	FirstPikmin = 0,
-	Blue        = 0,
-	Red         = 1,
-	Yellow      = 2,
-	LastOnyon   = 2,
+	AllPikminCalcs = -1, // used for gameStat calcs
+	FirstPikmin    = 0,
+	Blue           = 0,
+	Red            = 1,
+	Yellow         = 2,
+	LastOnyon      = 2,
 	OnyonCount,
 	Purple              = 3,
 	White               = 4,
@@ -95,8 +96,8 @@ struct PikiInitArg : public CreatureInitArg {
 };
 
 struct PikiKillArg : public CreatureKillArg {
-	inline PikiKillArg(int p1)
-	    : CreatureKillArg(p1)
+	inline PikiKillArg(int flags)
+	    : CreatureKillArg(flags)
 	{
 	}
 
@@ -118,6 +119,12 @@ struct PikiFSM : public StateMachine<Piki> {
 	// _00			= VTBL
 	// _00-_1C	= StateMachine
 	int mStateID; // _1C, state ID?
+};
+
+enum PikiWeight {
+	PW_Weightless   = 0,
+	PW_NormalWeight = 1,
+	PW_PurpleWeight = 10,
 };
 
 struct Piki : public FakePiki {

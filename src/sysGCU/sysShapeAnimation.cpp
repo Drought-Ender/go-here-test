@@ -11,8 +11,12 @@
 #include "nans.h"
 
 namespace SysShape {
-static const char BLAH_[] = "\0\0\0\0\0\0\0\0";
-static const char BLAH[]  = "sysShapeModel";
+
+static void strippedFunc()
+{
+	OSReport("\0\0\0\0\0\0\0\0\0\0\0");
+	OSReport("sysShapeModel");
+}
 
 /**
  * @note Address: 0x8043DCDC
@@ -23,7 +27,7 @@ void AnimInfo::attach(J3DModelData* modelData, void* animData)
 	JUT_ASSERTLINE(64, animData != nullptr, "animData null!\n");
 
 	mAnm  = (J3DAnmTransform*)J3DAnmLoaderDataBase::load(animData);
-	mCalc = J3DNewMtxCalcAnm(modelData->mJointTree.mFlags & 0xf, mAnm);
+	mCalc = J3DNewMtxCalcAnm(modelData->mJointTree.mFlags & J3DMLF_MtxTypeMask, mAnm);
 }
 
 /**
@@ -38,9 +42,9 @@ AnimMgr* AnimMgr::load(JKRFileLoader* a1, char* a2, J3DModelData* a3, JKRFileLoa
 	}
 
 	RamStream rs(resource, -1);
-	rs.resetPosition(true, 1);
+	rs.setMode(STREAM_MODE_TEXT, 1);
 
-	AnimMgr* newMgr = new AnimMgr();
+	AnimMgr* newMgr = new AnimMgr;
 	newMgr->load(rs, a3, a4, a5);
 
 	return newMgr;
@@ -70,7 +74,7 @@ void AnimMgr::load(Stream& s, J3DModelData* md, JKRFileLoader* fl, char* folderN
 		JUT_ASSERTLINE(64, animData, "animData null!\n");
 
 		c->mAnm  = (J3DAnmTransform*)J3DAnmLoaderDataBase::load(animData);
-		c->mCalc = J3DNewMtxCalcAnm(md->mJointTree.mFlags & 0xF, c->mAnm);
+		c->mCalc = J3DNewMtxCalcAnm(md->mJointTree.mFlags & J3DMLF_MtxTypeMask, c->mAnm);
 	}
 }
 
@@ -122,7 +126,7 @@ void AnimMgr::connectBasArc(char* a2, char* a3, JKRFileLoader* a4)
 
 		void* basFile = a4->getResource(path);
 		if (basFile) {
-			c->mBasFile = (JAIAnimeFrameSoundData*)basFile;
+			c->mBasFile = (JAIAnimeSoundData*)basFile;
 		}
 	}
 }

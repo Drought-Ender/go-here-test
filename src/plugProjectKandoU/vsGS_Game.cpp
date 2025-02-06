@@ -5,6 +5,7 @@
 #include "Game/Entities/ItemHole.h"
 #include "Game/Entities/PelletItem.h"
 #include "Game/MapMgr.h"
+#include "Game/AIConstants.h"
 #include "Game/gameStat.h"
 #include "Game/Data.h"
 #include "Game/mapParts.h"
@@ -44,7 +45,7 @@ GameState::GameState()
  */
 void GameState::init(VsGameSection* section, StateArg* stateArg)
 {
-	_16 = 0;
+	mSubState = 0;
 	mFlags.clear();
 	section->refreshHIO();
 	do_init(section);
@@ -55,11 +56,11 @@ void GameState::init(VsGameSection* section, StateArg* stateArg)
 	section->clearCaveMenus();
 
 	if (!gameSystem->isMultiplayerMode()) {
-		section->setPlayerMode(0);
+		section->setPlayerMode(NAVIID_Olimar);
 	}
 
 	if (gameSystem->isVersusMode()) {
-		section->setPlayerMode(2);
+		section->setPlayerMode(NAVIID_Multiplayer);
 		clearLoseCauses();
 		Screen::gGame2DMgr->startFadeBG_Floor();
 	}
@@ -73,8 +74,8 @@ void GameState::init(VsGameSection* section, StateArg* stateArg)
 		section->mTimeLimit += mFloorExtendTimer;
 	}
 
-	section->mMarbleCountP2         = 0;
-	section->mMarbleCountP1         = 0;
+	section->mMarbleCount[1]        = 0;
+	section->mMarbleCount[0]        = 0;
 	section->mYellowMarbleCounts[1] = 0;
 	section->mYellowMarbleCounts[0] = 0;
 	section->mGhostIconTimers[1]    = 0.0f;
@@ -89,7 +90,7 @@ void GameState::clearLoseCauses()
 {
 	mLoseCauses[0].clear();
 	mLoseCauses[1].clear();
-	_16 = 0;
+	mSubState = 0;
 }
 
 /**
@@ -120,7 +121,7 @@ void GameState::do_init(VsGameSection* section)
 		gameSystem->setPause(false, "vs-readygo", 3);
 		gameSystem->setPause(true, "vs readygo", 6);
 		gameSystem->setMoviePause(true, "vs readygo");
-		setFlag(VSGS_Unk8);
+		setFlag(VSGS_ReadyGoOpen);
 		gameSystem->setFlag(GAMESYS_IsPlaying);
 		section->setCamController();
 	}
@@ -139,7 +140,7 @@ void GameState::do_init(VsGameSection* section)
  * @note Address: 0x802296E8
  * @note Size: 0xC
  */
-bool GameState::goingToCave(VsGameSection* section) { return isFlag(VSGS_Unk1); }
+bool GameState::goingToCave(VsGameSection* section) { return isFlag(VSGS_EnteringCave); }
 
 /**
  * This fake function is here to generate the vtables in the correct order
@@ -154,22 +155,22 @@ static void fakeFuncVsGsGame() { og::Screen::DispMemberChallenge2P disp; }
  */
 void GameState::exec(VsGameSection* section)
 {
-	if (isFlag(VSGS_Unk16)) {
+	if (isFlag(VSGS_IsSectionFadeout)) {
 		return;
 	}
 
 	section->BaseGameSection::doUpdate();
 
-	if (section->mCurrentState->mId != VGS_Game) {
+	if (section->getCurrState()->mId != VGS_Game) {
 		return;
 	}
 
-	if (isFlag(VSGS_Unk8)) {
+	if (isFlag(VSGS_ReadyGoOpen)) {
 		switch (Screen::gGame2DMgr->check_ReadyGo()) {
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_ReadyGo_Finished:
 			gameSystem->setPause(false, "vs-rg-arr", 3);
 			gameSystem->setMoviePause(false, "vs-rg-arr");
-			resetFlag(VSGS_Unk8);
+			resetFlag(VSGS_ReadyGoOpen);
 			gameSystem->setFlag(GAMESYS_IsPlaying);
 			break;
 
@@ -195,10 +196,10 @@ void GameState::exec(VsGameSection* section)
 			section->mCardMgr->update();
 		}
 
-		if (isFlag(VSGS_Unk9)) {
+		if (isFlag(VSGS_WinLoseReasonOpen)) {
 			if ((u8)Screen::gGame2DMgr->check_WinLoseReason()) {
-				resetFlag(VSGS_Unk9);
-				setFlag(VSGS_Unk10);
+				resetFlag(VSGS_WinLoseReasonOpen);
+				setFlag(VSGS_WinLoseOpen);
 				int outcome;
 				u8 redLost  = getLoseCauses(VSPLAYER_Red);
 				u8 blueLost = getLoseCauses(VSPLAYER_Blue);
@@ -223,7 +224,7 @@ void GameState::exec(VsGameSection* section)
 					section->mVsWinner = -1;
 				}
 
-				kh::Screen::DispWinLose winLose(outcome, 1);
+				kh::Screen::DispWinLose winLose(outcome, ::Screen::Game2DMgr::CHECK2D_WinLose_Opened);
 				Screen::gGame2DMgr->open_WinLose(winLose);
 				return;
 
@@ -232,21 +233,21 @@ void GameState::exec(VsGameSection* section)
 			}
 		}
 
-		if (isFlag(VSGS_Unk10)) {
+		if (isFlag(VSGS_WinLoseOpen)) {
 			switch (Screen::gGame2DMgr->check_WinLose()) {
-			case 0:
-			case 1:
-			case 2:
+			case Screen::Game2DMgr::CHECK2D_WinLose_NotOpened:
+			case Screen::Game2DMgr::CHECK2D_WinLose_Opened:
+			case Screen::Game2DMgr::CHECK2D_WinLose_AnimDone:
 				break;
-			case 3:
+			case Screen::Game2DMgr::CHECK2D_WinLose_Finished:
 				TitleArg arg;
-				arg._00 = 1;
+				arg.mDoNeedClearHeap = true;
 				transit(section, VGS_Title, &arg);
 			}
 			return;
 		}
 
-		if (!_16) {
+		if (!mSubState) {
 			if (!GameStat::getAllPikmins(Red)) {
 				setLoseCause(VSPLAYER_Red, VSLOSE_Extinction);
 			}
@@ -257,7 +258,7 @@ void GameState::exec(VsGameSection* section)
 
 	} else {
 		PSM::PikminNumberDirector* pikiDirector = PSMGetPikminNumD();
-		if (GameStat::getMapPikmins_exclude_Me(-1) < 10 && DeathMgr::mSoundDeathCount > 0) {
+		if (GameStat::getMapPikmins_exclude_Me(AllPikminCalcs) < 10 && DeathMgr::mSoundDeathCount > 0) {
 			if (pikiDirector) {
 				pikiDirector->directOn();
 			}
@@ -266,13 +267,13 @@ void GameState::exec(VsGameSection* section)
 			pikiDirector->directOff();
 		}
 
-		if (isFlag(VSGS_Unk4)) {
+		if (isFlag(VSGS_TimeUp)) {
 			switch (Screen::gGame2DMgr->check_WinLose()) {
-			case 0:
-			case 1:
-			case 2:
+			case Screen::Game2DMgr::CHECK2D_WinLose_NotOpened:
+			case Screen::Game2DMgr::CHECK2D_WinLose_Opened:
+			case Screen::Game2DMgr::CHECK2D_WinLose_AnimDone:
 				break;
-			case 3:
+			case Screen::Game2DMgr::CHECK2D_WinLose_Finished:
 				GameStat::alivePikis.clear();
 				ResultArg arg;
 				arg.mEndFlag.clear();
@@ -281,16 +282,17 @@ void GameState::exec(VsGameSection* section)
 			return;
 		}
 
-		if (!gameSystem->paused() && section->mTimeLimit > 0.0f && isFlag(VSGS_Unk3) && !section->mMenuFlags
+		if (!gameSystem->paused() && section->mTimeLimit > 0.0f && isFlag(VSGS_IntroDone) && !section->mMenuFlags.typeView
 		    && gameSystem->isFlag(GAMESYS_IsGameWorldActive) && !gameSystem->paused_soft()
-		    && !moviePlayer->mDemoState) { // check game is in a state where timer should go down (not paused/menu/CS/etc)
+		    && moviePlayer->mDemoState
+		           == DEMOSTATE_Inactive) { // check game is in a state where timer should go down (not paused/menu/CS/etc)
 
 			section->mTimeLimit -= sys->mDeltaTime * 0.5f;
-			if (section->mTimeLimit <= 0.0f && !(isFlag(VSGS_Unk4))) {
+			if (section->mTimeLimit <= 0.0f && !isFlag(VSGS_TimeUp)) {
 				gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 				gameSystem->setPause(true, "timeup", 3);
 				gameSystem->setMoviePause(true, "timeup");
-				setFlag(VSGS_Unk4);
+				setFlag(VSGS_TimeUp);
 
 				if (!gameSystem->isMultiplayerMode()) {
 					Screen::gGame2DMgr->open_TimeUp1P();
@@ -302,51 +304,51 @@ void GameState::exec(VsGameSection* section)
 		}
 	}
 
-	if (!isFlag(VSGS_Unk1) && section->mHole) {
+	if (!isFlag(VSGS_EnteringCave) && section->mHole) {
 		switch (Screen::gGame2DMgr->check_CaveMoreMenu()) {
-		case 0:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_MenuOpen:
 			break;
 
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_Confirm:
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 			gameSystem->setPause(false, "cmore-yes", 3);
 			gameSystem->setMoviePause(false, "cmore-yes");
 			section->goNextFloor(section->mHole);
-			setFlag(VSGS_Unk1);
+			setFlag(VSGS_EnteringCave);
 			return;
 
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_Cancel:
 			gameSystem->setPause(false, "cmore-no", 3);
 			gameSystem->setMoviePause(false, "cmore-no");
 			break;
 
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_CaveInMenu_Unused:
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 			gameSystem->setMoviePause(false, "cmore-zenk");
 			break;
 		}
 	}
 
-	if (!section->mMenuFlags || section->updateCaveMenus()) {
+	if (!section->mMenuFlags.typeView || section->updateCaveMenus()) {
 		update_GameChallenge(section);
-		if (!_16) {
+		if (mSubState == 0) {
 			checkSMenu(section);
 		}
 
 		// check we're in VS Mode and that someone needs to lose
-		if (gameSystem->isVersusMode() && !isFlag(VSGS_Unk9) && !isFlag(VSGS_Unk10) && _16 != 1
+		if (gameSystem->isVersusMode() && !isFlag(VSGS_WinLoseReasonOpen) && !isFlag(VSGS_WinLoseOpen) && mSubState != 1
 		    && (getLoseCauses(VSPLAYER_Red) || getLoseCauses(VSPLAYER_Blue))) {
 
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
-			setFlag(VSGS_Unk9);
+			setFlag(VSGS_WinLoseReasonOpen);
 			gameSystem->setPause(true, nullptr, 3);
 
 			int redReason  = -1;
 			int blueReason = -1;
-			if (isLoseCause(VSPLAYER_Red, VSLOSE_Unk3)) {
+			if (isLoseCause(VSPLAYER_Red, VSLOSE_Finished)) {
 				blueReason = 3;
 
-			} else if (isLoseCause(VSPLAYER_Red, VSLOSE_Unk1)) {
+			} else if (isLoseCause(VSPLAYER_Red, VSLOSE_NaviDown)) {
 				redReason = 1;
 
 			} else if (isLoseCause(VSPLAYER_Red, VSLOSE_Extinction)) {
@@ -355,10 +357,10 @@ void GameState::exec(VsGameSection* section)
 
 			if (blueReason == 3) {
 
-			} else if (isLoseCause(VSPLAYER_Blue, VSLOSE_Unk3)) {
+			} else if (isLoseCause(VSPLAYER_Blue, VSLOSE_Finished)) {
 				redReason = 3;
 
-			} else if (isLoseCause(VSPLAYER_Blue, VSLOSE_Unk1)) {
+			} else if (isLoseCause(VSPLAYER_Blue, VSLOSE_NaviDown)) {
 				blueReason = 1;
 
 			} else if (isLoseCause(VSPLAYER_Blue, VSLOSE_Extinction)) {
@@ -397,7 +399,7 @@ void GameState::checkFindKeyDemo(VsGameSection* section)
 						arg.mDelegateStart = section->mMovieStartCallback;
 						arg.mOrigin        = obj->getPosition();
 
-						arg.mAngle = JMath::atanTable_.atan2_(obj->mBaseTrMatrix(0, 2), obj->mBaseTrMatrix(2, 2));
+						arg.mAngle = JMAAtan2Radian(obj->mBaseTrMatrix(0, 2), obj->mBaseTrMatrix(2, 2));
 
 						moviePlayer->mTargetObject = obj;
 						moviePlayer->play(arg);
@@ -417,31 +419,31 @@ void GameState::checkFindKeyDemo(VsGameSection* section)
 void GameState::checkSMenu(VsGameSection* section)
 {
 	switch (Screen::gGame2DMgr->check_SMenu()) {
-	case 1:
+	case Screen::Game2DMgr::CHECK2D_SMenu_Cancel:
 		gameSystem->setPause(false, "sm-canc", 3);
 		gameSystem->setMoviePause(false, "sm-canc");
-	case 0: // this is just cursed
+	case Screen::Game2DMgr::CHECK2D_SMenu_Opened:
 		return;
 
-	case 2:
-		JUT_PANICLINE(617, "‚ ‚è‚¦‚È‚¢‚Á‚·\n"); // 'impossible'
+	case Screen::Game2DMgr::CHECK2D_SMenu_GoToSunset:
+		JUT_PANICLINE(617, "ã‚ã‚Šãˆãªã„ã£ã™\n"); // 'impossible'
 		return;
 
-	case 3:
-		JUT_PANICLINE(620, "‚È‚¢\n"); // 'no'
+	case Screen::Game2DMgr::CHECK2D_SMenu_ReturnToFileSelect:
+		JUT_PANICLINE(620, "ãªã„\n"); // 'no'
 		return;
 
-	case 5:
+	case Screen::Game2DMgr::CHECK2D_SMenu_QuitChallenge:
 		gameSystem->setMoviePause(false, "sm-quit");
 		if (gameSystem->isVersusMode()) {
 			section->mVsWinner = -1;
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 			TitleArg titleArg;
-			titleArg._00 = 1;
+			titleArg.mDoNeedClearHeap = true;
 			transit(section, VGS_Title, &titleArg);
 			return;
 		}
-		if (moviePlayer->mDemoState == 0 && !isFlag(VSGS_Unk2)) {
+		if (moviePlayer->mDemoState == DEMOSTATE_Inactive && !isFlag(VSGS_PikminExtinct)) {
 			gameSystem->resetFlag(GAMESYS_IsGameWorldActive);
 			MoviePlayArg movieArgs("s12_cv_giveup", 0x0, section->mMovieFinishCallback, 0);
 			movieArgs.mDelegateStart = section->mMovieStartCallback;
@@ -463,7 +465,7 @@ void GameState::checkSMenu(VsGameSection* section)
 		return;
 	}
 
-	if (moviePlayer->mDemoState == 0 && !gameSystem->paused_soft()) {
+	if (moviePlayer->mDemoState == DEMOSTATE_Inactive && !gameSystem->paused_soft()) {
 		if (section->mControllerP1->isButtonDown(JUTGamePad::PRESS_START)) {
 			og::Screen::DispMemberSMenuAll sMenu;
 			int versus = 2;
@@ -478,7 +480,7 @@ void GameState::checkSMenu(VsGameSection* section)
 			}
 
 		} else if (gameSystem->isMultiplayerMode()) {
-			if ((section->mControllerP2->isButtonDown(JUTGamePad::PRESS_START))) {
+			if (section->mControllerP2->isButtonDown(JUTGamePad::PRESS_START)) {
 				og::Screen::DispMemberSMenuAll sMenu;
 				int versus = 2;
 				if (gameSystem->isVersusMode()) {
@@ -501,7 +503,7 @@ void GameState::checkSMenu(VsGameSection* section)
  */
 void GameState::pre2dDraw(Graphics& gfx, VsGameSection* section)
 {
-	if (gameSystem->isVersusMode() && !mFlags.typeView && !moviePlayer->mDemoState) {
+	if (gameSystem->isVersusMode() && !mFlags.typeView && moviePlayer->mDemoState == DEMOSTATE_Inactive) {
 		section->mCardMgr->draw(gfx);
 	}
 }
@@ -512,7 +514,7 @@ void GameState::pre2dDraw(Graphics& gfx, VsGameSection* section)
  */
 void GameState::draw(VsGameSection* section, Graphics& gfx)
 {
-	if (!isFlag(VSGS_Unk16)) {
+	if (!isFlag(VSGS_IsSectionFadeout)) {
 		section->BaseGameSection::doDraw(gfx);
 	}
 }
@@ -532,16 +534,16 @@ void GameState::cleanup(VsGameSection* section)
  * @note Address: 0x8022A824
  * @note Size: 0x34
  */
-void GameState::onBattleFinished(VsGameSection* section, int winnerMaybe, bool check)
+void GameState::onBattleFinished(VsGameSection* section, int winningPlayerIndex, bool check)
 {
-	if (_16) {
+	if (mSubState) {
 		return;
 	}
 
-	setLoseCause(1 - winnerMaybe, VSLOSE_Unk3);
+	setLoseCause(1 - winningPlayerIndex, VSLOSE_Finished);
 
 	if (check) {
-		_16 = 1;
+		mSubState = 1;
 	}
 }
 
@@ -549,7 +551,7 @@ void GameState::onBattleFinished(VsGameSection* section, int winnerMaybe, bool c
  * @note Address: 0x8022A858
  * @note Size: 0x10
  */
-bool GameState::isCardUsable(VsGameSection* section) { return (u32) !(_16); }
+bool GameState::isCardUsable(VsGameSection* section) { return (u32) !(mSubState); }
 
 /**
  * @note Address: 0x8022A868
@@ -559,18 +561,18 @@ void GameState::onRedOrBlueSuckStart(VsGameSection* section, int player, bool is
 {
 	if (isYellow) {
 		section->mYellowMarbleCounts[player]++;
-		if (isYellow && section->mYellowMarbleCounts[player] < 4) {
+		if (isYellow && section->mYellowMarbleCounts[player] < VS_WIN_YELLOW_MARBLE_NUM) {
 			return;
 		}
 	}
 
-	if (_16) {
+	if (mSubState) {
 		return;
 	}
 
-	_16 = 1;
+	mSubState = 1;
 
-	u8 loseReason = VSLOSE_Unk3;
+	u8 loseReason = VSLOSE_Finished;
 	if (!isYellow) {
 		loseReason |= VSLOSE_Marble;
 	}
@@ -595,7 +597,7 @@ void GameState::onRedOrBlueSuckStart(VsGameSection* section, int player, bool is
  */
 void GameState::checkPikminZero(VsGameSection* section)
 {
-	if (!gameSystem->isVersusMode() && !isFlag(VSGS_Unk2) && GameStat::getAllPikmins(-1) == 0 && !gameSystem->paused_soft()
+	if (!gameSystem->isVersusMode() && !isFlag(VSGS_PikminExtinct) && GameStat::getAllPikmins(-1) == 0 && !gameSystem->paused_soft()
 	    && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
 
 		Navi* activeNavi = naviMgr->getActiveNavi();
@@ -607,7 +609,7 @@ void GameState::checkPikminZero(VsGameSection* section)
 			activeNavi = naviMgr->getAt(naviIndex);
 		}
 
-		setFlag(VSGS_Unk2);
+		setFlag(VSGS_PikminExtinct);
 
 		MoviePlayArg movieArg("s05_pikminzero", nullptr, section->mMovieFinishCallback, 0);
 		movieArg.mDelegateStart = section->mMovieStartCallback;
@@ -622,34 +624,34 @@ void GameState::checkPikminZero(VsGameSection* section)
  * @note Address: 0x8022AB3C
  * @note Size: 0x474
  */
-void GameState::onMovieStart(VsGameSection* section, MovieConfig* config, u32 p1, u32 p2)
+void GameState::onMovieStart(VsGameSection* section, MovieConfig* movie, u32 p1, u32 p2)
 {
-	if (config->is("g2F_appear_hole") || config->is("g30_appear_fountain")) {
+	if (movie->is("g2F_appear_hole") || movie->is("g30_appear_fountain")) {
 		Screen::gGame2DMgr->setToumeiBG();
 	}
 
-	if (config->is("s0B_cv_coursein")) {
+	if (movie->is("s0B_cv_coursein")) {
 		section->createFallPikminSound();
 	}
 
 	Screen::gGame2DMgr->startFadeBG_Floor();
-	if (config->is("s03_orimadown")) {
+	if (movie->is("s03_orimadown")) {
 		Screen::Game2DMgr::GameOverTitle gameOverTitle;
 		if (p2 == 0) {
 			gameOverTitle = Screen::Game2DMgr::GOTITLE_OlimarDown;
 			if (!gameSystem->isMultiplayerMode()) {
-				section->setPlayerMode(0);
+				section->setPlayerMode(NAVIID_Olimar);
 			}
 		} else {
 			gameOverTitle = Screen::Game2DMgr::GOTITLE_LouieDown;
 			if (!gameSystem->isMultiplayerMode()) {
-				section->setPlayerMode(1);
+				section->setPlayerMode(NAVIID_Louie);
 			}
 		}
 		Screen::gGame2DMgr->open_GameOver(gameOverTitle);
 	}
 
-	if (config->is("s12_cv_giveup")) {
+	if (movie->is("s12_cv_giveup")) {
 		Screen::gGame2DMgr->mScreenMgr->reset();
 		Iterator<Piki> pikiIterator(pikiMgr);
 		CI_LOOP(pikiIterator)
@@ -658,12 +660,12 @@ void GameState::onMovieStart(VsGameSection* section, MovieConfig* config, u32 p1
 			if (piki->isAlive() && !piki->isStickTo()) {
 				piki->movie_begin(false);
 				piki->endStick();
-				piki->mBrain->start(1, nullptr);
+				piki->mBrain->start(PikiAI::ACT_Free, nullptr);
 			}
 		}
 	}
 
-	if (config->is("s09_holein")) {
+	if (movie->is("s09_holein")) {
 		Vector3f holePos = section->mHole->getPosition();
 		section->prepareHoleIn(holePos, true);
 		pikiMgr->saveAllPikmins(section->mContainer1);
@@ -676,7 +678,7 @@ void GameState::onMovieStart(VsGameSection* section, MovieConfig* config, u32 p1
 		section->mHole = nullptr;
 	}
 
-	if (config->is("s0C_cv_escape")) {
+	if (movie->is("s0C_cv_escape")) {
 		Vector3f fountainPos = section->mFountain->getPosition();
 		section->prepareFountainOn(fountainPos);
 	}
@@ -686,10 +688,10 @@ void GameState::onMovieStart(VsGameSection* section, MovieConfig* config, u32 p1
  * @note Address: 0x8022AFB0
  * @note Size: 0x9D0
  */
-void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1, u32 p2)
+void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 unused1, u32 unused2)
 {
 	if (gameSystem->isMultiplayerMode()) {
-		section->setPlayerMode(2);
+		section->setPlayerMode(NAVIID_Multiplayer);
 	}
 
 	RoomMapMgr* mgr   = static_cast<RoomMapMgr*>(mapMgr);
@@ -700,23 +702,15 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 	if (gameSystem->isChallengeMode() && Radar::Mgr::getNumOtakaraItems() == 0
 	    && (config->is("g2F_appear_hole") || config->is("g30_appear_fountain"))) {
 
-		PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-		checkSceneMgr(sceneMgr);
-		PSM::Scene_Cave* scene = static_cast<PSM::Scene_Cave*>(sceneMgr->getChildScene());
+		PSM::Scene_Game* scene = static_cast<PSM::Scene_Game*>(PSMGetSceneMgrCheck()->getChildScene());
 		checkGameScene(scene);
 		if (scene->isCave()) {
-			scene->startPollutUpSe();
+			static_cast<PSM::Scene_Cave*>(scene)->startPollutUpSe();
 		}
 	}
 
 	if (config->is("x19_vs_bedama") && (isLoseCause(VSPLAYER_Red, VSLOSE_Marble) || isLoseCause(VSPLAYER_Blue, VSLOSE_Marble))) {
-		PSSystem::SceneMgr* sceneMgr = PSSystem::getSceneMgr();
-		checkSceneMgr(sceneMgr);
-		PSM::SceneBase* scene = static_cast<PSM::SceneBase*>(sceneMgr->getChildScene());
-
-		scene = (scene->isGameScene()) ? scene : nullptr;
-
-		scene->mSeqMgr.stopAllSound(15);
+		PSMGetGameScene()->mSeqMgr.stopAllSound(15);
 	}
 
 	if (config->is("e00_E3_cavestart")) {
@@ -731,7 +725,7 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 
 		gameSystem->setPause(true, "readygo", 6);
 		gameSystem->setMoviePause(true, "readygo");
-		setFlag(VSGS_Unk8);
+		setFlag(VSGS_ReadyGoOpen);
 
 	} else if (config->is("s0B_cv_coursein")) {
 		Iterator<Piki> pikiIterator(pikiMgr);
@@ -742,18 +736,18 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 			pikiPos.y        = mapMgr->getMinY(pikiPos);
 
 			piki->setPosition(pikiPos, false);
-			piki->mSimVelocity = Vector3f(0.0f);
-			piki->mVelocity    = Vector3f(0.0f);
+			piki->mVelocity       = Vector3f(0.0f);
+			piki->mTargetVelocity = Vector3f(0.0f);
 		}
 
 		Screen::gGame2DMgr->close_Floor();
-		setFlag(VSGS_Unk3);
+		setFlag(VSGS_IntroDone);
 		if (currFloor == 0) {
 			if (sys->getPlayCommonData()->challenge_is_virgin_check_only()) {
 				if (!gameSystem->isVersusMode()) {
 					MoviePlayArg movieArg("e00_E3_cavestart", nullptr, section->mMovieFinishCallback, 0);
 					if (gameSystem->isMultiplayerMode()) {
-						section->setPlayerMode(0);
+						section->setPlayerMode(NAVIID_Olimar);
 					}
 					section->setCamController();
 					movieArg.mDelegateStart = section->mMovieStartCallback;
@@ -782,7 +776,7 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 
 			gameSystem->setPause(true, "readygo2", 6);
 			gameSystem->setMoviePause(true, "readygo2");
-			setFlag(VSGS_Unk8);
+			setFlag(VSGS_ReadyGoOpen);
 
 		} else if (isFinalFloor) {
 			open_GameChallenge(section, 2);
@@ -799,8 +793,8 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 		PSMCancelToPauseOffMainBgm();
 		section->mCurrentFloor++;
 		LoadArg arg;
-		arg._04 = 0;
-		arg._08 = true;
+		arg.mGameLoadType  = 0;
+		arg.mNeedClearHeap = true;
 		transit(section, VGS_Load, &arg);
 
 	} else if (config->is("s12_cv_giveup")) {
@@ -808,11 +802,11 @@ void GameState::onMovieDone(VsGameSection* section, MovieConfig* config, u32 p1,
 		GameStat::alivePikis.clear();
 		moviePlayer->clearSuspendedDemo();
 		TitleArg arg;
-		arg._00 = 1;
+		arg.mDoNeedClearHeap = true;
 		transit(section, VGS_Title, &arg);
 
 	} else if (config->is("s03_orimadown")) {
-		naviMgr->informOrimaDead(p2);
+		naviMgr->informOrimaDead(unused2);
 		Screen::gGame2DMgr->close_GameOver();
 		if (gameSystem->isVersusMode()) {
 			JUT_PANICLINE(1279, "cannot happen !\n");
@@ -867,8 +861,8 @@ void GameState::onOrimaDown(VsGameSection* section, int naviIdx)
 	P2ASSERTBOUNDSLINE(1341, 0, naviIdx, 2);
 
 	if (gameSystem->isVersusMode()) {
-		if (!_16) {
-			setLoseCause(naviIdx, VSLOSE_Unk1);
+		if (!mSubState) {
+			setLoseCause(naviIdx, VSLOSE_NaviDown);
 		}
 		return;
 	}
@@ -930,49 +924,49 @@ void GameState::update_GameChallenge(VsGameSection* section)
 		Navi* olimar                    = naviMgr->getAt(NAVIID_Olimar);
 		disp.mOlimarData.mFollowPikis   = GameStat::formationPikis.mCounter[NAVIID_Olimar];
 		disp.mOlimarData.mNextThrowPiki = olimar->ogGetNextThrowPiki();
-		disp.mOlimarData.mDope1Count    = playData->getDopeCount(1);
-		disp.mOlimarData.mDope0Count    = playData->getDopeCount(0);
+		disp.mOlimarData.mDope1Count    = playData->getDopeCount(SPRAY_TYPE_BITTER);
+		disp.mOlimarData.mDope0Count    = playData->getDopeCount(SPRAY_TYPE_SPICY);
 		disp.mOlimarData.mNaviLifeRatio = olimar->getLifeRatio();
 
 		Navi* louie                    = naviMgr->getAt(NAVIID_Louie);
 		disp.mLouieData.mFollowPikis   = GameStat::formationPikis.mCounter[NAVIID_Louie];
 		disp.mLouieData.mNextThrowPiki = louie->ogGetNextThrowPiki();
-		disp.mLouieData.mDope1Count    = playData->getDopeCount(1);
-		disp.mLouieData.mDope0Count    = playData->getDopeCount(0);
+		disp.mLouieData.mDope1Count    = playData->getDopeCount(SPRAY_TYPE_BITTER);
+		disp.mLouieData.mDope0Count    = playData->getDopeCount(SPRAY_TYPE_SPICY);
 		disp.mLouieData.mNaviLifeRatio = louie->getLifeRatio();
 
 		Navi* activeNavi = naviMgr->getActiveNavi();
-		int check        = 2;
+		int id           = NAVIID_Multiplayer;
 		if (activeNavi) {
-			check = activeNavi->mNaviIndex;
+			id = activeNavi->mNaviIndex;
 		}
 
-		if (check == 0) {
-			disp.mOlimarData.mActiveNaviID = 1;
-			disp.mLouieData.mActiveNaviID  = 0;
+		if (id == NAVIID_Olimar) {
+			disp.mOlimarData.mActiveNaviID = TRUE;
+			disp.mLouieData.mActiveNaviID  = FALSE;
 
-		} else if (check == 1) {
-			disp.mOlimarData.mActiveNaviID = 0;
-			disp.mLouieData.mActiveNaviID  = 1;
+		} else if (id == NAVIID_Louie) {
+			disp.mOlimarData.mActiveNaviID = FALSE;
+			disp.mLouieData.mActiveNaviID  = TRUE;
 
-		} else if (section->mPrevNaviIdx == 0) {
-			disp.mOlimarData.mActiveNaviID = 0;
-			disp.mLouieData.mActiveNaviID  = 1;
+		} else if (section->mPrevNaviIdx == NAVIID_Olimar) {
+			disp.mOlimarData.mActiveNaviID = FALSE;
+			disp.mLouieData.mActiveNaviID  = TRUE;
 
 		} else {
-			disp.mOlimarData.mActiveNaviID = 1;
-			disp.mLouieData.mActiveNaviID  = 0;
+			disp.mOlimarData.mActiveNaviID = TRUE;
+			disp.mLouieData.mActiveNaviID  = FALSE;
 		}
 
-		disp.mDataGame.mMapPikminCount = GameStat::getMapPikmins(-1);
+		disp.mDataGame.mMapPikminCount = GameStat::getMapPikmins(AllPikminCalcs);
 		Screen::gGame2DMgr->setDispMember(&disp);
 		return;
 	}
 
 	if (gameSystem->isVersusMode()) {
-		if (Screen::gGame2DMgr->check_VsStatus() == 2 && _16 == 1 && !(moviePlayer->isFlag(MVP_IsActive))) {
-			_16 = 2;
-		} else if (_16 == 1) {
+		if (Screen::gGame2DMgr->check_VsStatus() == 2 && mSubState == 1 && !(moviePlayer->isFlag(MVP_IsActive))) {
+			mSubState = 2;
+		} else if (mSubState == 1) {
 			Screen::gGame2DMgr->check_VsStatus(); // probably in a leftover && check
 		}
 
@@ -981,19 +975,19 @@ void GameState::update_GameChallenge(VsGameSection* section)
 		Navi* olimar                    = naviMgr->getAt(NAVIID_Olimar);
 		disp.mOlimarData.mFollowPikis   = GameStat::formationPikis.mCounter[NAVIID_Olimar];
 		disp.mOlimarData.mNextThrowPiki = olimar->ogGetNextThrowPiki();
-		disp.mOlimarData.mDope1Count    = olimar->getDopeCount(1);
-		disp.mOlimarData.mDope0Count    = olimar->getDopeCount(0);
+		disp.mOlimarData.mDope1Count    = olimar->getDopeCount(SPRAY_TYPE_BITTER);
+		disp.mOlimarData.mDope0Count    = olimar->getDopeCount(SPRAY_TYPE_SPICY);
 		disp.mOlimarData.mNaviLifeRatio = olimar->getLifeRatio();
 
 		Navi* louie                    = naviMgr->getAt(NAVIID_Louie);
 		disp.mLouieData.mFollowPikis   = GameStat::formationPikis.mCounter[NAVIID_Louie];
 		disp.mLouieData.mNextThrowPiki = louie->ogGetNextThrowPiki();
-		disp.mLouieData.mDope1Count    = louie->getDopeCount(1);
-		disp.mLouieData.mDope0Count    = louie->getDopeCount(0);
+		disp.mLouieData.mDope1Count    = louie->getDopeCount(SPRAY_TYPE_BITTER);
+		disp.mLouieData.mDope0Count    = louie->getDopeCount(SPRAY_TYPE_SPICY);
 		disp.mLouieData.mNaviLifeRatio = louie->getLifeRatio();
 
-		disp.mRedPikminCount  = GameStat::getMapPikmins(1);
-		disp.mBluePikminCount = GameStat::getMapPikmins(0);
+		disp.mRedPikminCount  = GameStat::getMapPikmins(Red);
+		disp.mBluePikminCount = GameStat::getMapPikmins(Blue);
 
 		disp.mFlags[2] = section->mGhostIconTimers[0] > 0.0f;
 		disp.mFlags[3] = section->mGhostIconTimers[1] > 0.0f;
@@ -1001,15 +995,15 @@ void GameState::update_GameChallenge(VsGameSection* section)
 		disp.mGhostIconTimerP1 = section->mGhostIconTimers[0];
 		disp.mGhostIconTimerP2 = section->mGhostIconTimers[1];
 
-		int marbleCountP1 = section->mMarbleCountP1;
-		int marbleCountP2 = section->mMarbleCountP2;
+		int marbleCountP1 = section->mMarbleCount[0];
+		int marbleCountP2 = section->mMarbleCount[1];
 
-		if (section->mMarbleCountP1 == 4 && moviePlayer->isFlag(MVP_IsActive)) {
-			marbleCountP1 = section->mMarbleCountP1 - 1;
+		if (section->mMarbleCount[0] == VS_WIN_YELLOW_MARBLE_NUM && moviePlayer->isFlag(MVP_IsActive)) {
+			marbleCountP1 = section->mMarbleCount[0] - 1;
 		}
 
-		if (section->mMarbleCountP2 == 4 && moviePlayer->isFlag(MVP_IsActive)) {
-			marbleCountP2 = section->mMarbleCountP2 - 1;
+		if (section->mMarbleCount[1] == VS_WIN_YELLOW_MARBLE_NUM && moviePlayer->isFlag(MVP_IsActive)) {
+			marbleCountP2 = section->mMarbleCount[1] - 1;
 		}
 
 		disp.mMarbleCountP1 = marbleCountP1;
@@ -1035,20 +1029,20 @@ void GameState::update_GameChallenge(VsGameSection* section)
 	disp.mTimeLimit        = section->mTimeLimit;
 	disp.mDeadPiki         = section->mDeadPikiCount;
 
-	Navi* olimar                    = naviMgr->getAt(0);
+	Navi* olimar                    = naviMgr->getAt(NAVIID_Olimar);
 	disp.mOlimarData.mFollowPikis   = GameStat::formationPikis.mCounter[0];
 	disp.mOlimarData.mNextThrowPiki = olimar->ogGetNextThrowPiki();
-	disp.mOlimarData.mDope1Count    = playData->getDopeCount(1);
-	disp.mOlimarData.mDope0Count    = playData->getDopeCount(0);
+	disp.mOlimarData.mDope1Count    = playData->getDopeCount(SPRAY_TYPE_BITTER);
+	disp.mOlimarData.mDope0Count    = playData->getDopeCount(SPRAY_TYPE_SPICY);
 	disp.mOlimarData.mNaviLifeRatio = olimar->getLifeRatio();
 
-	Navi* louie                    = naviMgr->getAt(1);
+	Navi* louie                    = naviMgr->getAt(NAVIID_Louie);
 	disp.mLouieData.mFollowPikis   = GameStat::formationPikis.mCounter[1];
 	disp.mLouieData.mNextThrowPiki = louie->ogGetNextThrowPiki();
-	disp.mLouieData.mDope1Count    = playData->getDopeCount(1);
-	disp.mLouieData.mDope0Count    = playData->getDopeCount(0);
+	disp.mLouieData.mDope1Count    = playData->getDopeCount(SPRAY_TYPE_BITTER);
+	disp.mLouieData.mDope0Count    = playData->getDopeCount(SPRAY_TYPE_SPICY);
 	disp.mLouieData.mNaviLifeRatio = louie->getLifeRatio();
-	disp.mDataGame.mMapPikminCount = GameStat::getMapPikmins(-1);
+	disp.mDataGame.mMapPikminCount = GameStat::getMapPikmins(AllPikminCalcs);
 	Screen::gGame2DMgr->setDispMember(&disp);
 }
 

@@ -5,10 +5,10 @@
 #include "Dolphin/vec.h"
 #include "JSystem/JStudio/data.h"
 #include "JSystem/JStudio/TVariableValue.h"
+#include "JSystem/JParticle/JPAEmitter.h"
 
 namespace JStudio {
 struct TObject;
-struct TVariableValue;
 
 struct TAdaptor {
 	struct TSetVariableValue_immediate {
@@ -22,11 +22,12 @@ struct TAdaptor {
 		f32 _04; // _04
 	};
 
+	typedef void (JStudio::TAdaptor::*AdaptorDoFunction)(JStudio::data::TEOperationData, const void*, u32);
 	typedef void (*StaticCapsSetVariableValueFunction)(TAdaptor*, TObject*, u32, const void*, u32);
 
 	inline TAdaptor(TVariableValue* values, int count)
-	    : _04(values)
-	    , _08(count)
+	    : mVariableValues(values)
+	    , mCount(count)
 	{
 	}
 
@@ -58,9 +59,15 @@ struct TAdaptor {
 	void adaptor_updateVariableValue();
 	void adaptor_updateVariableValue(JStudio::TObject*, u32);
 
+	inline TVariableValue& adaptor_referVariableValue(u32 idx) { return mVariableValues[idx]; }
+
+	inline TVariableValue* adaptor_getVariableValue(u32 idx) { return &mVariableValues[idx]; }
+
+	inline void adaptor_setVariableValue_immediate(u32 idx, f32 val) { adaptor_referVariableValue(idx).setValueImmediate(val); }
+
 	// VTBL _00
-	TVariableValue* _04; // _04
-	int _08;             // _08 - length of array pointed to by _04
+	TVariableValue* mVariableValues; // _04
+	int mCount;                      // _08
 };
 
 struct TAdaptor_actor : public TAdaptor {
@@ -86,11 +93,13 @@ struct TAdaptor_actor : public TAdaptor {
 	virtual void adaptor_do_TEXTURE_ANIMATION(JStudio::data::TEOperationData, const void*, u32)      = 0; // _48
 	virtual void adaptor_do_TEXTURE_ANIMATION_MODE(JStudio::data::TEOperationData, const void*, u32) = 0; // _4C
 
-	JStudio::TVariableValue _0C[14]; // _0C
-
 	static const u32 sauVariableValue_3_TRANSLATION_XYZ[3];
 	static const u32 sauVariableValue_3_ROTATION_XYZ[3];
 	static const u32 sauVariableValue_3_SCALING_XYZ[3];
+
+	// _00     = VTBL
+	// _00-_0C = TAdaptor
+	JStudio::TVariableValue _0C[14]; // _0C
 };
 
 struct TAdaptor_ambientLight : public TAdaptor {
@@ -130,6 +139,7 @@ struct TAdaptor_camera : public TAdaptor {
 
 	JStudio::TVariableValue _0C[0xC]; // _0C
 
+	static const u32 sauVariableValue_2_DISTANCE_NEAR_FAR[2];
 	static const u32 sauVariableValue_3_POSITION_XYZ[3];
 	static const u32 sauVariableValue_3_TARGET_POSITION_XYZ[3];
 };
@@ -147,6 +157,7 @@ struct TAdaptor_fog : public TAdaptor {
 
 	JStudio::TVariableValue _0C[6];
 
+	static const u32 sauVariableValue_2_RANGE_BEGIN_END[2];
 	static const u32 sauVariableValue_3_COLOR_RGB[3];
 	static const u32 sauVariableValue_4_COLOR_RGBA[4];
 };
@@ -162,12 +173,15 @@ struct TAdaptor_light : public TAdaptor {
 	virtual void adaptor_do_ENABLE(JStudio::data::TEOperationData, const void*, u32)  = 0; // _20
 	virtual void adaptor_do_FACULTY(JStudio::data::TEOperationData, const void*, u32) = 0; // _24
 
-	JStudio::TVariableValue _0C[13]; // _0C
-
+	static const u32 sauVariableValue_2_DIRECTION_THETA_PHI[2];
 	static const u32 sauVariableValue_3_COLOR_RGB[3];
 	static const u32 sauVariableValue_4_COLOR_RGBA[4];
 	static const u32 sauVariableValue_3_POSITION_XYZ[3];
 	static const u32 sauVariableValue_3_TARGET_POSITION_XYZ[3];
+
+	// _00     = VTBL
+	// _00-_0C = TAdaptor
+	JStudio::TVariableValue _0C[13]; // _0C
 };
 
 struct TAdaptor_message : public TAdaptor {
@@ -188,6 +202,24 @@ struct TAdaptor_particle : public TAdaptor {
 	    , _0C()
 	{
 	}
+
+	struct TJPAEmitter_stopDrawParticle_ {
+		TJPAEmitter_stopDrawParticle_(JPABaseEmitter* emitter)
+		    : mEmitter(emitter)
+		{
+		}
+
+		~TJPAEmitter_stopDrawParticle_()
+		{
+			if (mEmitter) {
+				mEmitter->stopDrawParticle();
+			}
+		}
+
+		void set(JPABaseEmitter* emitter) { mEmitter = emitter; }
+
+		JPABaseEmitter* mEmitter; // _00
+	};
 
 	// ~TAdaptor_particle();
 
@@ -213,22 +245,27 @@ struct TAdaptor_particle : public TAdaptor {
 };
 
 struct TAdaptor_sound : public TAdaptor {
-	TAdaptor_sound(TVariableValue* var, u32 a1)
-	    : TAdaptor(var, a1)
+	TAdaptor_sound()
+	    : TAdaptor(mVariableList, ARRAY_SIZE(mVariableList))
+	    , mVariableList()
 	{
 	}
-	// ~TAdaptor_sound();
 
-	virtual ~TAdaptor_sound() = 0; // _08
-	// virtual void _20()        = 0; // _20
-	// virtual void _24()        = 0; // _24
-	// virtual void _28()        = 0; // _28
-	// virtual void _2C()        = 0; // _2C
-	// virtual void _30()        = 0; // _30
-	// virtual void _34()        = 0; // _34
-	// virtual void _38()        = 0; // _38
-	// virtual void _3C()        = 0; // _3C
-	// virtual void _40()        = 0; // _40
+	virtual ~TAdaptor_sound()                                                               = 0; // _08
+	virtual void adaptor_do_prepare(const JStudio::TObject*)                                = 0; // _0C
+	virtual void adaptor_do_end(const JStudio::TObject*)                                    = 0; // _14
+	virtual void adaptor_do_update(const JStudio::TObject*, u32)                            = 0; // _18
+	virtual void adaptor_do_SOUND(JStudio::data::TEOperationData, const void*, u32)         = 0; // _20
+	virtual void adaptor_do_BEGIN(JStudio::data::TEOperationData, const void*, u32)         = 0; // _24
+	virtual void adaptor_do_BEGIN_FADE_IN(JStudio::data::TEOperationData, const void*, u32) = 0; // _28
+	virtual void adaptor_do_END(JStudio::data::TEOperationData, const void*, u32)           = 0; // _2C
+	virtual void adaptor_do_END_FADE_OUT(JStudio::data::TEOperationData, const void*, u32)  = 0; // _30
+	virtual void adaptor_do_PARENT(JStudio::data::TEOperationData, const void*, u32)        = 0; // _34
+	virtual void adaptor_do_PARENT_NODE(JStudio::data::TEOperationData, const void*, u32)   = 0; // _38
+	virtual void adaptor_do_PARENT_ENABLE(JStudio::data::TEOperationData, const void*, u32) = 0; // _3C
+	virtual void adaptor_do_LOCATED(JStudio::data::TEOperationData, const void*, u32)       = 0; // _40
+
+	JStudio::TVariableValue mVariableList[10]; // _0C
 
 	static const u32 sauVariableValue_3_POSITION_XYZ[3];
 };

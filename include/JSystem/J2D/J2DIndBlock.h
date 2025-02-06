@@ -28,6 +28,8 @@ extern const J2DIndTexCoordScaleInfo j2dDefaultIndTexCoordScaleInfo;
 struct J2DIndTexCoordScale {
 	J2DIndTexCoordScale() { mScaleInfo = j2dDefaultIndTexCoordScaleInfo; }
 
+	J2DIndTexCoordScale(const J2DIndTexCoordScaleInfo& info) { mScaleInfo = info; }
+
 	~J2DIndTexCoordScale() { }
 
 	void load(u8);
@@ -46,7 +48,7 @@ struct J2DIndTexMtxInfo {
 				mMtx[i][j] = other.mMtx[i][j];
 			}
 		}
-		mScale = other.mScale;
+		mScale = *(s8*)&other.mScale; // don't even ask.
 		return *this;
 	}
 };
@@ -59,6 +61,8 @@ extern const J2DIndTexMtxInfo j2dDefaultIndTexMtxInfo;
 struct J2DIndTexMtx {
 	J2DIndTexMtx() { mMtxInfo = j2dDefaultIndTexMtxInfo; }
 
+	J2DIndTexMtx(const J2DIndTexMtxInfo& info) { mMtxInfo = info; }
+
 	~J2DIndTexMtx() { }
 
 	void load(u8);
@@ -66,29 +70,33 @@ struct J2DIndTexMtx {
 	J2DIndTexMtxInfo mMtxInfo; // _00
 };
 
-// fabricated based on global variable name
-struct J2DIndTexOrderNull {
-	J2DIndTexOrderNull& operator=(const J2DIndTexOrderNull& other)
+struct J2DIndTexOrderInfo {
+
+	J2DIndTexOrderInfo& operator=(const J2DIndTexOrderInfo& other)
 	{
-		mCoord = other.mCoord;
-		mMap   = other.mMap;
+		mTexCoordID = other.mTexCoordID;
+		mTexMapID   = other.mTexMapID;
 		return *this;
 	}
 
-	u8 mCoord; // _00
-	u8 mMap;   // _01
+	GXTexCoordID getTexCoordID() const { return (GXTexCoordID)mTexCoordID; }
+	GXTexMapID getTexMapID() const { return (GXTexMapID)mTexMapID; }
+
+	u8 mTexCoordID; // _00
+	u8 mTexMapID;   // _01
 };
 
-extern const J2DIndTexOrderNull j2dDefaultIndTexOrderNull;
+extern const J2DIndTexOrderInfo j2dDefaultIndTexOrderNull;
 
 /**
  * @size{0x2}
  */
 struct J2DIndTexOrder {
 	J2DIndTexOrder() { mOrder = j2dDefaultIndTexOrderNull; }
+	J2DIndTexOrder(const J2DIndTexOrderInfo& info) { mOrder = info; }
 	void load(u8);
 
-	J2DIndTexOrderNull mOrder; // _00
+	J2DIndTexOrderInfo mOrder; // _00
 };
 
 struct J2DIndBlock {
@@ -136,7 +144,7 @@ struct J2DIndBlockFull : public J2DIndBlock {
 	virtual u8 getIndTexStageNum() const { return mTexStageNum; }                                              // _18 (weak)
 	virtual void setIndTexOrder(u32 index, J2DIndTexOrder order) { mTexOrders[index] = order; }                // _1C (weak)
 	virtual J2DIndTexOrder* getIndTexOrder(u32 index) { return mTexOrders + index; }                           // _20 (weak)
-	virtual void setIndTexMtx(u32 index, J2DIndTexMtx texMtx) { mTexMtxes[index] = texMtx; }                   // _24 (weak)
+	virtual void setIndTexMtx(u32 index, J2DIndTexMtx texMtx) { mTexMtxes[index].mMtxInfo = texMtx.mMtxInfo; } // _24 (weak)
 	virtual J2DIndTexMtx* getIndTexMtx(u32 index) { return mTexMtxes + index; }                                // _28 (weak)
 	virtual void setIndTexCoordScale(u32 index, J2DIndTexCoordScale scale) { mTexCoordScales[index] = scale; } // _2C (weak)
 	virtual J2DIndTexCoordScale* getIndTexCoordScale(u32 index) { return mTexCoordScales + index; }            // _30 (weak)

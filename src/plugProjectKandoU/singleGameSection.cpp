@@ -266,21 +266,21 @@ void SingleGameSection::flow_goto_title() { mDoEnd = true; }
  */
 void SingleGameSection::onInit()
 {
-	_228              = 0;
+	mIsGameStarted    = false;
 	gameSystem->mMode = GSM_STORY_MODE;
 
 	System::assert_fragmentation("SGS::onInit");
 
-	mWeatherEfx = nullptr;
-	_194        = false;
+	mWeatherEfx   = nullptr;
+	mIsExitingMap = false;
 	clearCaveMenus();
 
-	_11C              = 0;
-	mLoadGameCallback = new Delegate<Game::SingleGameSection>(this, setupFloatMemory);
+	mUnusedFlag       = false;
+	mLoadGameCallback = new Delegate<SingleGameSection>(this, setupFloatMemory);
 
 	mFsm = new SingleGame::FSM;
 	mFsm->init(this);
-	mFsm->start(this, 0, nullptr);
+	mFsm->start(this, SingleGame::SGS_File, nullptr);
 
 	System::assert_fragmentation("SGS::FSM");
 	setupFixMemory();
@@ -302,7 +302,7 @@ bool SingleGameSection::doUpdate()
 		mFsm->exec(this);
 
 		if (!gameSystem->mIsFrozen && !gameSystem->paused()) {
-			if (mTimerEnabled && !moviePlayer->mDemoState && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
+			if (mTimerEnabled && moviePlayer->mDemoState == DEMOSTATE_Inactive && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
 				mTimer -= sys->mDeltaTime;
 
 				if (mTimer < 0.0f) {
@@ -443,7 +443,7 @@ void SingleGameSection::onClearHeap()
  * @note Address: 0x80153410
  * @note Size: 0xC
  */
-void SingleGameSection::onStartHeap() { _194 = 0; }
+void SingleGameSection::onStartHeap() { mIsExitingMap = 0; }
 
 /**
  * @note Address: 0x8015341C
@@ -498,10 +498,10 @@ void SingleGameSection::disableTimer(u32 id)
  * @note Address: 0x80153508
  * @note Size: 0x54
  */
-void SingleGameSection::onMovieStart(Game::MovieConfig* config, u32 p2, u32 p3)
+void SingleGameSection::onMovieStart(Game::MovieConfig* config, u32 unused, u32 naviID)
 {
 	if (mCurrentState) {
-		mCurrentState->onMovieStart(this, config, p2, p3);
+		mCurrentState->onMovieStart(this, config, unused, naviID);
 	}
 }
 
@@ -642,15 +642,14 @@ void SingleGameSection::saveMainMapSituation(bool isSubmergedCastle)
 {
 	if (isSubmergedCastle) {
 		Iterator<Piki> iterator(pikiMgr, 0, nullptr);
-		iterator.first();
-		while (!iterator.isDone()) {
+		CI_LOOP(iterator)
+		{
 			Piki* piki = (*iterator);
 			if (piki->isAlive() && piki->getKind() != Blue) {
 				playData->mPikiContainer.getCount(piki->getKind(), piki->getHappa())++;
-				PikiKillArg killArg(0x10001);
+				PikiKillArg killArg(CKILL_DontCountAsDeath | CKILL_Unk17);
 				piki->kill(&killArg);
 			}
-			iterator.next();
 		}
 	}
 	pikiMgr->caveSaveFormationPikmins(false);
@@ -689,34 +688,34 @@ void SingleGameSection::openCaveInMenu(ItemCave::Item* cave, int naviID)
 		isSC = true;
 	}
 
-	if (!_194 && !(mOpenMenuFlags & 1)) {
+	if (!mIsExitingMap && !(mOpenMenuFlags & 1)) {
 		mCaveIndex = id;
 		og::Screen::DispMemberAnaDemo disp;
-		disp._20             = 0;
+		disp.mUnusedValue    = 0;
 		disp.mCaveOtakaraNum = cave->getCaveOtakaraNum();
 		disp.mCaveOtakaraMax = cave->getCaveOtakaraMax();
-		disp.mPayedDebt      = playData->mStoryFlags & STORY_DebtPaid;
-		disp.mPikisField     = GameStat::getMapPikmins(-1) - GameStat::getZikatuPikmins(-1);
+		disp.mPayedDebt      = playData->isStoryFlag(STORY_DebtPaid);
+		disp.mPikisField     = GameStat::getMapPikmins(AllPikminCalcs) - GameStat::getZikatuPikmins(AllPikminCalcs);
 
-		int pikis = 0;
+		int enteringPikiCount = 0;
 		Iterator<Piki> iterator(pikiMgr);
 		CI_LOOP(iterator)
 		{
 			Piki* piki = *iterator;
-			piki->mFakePikiFlags.unset(0x40);
+			piki->resetFPFlag(FPFLAGS_PikiEnteringCave);
 			if (piki->isAlive() && piki->getCurrActionID() == PikiAI::ACT_Formation) {
 				int state = piki->getStateID();
 				if (state != PIKISTATE_Flying && state != PIKISTATE_HipDrop && piki->mNavi && naviID == piki->mNavi->mNaviIndex
-				    && (!isSC || (int)piki->getKind() == Blue)) {
-					pikis++;
-					piki->mFakePikiFlags.set(0x40);
+				    && (!isSC || piki->getKind() == Blue)) {
+					enteringPikiCount++;
+					piki->setFPFlag(FPFLAGS_PikiEnteringCave);
 				}
 			}
 		}
-		disp.mPikis  = pikis;
+		disp.mPikis  = enteringPikiCount;
 		disp.mCaveID = mCaveIndex;
 		if (Screen::gGame2DMgr->open_CaveInMenu(disp)) {
-			playData->setSaveFlag(3, nullptr);
+			playData->setSaveFlag(STORYSAVE_Cave, nullptr);
 			playData->setCurrentCourse(getCurrentCourseInfo()->mCourseIndex);
 			playData->setCurrentCave(cave->mCaveID, 0);
 			getCurrentCourseInfo()->getCaveinfoFilename_FromID(cave->mCaveID);
@@ -734,13 +733,13 @@ void SingleGameSection::openCaveInMenu(ItemCave::Item* cave, int naviID)
  */
 void SingleGameSection::openCaveMoreMenu(ItemHole::Item* hole, Controller* input)
 {
-	if (!_194 && !(mOpenMenuFlags & 2)) {
+	if (!mIsExitingMap && !(mOpenMenuFlags & 2)) {
 		og::Screen::DispMemberCaveMore disp;
 		disp.mCaveID = mCaveIndex;
 		int pikis    = GameStat::mePikis;
 		if (pikis > 0) {
 			disp.mPikiInDanger = true;
-			if (pikis == GameStat::getMapPikmins(-1)) {
+			if (pikis == GameStat::getMapPikmins(AllPikminCalcs)) {
 				disp.mCantProceed = true;
 			} else {
 				disp.mCantProceed = false;
@@ -752,7 +751,7 @@ void SingleGameSection::openCaveMoreMenu(ItemHole::Item* hole, Controller* input
 		}
 
 		if (Screen::gGame2DMgr->open_CaveMoreMenu(disp)) {
-			playData->setSaveFlag(3, nullptr);
+			playData->setSaveFlag(STORYSAVE_Cave, nullptr);
 			mHole = hole;
 			mOpenMenuFlags |= 2;
 			gameSystem->setPause(true, "openCaveMore", 3);
@@ -773,12 +772,12 @@ void SingleGameSection::saveCaveMore() { pikiMgr->caveSaveAllPikmins(false, fals
  */
 void SingleGameSection::openKanketuMenu(ItemBigFountain::Item* geyser, Controller*)
 {
-	if (!_194 && !(mOpenMenuFlags & 4)) {
+	if (!mIsExitingMap && !(mOpenMenuFlags & 4)) {
 		og::Screen::DispMemberKanketuMenu disp;
 		int pikis = GameStat::mePikis;
 		if (pikis > 0) {
 			disp.mPikiInDanger = true;
-			if (pikis == GameStat::getMapPikmins(-1)) {
+			if (pikis == GameStat::getMapPikmins(AllPikminCalcs)) {
 				disp.mCantProceed = true;
 			} else {
 				disp.mCantProceed = false;
@@ -807,9 +806,9 @@ bool SingleGameSection::updateCaveMenus()
 	u32 flag = mOpenMenuFlags;
 	if (flag & 1) {
 		switch (Screen::gGame2DMgr->check_CaveInMenu()) {
-		case 0:
+		case Screen::Game2DMgr::CHECK2D_CaveInMenu_MenuOpen:
 			break;
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_CaveInMenu_Confirm:
 			playData->mNaviLifeMax[NAVIID_Olimar] = naviMgr->mNaviParms->mNaviParms.mMaxHealth;
 			playData->mNaviLifeMax[NAVIID_Louie]  = naviMgr->mNaviParms->mNaviParms.mMaxHealth;
 			gameSystem->setPause(false, "cave-yes", 3);
@@ -817,20 +816,20 @@ bool SingleGameSection::updateCaveMenus()
 			mOpenMenuFlags &= ~1;
 			goCave(mCurrentCave);
 			return true;
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_CaveInMenu_Cancel:
 			gameSystem->setPause(false, "cave-no", 3);
 			gameSystem->setMoviePause(false, "cave-no");
 			mOpenMenuFlags &= ~1;
 			break;
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_CaveInMenu_Unused:
 			gameSystem->setMoviePause(false, "cave-zenkai");
 			break;
 		}
 	} else if (flag & 2) {
 		switch (Screen::gGame2DMgr->check_CaveMoreMenu()) {
-		case 0:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_MenuOpen:
 			break;
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_Confirm:
 			playData->mNaviLifeMax[NAVIID_Olimar] = naviMgr->getAt(NAVIID_Olimar)->mHealth;
 			playData->mNaviLifeMax[NAVIID_Louie]  = naviMgr->getAt(NAVIID_Louie)->mHealth;
 			gameSystem->setPause(false, "more-yes", 3);
@@ -838,27 +837,27 @@ bool SingleGameSection::updateCaveMenus()
 			mOpenMenuFlags &= ~2;
 			goNextFloor(mHole);
 			return true;
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_Cancel:
 			gameSystem->setPause(false, "more-no", 3);
 			gameSystem->setMoviePause(false, "more-no");
 			mOpenMenuFlags &= ~2;
 			break;
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_CaveMoreMenu_Unused:
 			gameSystem->setMoviePause(false, "more-zenkai");
 			break;
 		}
 	} else if (flag & 4) {
 		switch (Screen::gGame2DMgr->check_KanketuMenu()) {
-		case 1:
+		case Screen::Game2DMgr::CHECK2D_KanketuMenu_Confirm:
 			gameSystem->setPause(false, "kank-yes", 3);
 			gameSystem->setMoviePause(false, "kank-yes");
 			mOpenMenuFlags &= ~4;
 			goMainMap(mFountain);
 			return true;
-		case 0:
-		case 3:
+		case Screen::Game2DMgr::CHECK2D_KanketuMenu_MenuOpen:
+		case Screen::Game2DMgr::CHECK2D_KanketuMenu_Unused:
 			break;
-		case 2:
+		case Screen::Game2DMgr::CHECK2D_KanketuMenu_Cancel:
 			gameSystem->setPause(false, "kank-no", 3);
 			gameSystem->setMoviePause(false, "kank-no");
 			mOpenMenuFlags &= ~4;
@@ -874,7 +873,7 @@ bool SingleGameSection::updateCaveMenus()
  */
 void SingleGameSection::goNextFloor(ItemHole::Item* hole)
 {
-	_194 = true;
+	mIsExitingMap = true;
 	mCurrentState->onNextFloor(this, hole);
 }
 
@@ -886,8 +885,8 @@ void SingleGameSection::goCave(ItemCave::Item* cave)
 {
 	strcpy(mCaveFilename, cave->mCaveFilename);
 	mCaveID.setID(cave->mCaveID.getID());
-	_194    = true;
-	mInCave = true;
+	mIsExitingMap = true;
+	mInCave       = true;
 	mCurrentState->onHoleIn(this, cave);
 }
 
@@ -897,8 +896,8 @@ void SingleGameSection::goCave(ItemCave::Item* cave)
  */
 void SingleGameSection::goMainMap(ItemBigFountain::Item* fountain)
 {
-	_194    = true;
-	mInCave = false;
+	mIsExitingMap = true;
+	mInCave       = false;
 	mCurrentState->onFountainReturn(this, fountain);
 }
 
@@ -1005,9 +1004,10 @@ void SingleGameSection::setDispMemberSMenu(og::Screen::DispMemberSMenuAll& disp)
 	disp.mSMenuMap.mDataMap.mCurrentPikminCounts[og::Screen::MAPPIKI_White]  = GameStat::formationPikis.getCount(id, White);
 	disp.mSMenuMap.mDataMap.mCurrentPikminCounts[og::Screen::MAPPIKI_Purple] = GameStat::formationPikis.getCount(id, Purple);
 
-	int form                            = GameStat::formationPikis;
-	int work                            = GameStat::workPikis;
-	int alive                           = GameStat::alivePikis;
+	int form  = GameStat::formationPikis;
+	int work  = GameStat::workPikis;
+	int alive = GameStat::alivePikis;
+
 	disp.mSMenuMap.mDataMap.mFreePikmin = alive - form - work;
 	disp.mSMenuMap.mDataMap.mPokos      = _aiConstants->mDebt.mData - playData->mPokoCount;
 	disp.mSMenuMap.mInCave              = gameSystem->mIsInCave;
@@ -1021,10 +1021,10 @@ void SingleGameSection::setDispMemberSMenu(og::Screen::DispMemberSMenuAll& disp)
 	disp.mSMenuMap.mCourseIndex         = mCurrentCourseInfo->mCourseIndex;
 
 	// Items screen data
-	disp.mSMenuItem.mSpicySprayCount  = playData->getDopeCount(SPRAY_TYPE_BITTER);
-	disp.mSMenuItem.mSpicyBerryCount  = playData->getDopeFruitCount(SPRAY_TYPE_BITTER);
-	disp.mSMenuItem.mBitterSprayCount = playData->getDopeCount(SPRAY_TYPE_SPICY);
-	disp.mSMenuItem.mBitterBerryCount = playData->getDopeFruitCount(SPRAY_TYPE_SPICY);
+	disp.mSMenuItem.mBitterSprayCount = playData->getDopeCount(SPRAY_TYPE_BITTER);
+	disp.mSMenuItem.mBitterBerryCount = playData->getDopeFruitCount(SPRAY_TYPE_BITTER);
+	disp.mSMenuItem.mSpicySprayCount  = playData->getDopeCount(SPRAY_TYPE_SPICY);
+	disp.mSMenuItem.mSpicyBerryCount  = playData->getDopeFruitCount(SPRAY_TYPE_SPICY);
 	for (int i = 0; i < OlimarData::ODII_FIRST_NON_EXPLORATION_KIT_ITEM; i++) {
 		disp.mSMenuItem.mExplorationKitInventory[i] = playData->mOlimarData[0].hasItem(i);
 	}
@@ -1043,12 +1043,12 @@ void SingleGameSection::setDispMemberSMenu(og::Screen::DispMemberSMenuAll& disp)
  * @note Address: N/A
  * @note Size: 0xE0
  */
-void SingleGameSection::setDispMemberNavi(og::Screen::DataNavi& data, int id)
+void SingleGameSection::setDispMemberNavi(og::Screen::DataNavi& data, int naviID)
 {
-	data.mFollowPikis   = GameStat::formationPikis.mCounter[id];
-	data.mDope1Count    = playData->getDopeCount(1);
-	data.mDope0Count    = playData->getDopeCount(0);
-	Navi* navi          = naviMgr->getAt(id);
+	data.mFollowPikis   = GameStat::formationPikis.mCounter[naviID];
+	data.mDope1Count    = playData->getDopeCount(SPRAY_TYPE_BITTER);
+	data.mDope0Count    = playData->getDopeCount(SPRAY_TYPE_SPICY);
+	Navi* navi          = naviMgr->getAt(naviID);
 	data.mNaviLifeRatio = navi->getLifeRatio();
 	data.mNextThrowPiki = navi->ogGetNextThrowPiki();
 }
@@ -1057,27 +1057,31 @@ void SingleGameSection::setDispMemberNavi(og::Screen::DataNavi& data, int id)
  * @note Address: N/A
  * @note Size: 0x148
  */
-int SingleGameSection::calcOtakaraLevel(f32& dist)
+Radar::Mgr::RadarSearchResult SingleGameSection::calcOtakaraLevel(f32& treasureDistance)
 {
 	Navi* navi = naviMgr->getActiveNavi();
 
-	int otastate = 5;
-	dist         = 900.0f;
+	Radar::Mgr::RadarSearchResult treasureSearchResult = Radar::Mgr::NOT_PROCESSED;
+	treasureDistance                                   = 900.0f;
+
 	if (navi) {
-		Vector3f pos = navi->getPosition();
-		Vector3f out;
-		otastate = Radar::mgr->calcNearestTreasure(pos, 900.0f, out, dist);
-		if (otastate == 2) {
-			if (!(1.0f - (dist / 900.0f) < 0.0f)) {
-				return otastate;
+		Vector3f playerPosition = navi->getPosition();
+		Vector3f treasurePosition;
+		treasureSearchResult = Radar::mgr->calcNearestTreasure(playerPosition, 900.0f, treasurePosition, treasureDistance);
+
+		if (treasureSearchResult == Radar::Mgr::CLOSEST_TREASURE_FOUND) {
+			// If the distance is within the range (0 - 900.0f)
+			if (!(1.0f - (treasureDistance / 900.0f) < 0.0f)) {
+				return treasureSearchResult; // Return 2
 			} else {
 				P2DEBUG("stuff");
 			}
-		} else if (otastate == 1) {
+		} else if (treasureSearchResult == Radar::Mgr::TREASURE_FOUND) {
 			rand();
 		}
 	}
-	return otastate;
+
+	return treasureSearchResult;
 }
 
 /**
@@ -1088,21 +1092,22 @@ void SingleGameSection::updateMainMapScreen()
 {
 	og::Screen::DispMemberGround disp;
 
-	f32 dist;
-	int otastate = calcOtakaraLevel(dist);
+	f32 treasureDistance;
+	Radar::Mgr::RadarSearchResult treasureSearchResult = calcOtakaraLevel(treasureDistance);
 
 	bool flag          = false;
-	disp.mTreasureDist = dist;
-	disp.mRadarState   = otastate;
-	if (!mNeedTreasureCalc && otastate == 0 && Screen::gGame2DMgr->is_GameGround()) {
+	disp.mTreasureDist = treasureDistance;
+	disp.mRadarState   = treasureSearchResult;
+	if (!mNeedTreasureCalc && treasureSearchResult == Radar::Mgr::NO_TREASURE_FOUND && Screen::gGame2DMgr->is_GameGround()) {
 		flag              = true;
 		mNeedTreasureCalc = true;
 	}
-	if (!mTreasureRadarActive && otastate == 0) {
+	if (!mTreasureRadarActive && treasureSearchResult == Radar::Mgr::NO_TREASURE_FOUND) {
 		mTreasureRadarActive = true;
 	}
 
-	if (mTreasureRadarActive && otastate != 0 && otastate != 5) {
+	if (mTreasureRadarActive && treasureSearchResult != Radar::Mgr::NO_TREASURE_FOUND
+	    && treasureSearchResult != Radar::Mgr::NOT_PROCESSED) {
 		mTreasureRadarActive = false;
 		mNeedTreasureCalc    = false;
 	}
@@ -1112,8 +1117,8 @@ void SingleGameSection::updateMainMapScreen()
 	disp.mHasRadar           = playData->mOlimarData[0].hasItem(OlimarData::ODII_PrototypeDetector);
 	disp.mIsNotDay1          = gameSystem->mTimeMgr->mDayCount;
 
-	disp.mDataGame.mMapPikminCount   = GameStat::getMapPikmins(-1) - GameStat::getZikatuPikmins(-1);
-	disp.mDataGame.mTotalPikminCount = GameStat::getAllPikmins(-1) - GameStat::getZikatuPikmins(-1);
+	disp.mDataGame.mMapPikminCount   = GameStat::getMapPikmins(AllPikminCalcs) - GameStat::getZikatuPikmins(AllPikminCalcs);
+	disp.mDataGame.mTotalPikminCount = GameStat::getAllPikmins(AllPikminCalcs) - GameStat::getZikatuPikmins(AllPikminCalcs);
 	disp.mDataGame.mDayNum           = gameSystem->mTimeMgr->mDayCount + 1;
 	disp.mDataGame.mSunGaugeRatio    = gameSystem->mTimeMgr->getSunGaugeRatio();
 	disp.mDataGame.mPokoCount        = playData->mPokoCount;
@@ -1133,47 +1138,49 @@ void SingleGameSection::updateMainMapScreen()
 		disp.mUnlockedBitter = false;
 	}
 
-	if (Screen::gGame2DMgr->is_GameGround() && !moviePlayer->mDemoState && bitter && !playData->isDemoFlag(DEMO_BITTER_ENABLED)) {
+	if (Screen::gGame2DMgr->is_GameGround() && moviePlayer->mDemoState == DEMOSTATE_Inactive && bitter
+	    && !playData->isDemoFlag(DEMO_BITTER_ENABLED)) {
 		playData->setDemoFlag(DEMO_BITTER_ENABLED);
 		disp.mHasBitter = true;
 	} else {
 		disp.mHasBitter = false;
 	}
 
-	if (Screen::gGame2DMgr->is_GameGround() && !moviePlayer->mDemoState && spicy && !playData->isDemoFlag(DEMO_SPICY_ENABLED)) {
+	if (Screen::gGame2DMgr->is_GameGround() && moviePlayer->mDemoState == DEMOSTATE_Inactive && spicy
+	    && !playData->isDemoFlag(DEMO_SPICY_ENABLED)) {
 		playData->setDemoFlag(DEMO_SPICY_ENABLED);
 		disp.mHasSpicy = true;
 	} else {
 		disp.mHasSpicy = false;
 	}
 
-	if (playData->mStoryFlags & STORY_DebtPaid) {
+	if (playData->isStoryFlag(STORY_DebtPaid)) {
 		disp.mPayDebt = true;
 	}
 
 	Navi* navi = naviMgr->getActiveNavi();
-	int id     = 2;
+	int id     = NAVIID_Multiplayer;
 	if (navi) {
 		id = navi->mNaviIndex;
 	}
 
-	setDispMemberNavi(disp.mOlimarData, 0);
+	setDispMemberNavi(disp.mOlimarData, NAVIID_Olimar);
 
-	if (id == 0) {
-		disp.mOlimarData.mActiveNaviID = 1;
-		disp.mLouieData.mActiveNaviID  = 0;
-	} else if (id == 1) {
-		disp.mOlimarData.mActiveNaviID = 0;
-		disp.mLouieData.mActiveNaviID  = 1;
-	} else if (mPrevNaviIdx == 0) {
-		disp.mOlimarData.mActiveNaviID = 0;
-		disp.mLouieData.mActiveNaviID  = 1;
+	if (id == NAVIID_Olimar) {
+		disp.mOlimarData.mActiveNaviID = TRUE;
+		disp.mLouieData.mActiveNaviID  = FALSE;
+	} else if (id == NAVIID_Louie) {
+		disp.mOlimarData.mActiveNaviID = FALSE;
+		disp.mLouieData.mActiveNaviID  = TRUE;
+	} else if (mPrevNaviIdx == NAVIID_Olimar) {
+		disp.mOlimarData.mActiveNaviID = FALSE;
+		disp.mLouieData.mActiveNaviID  = TRUE;
 	} else {
-		disp.mOlimarData.mActiveNaviID = 1;
-		disp.mLouieData.mActiveNaviID  = 0;
+		disp.mOlimarData.mActiveNaviID = TRUE;
+		disp.mLouieData.mActiveNaviID  = FALSE;
 	}
 
-	setDispMemberNavi(disp.mLouieData, 1);
+	setDispMemberNavi(disp.mLouieData, NAVIID_Louie);
 
 	Screen::gGame2DMgr->setDispMember(&disp);
 }
@@ -1214,7 +1221,7 @@ void SingleGameSection::updateCaveScreen()
 	disp.mRadarEnabled      = mTreasureRadarActive;
 	disp.mAllTreasureGotten = flag;
 
-	if (Screen::gGame2DMgr->is_GameCave() && moviePlayer->mDemoState == 0) {
+	if (Screen::gGame2DMgr->is_GameCave() && moviePlayer->mDemoState == DEMOSTATE_Inactive) {
 		disp.mAppearRadar = false;
 		if (!playData->isDemoFlag(DEMO_RADAR_ENABLED) && playData->mOlimarData[0].hasItem(OlimarData::ODII_PrototypeDetector)) {
 			playData->setDemoFlag(DEMO_RADAR_ENABLED);
@@ -1232,40 +1239,40 @@ void SingleGameSection::updateCaveScreen()
 	disp.mIsBitterUnlocked           = playData->isDemoFlag(DEMO_First_Bitter_Spray_Made);
 	disp.mIsSpicyUnlocked            = playData->isDemoFlag(DEMO_First_Spicy_Spray_Made);
 	disp.mIsFinalFloor               = (static_cast<RoomMapMgr*>(mapMgr)->mCaveInfo->getFloorMax() == disp.mDataGame.mFloorNum);
-	disp.mDataGame.mMapPikminCount   = GameStat::getMapPikmins(-1);
-	disp.mDataGame.mTotalPikminCount = GameStat::getAllPikmins(-1);
+	disp.mDataGame.mMapPikminCount   = GameStat::getMapPikmins(AllPikminCalcs);
+	disp.mDataGame.mTotalPikminCount = GameStat::getAllPikmins(AllPikminCalcs);
 	disp.mDataGame.mDayNum           = gameSystem->mTimeMgr->mDayCount + 1;
 	disp.mDataGame.mSunGaugeRatio    = gameSystem->mTimeMgr->getSunGaugeRatio();
 
 	disp.mDataGame.mPokoCount = playData->getPokoCount() + playData->getCavePokoCount();
 
-	if (playData->mStoryFlags & STORY_DebtPaid) {
+	if (playData->isStoryFlag(STORY_DebtPaid)) {
 		disp.mPayDebt = true;
 	}
 
 	Navi* navi = naviMgr->getActiveNavi();
-	int id     = 2;
+	int id     = NAVIID_Multiplayer;
 	if (navi) {
 		id = navi->mNaviIndex;
 	}
 
-	setDispMemberNavi(disp.mOlimarData, 0);
+	setDispMemberNavi(disp.mOlimarData, NAVIID_Olimar);
 
-	if (id == 0) {
-		disp.mOlimarData.mActiveNaviID = 1;
-		disp.mLouieData.mActiveNaviID  = 0;
-	} else if (id == 1) {
-		disp.mOlimarData.mActiveNaviID = 0;
-		disp.mLouieData.mActiveNaviID  = 1;
-	} else if (mPrevNaviIdx == 0) {
-		disp.mOlimarData.mActiveNaviID = 0;
-		disp.mLouieData.mActiveNaviID  = 1;
+	if (id == NAVIID_Olimar) {
+		disp.mOlimarData.mActiveNaviID = TRUE;
+		disp.mLouieData.mActiveNaviID  = FALSE;
+	} else if (id == NAVIID_Louie) {
+		disp.mOlimarData.mActiveNaviID = FALSE;
+		disp.mLouieData.mActiveNaviID  = TRUE;
+	} else if (mPrevNaviIdx == NAVIID_Olimar) {
+		disp.mOlimarData.mActiveNaviID = FALSE;
+		disp.mLouieData.mActiveNaviID  = TRUE;
 	} else {
-		disp.mOlimarData.mActiveNaviID = 1;
-		disp.mLouieData.mActiveNaviID  = 0;
+		disp.mOlimarData.mActiveNaviID = TRUE;
+		disp.mLouieData.mActiveNaviID  = FALSE;
 	}
 
-	setDispMemberNavi(disp.mLouieData, 1);
+	setDispMemberNavi(disp.mLouieData, NAVIID_Louie);
 
 	Screen::gGame2DMgr->setDispMember(&disp);
 }
@@ -1282,8 +1289,8 @@ void SingleGameSection::drawCaveScreen() { }
  */
 void SingleGameSection::newCaveOtakaraEarningsAndDrops()
 {
-	int otakaraCount = PelletList::Mgr::getCount(PelletList::OTAKARA);
-	int itemCount    = PelletList::Mgr::getCount(PelletList::ITEM);
+	int otakaraCount = PelletList::Mgr::getCount(PelletList::PLK_Otakara);
+	int itemCount    = PelletList::Mgr::getCount(PelletList::PLK_Item);
 	mCaveTreasureCounter.alloc(otakaraCount);
 	mCaveUpgradeCounter.alloc(itemCount);
 	mOtakaraCounter.alloc(otakaraCount);

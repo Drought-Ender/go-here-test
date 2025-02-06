@@ -61,7 +61,7 @@ void Obj::onInit(CreatureInitArg* initArg)
 	mSwingTimer      = 0.0f;
 	mQueenColorTimer = 0.0f;
 
-	mFsm->start(this, 0, nullptr);
+	mFsm->start(this, POM_Wait, nullptr);
 }
 
 /**
@@ -72,7 +72,7 @@ void Obj::doUpdate()
 {
 	mFsm->exec(this);
 	mMouthSlots.update();
-	if (isEvent(0, EB_DamageAnimEnabled) && mBounceTriangle) {
+	if (isEvent(0, EB_DamageAnimEnabled) && mFloorTriangle) {
 		if (isEvent(0, EB_HardConstrained)) {
 			enableEvent(0, EB_Invulnerable);
 			disableEvent(0, EB_DamageAnimEnabled);
@@ -89,17 +89,17 @@ void Obj::doUpdate()
 void Obj::changeMaterial()
 {
 	J3DModel* j3dModel      = mModel->mJ3dModel;
-	J3DModelData* modelData = j3dModel->mModelData;
+	J3DModelData* modelData = j3dModel->getModelData();
 
-	u16 nameIdx           = j3dModel->mModelData->mMaterialTable.mMaterialNames->getIndex("hanabira1_v");
-	J3DMaterial* material = modelData->mMaterialTable.mMaterials[nameIdx];
-	material->mTevBlock->setTevColor(0, mRgbColor);
+	u16 nameIdx           = modelData->getMaterialName()->getIndex("hanabira1_v");
+	J3DMaterial* material = modelData->getMaterialNodePointer(nameIdx);
+	material->getTevBlock()->setTevColor(0, mRgbColor);
 	j3dModel->calcMaterial();
 
-	for (u16 i = 0; i < modelData->mMaterialTable.mMaterialNum; i++) {
-		J3DMatPacket& packet = j3dModel->mMatPackets[i];
-		j3dSys.mMatPacket    = &j3dModel->mMatPackets[i];
-		modelData->mMaterialTable.mMaterials[i]->diff(packet.mShapePacket->mDiffFlag);
+	for (u16 i = 0; i < modelData->getMaterialNum(); i++) {
+		J3DMatPacket* packet = j3dModel->getMatPacket(i);
+		j3dSys.setMatPacket(j3dModel->getMatPacket(i));
+		modelData->getMaterialNodePointer(i)->diff(packet->getShapePacket()->mDiffFlag);
 	}
 }
 
@@ -287,19 +287,19 @@ void Obj::shotPikmin()
 					mUsedSlotCount--;
 				}
 			}
-			CreatureKillArg killArg(CKILL_Unk1);
+			CreatureKillArg killArg(CKILL_DontCountAsDeath);
 			InteractKill kill(this, &killArg);
 			creature->stimulate(kill);
 		}
 	}
 
 	for (int i = 0; i < val; i++) {
-		ItemPikihead::Item* sprout = static_cast<ItemPikihead::Item*>(ItemPikihead::mgr->birth());
+		ItemPikihead::Item* sprout = ItemPikihead::mgr->birth();
 		if (sprout) {
 			f32 randAngle = randWeightFloat(TAU);
 
-			Vector3f initPos = Vector3f(110.0f * cosf(randAngle), 750.0f, 110.0f * sinf(randAngle));
-			ItemPikihead::InitArg initArg((EPikiKind)mPikiKind, initPos);
+			Vector3f velocity(110.0f * cosf(randAngle), 750.0f, 110.0f * sinf(randAngle));
+			ItemPikihead::InitArg initArg((EPikiKind)mPikiKind, velocity);
 
 			sprout->init(&initArg);
 			sprout->setPosition(pos, false);

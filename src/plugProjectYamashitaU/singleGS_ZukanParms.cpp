@@ -11,31 +11,29 @@ Camera* Parms::sCamera;
 
 static const int unusedIllustratedBookArray[] = { 0, 0, 0 };
 
-#define COMPLEMENT(src, dest, proportion) (proportion) * ((f32)(dest) - (f32)(src)) + (f32)(src)
-
 /**
  * @note Address: 0x80130B9C
  * @note Size: 0x1D0
  */
 ColorSetting::ColorSetting()
-    : CNode("êFê›íË")
+    : CNode("Ëâ≤Ë®≠ÂÆö")
 {
-	_18[0][0] = Color4(88, 91, 153, 255);
-	_18[0][1] = Color4(64, 64, 64, 255);
-	_18[1][0] = Color4(166, 232, 253, 255);
-	_18[1][1] = Color4(255, 255, 255, 255);
-	_18[2][0] = Color4(166, 232, 253, 255);
-	_18[2][1] = Color4(255, 255, 255, 255);
-	_18[3][0] = Color4(255, 192, 128, 255);
-	_18[3][1] = Color4(255, 255, 143, 255);
-	_18[4][0] = Color4(255, 255, 255, 255);
-	_18[4][1] = Color4(255, 255, 255, 255);
+	mColorListA[0][0] = Color4(88, 91, 153, 255);
+	mColorListA[0][1] = Color4(64, 64, 64, 255);
+	mColorListA[1][0] = Color4(166, 232, 253, 255);
+	mColorListA[1][1] = Color4(255, 255, 255, 255);
+	mColorListA[2][0] = Color4(166, 232, 253, 255);
+	mColorListA[2][1] = Color4(255, 255, 255, 255);
+	mColorListA[3][0] = Color4(255, 192, 128, 255);
+	mColorListA[3][1] = Color4(255, 255, 143, 255);
+	mColorListA[4][0] = Color4(255, 255, 255, 255);
+	mColorListA[4][1] = Color4(255, 255, 255, 255);
 
-	_40[0] = Color4(73, 73, 73, 255);
-	_40[1] = Color4(8, 8, 8, 255);
-	_40[2] = Color4(50, 50, 40, 255);
-	_40[3] = Color4(52, 32, 10, 255);
-	_40[4] = Color4(32, 32, 10, 255);
+	mColorListB[0] = Color4(73, 73, 73, 255);
+	mColorListB[1] = Color4(8, 8, 8, 255);
+	mColorListB[2] = Color4(50, 50, 40, 255);
+	mColorListB[3] = Color4(52, 32, 10, 255);
+	mColorListB[4] = Color4(32, 32, 10, 255);
 }
 
 /**
@@ -45,12 +43,12 @@ ColorSetting::ColorSetting()
 void ColorSetting::read(Stream& stream)
 {
 	for (int i = 0; i < 4; i++) {
-		_18[i][0].read(stream);
-		_18[i][1].read(stream);
+		mColorListA[i][0].read(stream);
+		mColorListA[i][1].read(stream);
 	}
 
 	for (int i = 0; i < 4; i++) {
-		_40[i].read(stream);
+		mColorListB[i].read(stream);
 	}
 }
 
@@ -88,48 +86,48 @@ void ColorSetting::update()
 	}
 
 	f32 ratio             = gameSystem->mTimeMgr->mLightSettingRatio;
-	Color4* startColor40  = &_40[start];
-	Color4* middleColor40 = &_40[middle];
-	Color4* stopColor40   = &_40[stop];
+	Color4* startColor40  = &mColorListB[start];
+	Color4* middleColor40 = &mColorListB[middle];
+	Color4* stopColor40   = &mColorListB[stop];
 
 	// how are these meant to get loaded in/pointed to?
-	Color4* startColor18  = _18[start];
-	Color4* middleColor18 = _18[middle];
-	Color4* stopColor18   = _18[stop];
+	Color4* startColor18  = mColorListA[start];
+	Color4* middleColor18 = mColorListA[middle];
+	Color4* stopColor18   = mColorListA[stop];
 
 	if (ratio < 0.5f) {
 		ratio *= 2.0f;
-		_54.r = COMPLEMENT(startColor18[0].r, middleColor18[0].r, ratio);
-		_54.g = COMPLEMENT(startColor18[0].g, middleColor18[0].g, ratio);
-		_54.b = COMPLEMENT(startColor18[0].b, middleColor18[0].b, ratio);
-		_54.a = COMPLEMENT(startColor18[0].a, middleColor18[0].a, ratio);
+		mActiveColorA.r = INTERPOLATE_BETWEEN(startColor18[0].r, middleColor18[0].r, ratio);
+		mActiveColorA.g = INTERPOLATE_BETWEEN(startColor18[0].g, middleColor18[0].g, ratio);
+		mActiveColorA.b = INTERPOLATE_BETWEEN(startColor18[0].b, middleColor18[0].b, ratio);
+		mActiveColorA.a = INTERPOLATE_BETWEEN(startColor18[0].a, middleColor18[0].a, ratio);
 
-		_58.r = COMPLEMENT(startColor18[1].r, middleColor18[1].r, ratio);
-		_58.g = COMPLEMENT(startColor18[1].g, middleColor18[1].g, ratio);
-		_58.b = COMPLEMENT(startColor18[1].b, middleColor18[1].b, ratio);
-		_58.a = COMPLEMENT(startColor18[1].a, middleColor18[1].a, ratio);
+		mActiveColorB.r = INTERPOLATE_BETWEEN(startColor18[1].r, middleColor18[1].r, ratio);
+		mActiveColorB.g = INTERPOLATE_BETWEEN(startColor18[1].g, middleColor18[1].g, ratio);
+		mActiveColorB.b = INTERPOLATE_BETWEEN(startColor18[1].b, middleColor18[1].b, ratio);
+		mActiveColorB.a = INTERPOLATE_BETWEEN(startColor18[1].a, middleColor18[1].a, ratio);
 
-		_5C.r = COMPLEMENT(startColor40->r, middleColor40->r, ratio);
-		_5C.g = COMPLEMENT(startColor40->g, middleColor40->g, ratio);
-		_5C.b = COMPLEMENT(startColor40->b, middleColor40->b, ratio);
-		_5C.a = COMPLEMENT(startColor40->a, middleColor40->a, ratio);
+		mActiveColorC.r = INTERPOLATE_BETWEEN(startColor40->r, middleColor40->r, ratio);
+		mActiveColorC.g = INTERPOLATE_BETWEEN(startColor40->g, middleColor40->g, ratio);
+		mActiveColorC.b = INTERPOLATE_BETWEEN(startColor40->b, middleColor40->b, ratio);
+		mActiveColorC.a = INTERPOLATE_BETWEEN(startColor40->a, middleColor40->a, ratio);
 
 	} else {
-		ratio = 2.0f * (ratio - 0.5f);
-		_54.r = COMPLEMENT(middleColor18[0].r, stopColor18[0].r, ratio);
-		_54.g = COMPLEMENT(middleColor18[0].g, stopColor18[0].g, ratio);
-		_54.b = COMPLEMENT(middleColor18[0].b, stopColor18[0].b, ratio);
-		_54.a = COMPLEMENT(middleColor18[0].a, stopColor18[0].a, ratio);
+		ratio           = 2.0f * (ratio - 0.5f);
+		mActiveColorA.r = INTERPOLATE_BETWEEN(middleColor18[0].r, stopColor18[0].r, ratio);
+		mActiveColorA.g = INTERPOLATE_BETWEEN(middleColor18[0].g, stopColor18[0].g, ratio);
+		mActiveColorA.b = INTERPOLATE_BETWEEN(middleColor18[0].b, stopColor18[0].b, ratio);
+		mActiveColorA.a = INTERPOLATE_BETWEEN(middleColor18[0].a, stopColor18[0].a, ratio);
 
-		_58.r = COMPLEMENT(middleColor18[1].r, stopColor18[1].r, ratio);
-		_58.g = COMPLEMENT(middleColor18[1].g, stopColor18[1].g, ratio);
-		_58.b = COMPLEMENT(middleColor18[1].b, stopColor18[1].b, ratio);
-		_58.a = COMPLEMENT(middleColor18[1].a, stopColor18[1].a, ratio);
+		mActiveColorB.r = INTERPOLATE_BETWEEN(middleColor18[1].r, stopColor18[1].r, ratio);
+		mActiveColorB.g = INTERPOLATE_BETWEEN(middleColor18[1].g, stopColor18[1].g, ratio);
+		mActiveColorB.b = INTERPOLATE_BETWEEN(middleColor18[1].b, stopColor18[1].b, ratio);
+		mActiveColorB.a = INTERPOLATE_BETWEEN(middleColor18[1].a, stopColor18[1].a, ratio);
 
-		_5C.r = COMPLEMENT(middleColor40->r, stopColor40->r, ratio);
-		_5C.g = COMPLEMENT(middleColor40->g, stopColor40->g, ratio);
-		_5C.b = COMPLEMENT(middleColor40->b, stopColor40->b, ratio);
-		_5C.a = COMPLEMENT(middleColor40->a, stopColor40->a, ratio);
+		mActiveColorC.r = INTERPOLATE_BETWEEN(middleColor40->r, stopColor40->r, ratio);
+		mActiveColorC.g = INTERPOLATE_BETWEEN(middleColor40->g, stopColor40->g, ratio);
+		mActiveColorC.b = INTERPOLATE_BETWEEN(middleColor40->b, stopColor40->b, ratio);
+		mActiveColorC.a = INTERPOLATE_BETWEEN(middleColor40->a, stopColor40->a, ratio);
 	}
 	/*
 	stwu     r1, -0x1a0(r1)
@@ -723,7 +721,7 @@ lbl_801316B4:
 PositionParms::PositionParms()
     : CNode(mEnemyName)
 {
-	sprintf(mEnemyName, "èoåªèÍèäñº"); // 'appearance location name'
+	sprintf(mEnemyName, "Âá∫ÁèæÂ†¥ÊâÄÂêç"); // 'appearance location name'
 }
 
 /**
@@ -741,7 +739,7 @@ void PositionParms::read(Stream& stream)
  * @note Size: 0xBC
  */
 PositionParmsList::PositionParmsList()
-    : CNode("èoåªà íuÉäÉXÉg")
+    : CNode("Âá∫Áèæ‰ΩçÁΩÆ„É™„Çπ„Éà")
 {
 	for (u32 i = 0; i < 10; i++) {
 		add(&mParms[i]);
@@ -790,7 +788,7 @@ void EnemyParms::read(Stream& stream)
  * @note Size: 0xD0
  */
 EnemyModeParms::EnemyModeParms(PositionParmsList* list)
-    : CNode("ìGê}ä”") // 'enemy encyclopedia'
+    : CNode("ÊïµÂõ≥Èëë") // 'enemy encyclopedia'
 {
 	for (int i = 0; i < EnemyTypeID::EnemyID_COUNT; i++) {
 		mEnemyParms[i].mName         = EnemyInfoFunc::getEnemyName(i, 0xFFFF);
@@ -817,7 +815,7 @@ void EnemyModeParms::read(Stream& stream)
  * @note Size: 0x148
  */
 ItemParms::ItemParms()
-    : CNode("ê›íË") // 'setting'
+    : CNode("Ë®≠ÂÆö") // 'setting'
 {
 	mIndex = -1;
 }
@@ -838,7 +836,7 @@ void ItemParms::read(Stream& stream)
  * @note Size: 0x118
  */
 ItemModeParms::ItemModeParms(PositionParmsList* list)
-    : CNode("Ç®ïÛê}ä”") // 'treasure book'
+    : CNode("„ÅäÂÆùÂõ≥Èëë") // 'treasure book'
 {
 	mItemCount = SingleGame::ZukanState::getMaxPelletID();
 	mItemParms = new ItemParms[mItemCount];
@@ -868,7 +866,7 @@ void ItemModeParms::read(Stream& stream)
  * @note Size: 0x29C
  */
 Parms::Parms()
-    : CNode("ê}ä”ê›íË") // 'picture book setting'
+    : CNode("Âõ≥ÈëëË®≠ÂÆö") // 'picture book setting'
     , mEnemyParms(&mPosParmsList)
     , mItemParms(&mPosParmsList)
 {
@@ -900,7 +898,7 @@ void Parms::loadFile(JKRArchive* archive)
 	void* resource = archive->getResource("setting.ini");
 	P2ASSERTLINE(736, resource);
 	RamStream stream(resource, -1);
-	stream.resetPosition(true, true);
+	stream.setMode(STREAM_MODE_TEXT, 1);
 	read(stream);
 }
 

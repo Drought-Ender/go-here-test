@@ -53,12 +53,13 @@ struct PelletConfig : public CNode {
 		PrimTagParm<u16> mDictionary;     // _248
 		s16 mIndex;                       // _25C
 		u8 mIndirectState;                // _25A
-	};                                    // struct TParms
+	}; // struct TParms
 
 	PelletConfig();
 	virtual ~PelletConfig() { }
 
 	inline int getPokoValue() const { return mParams.mMoney.mData; }
+	inline char* getName() const { return mParams.mName.mData; }
 
 	// _00     = VTBL
 	// _00-_18 = CNode

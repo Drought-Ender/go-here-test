@@ -100,8 +100,29 @@ struct TAsinAcosTable<1024, f32> {
 		mTable[0]  = 0.0f;
 		mTable2[0] = TAngleConstant_<f32>::RADIAN_DEG180() / 4;
 	}
+
+	inline f32 acosDegree(f32 value) const { return acos_(value) * TAngleConstant_<f32>::RADIAN_TO_DEGREE_FACTOR(); }
+
 	f32 acos2_(f32, f32) const;
-	f32 acos_(f32) const;
+	f32 acos_(f32 value) const
+	{
+		if (value >= 1.0f) {
+			return 0.0f;
+		}
+
+		if (value <= -1.0f) {
+			return TAngleConstant_<f32>::RADIAN_DEG180();
+		}
+
+		if (value < 0.0f) {
+			return mTable[(u32)(-value * 1023.5f)] + TAngleConstant_<f32>::RADIAN_DEG090();
+		}
+
+		return TAngleConstant_<f32>::RADIAN_DEG090() - mTable[(u32)(value * 1023.5f)];
+	}
+
+	f32 asin_(f32 value) const;
+
 	f32 mTable[1024];
 	f32 mTable2[8];
 };
@@ -234,6 +255,8 @@ inline f32 JMAFastReciprocal(f32 value) { return __fres(value); }
 
 inline f32 fastReciprocal(f32 value) { return JMAFastReciprocal(value); }
 
+inline f32 acosDegree(f32 value) { return JMath::asinAcosTable_.acosDegree(value); }
+
 } // namespace JMath
 
 void JMAEulerToQuat(s16, s16, s16, Quaternion*);
@@ -255,6 +278,9 @@ inline f32 JMASinShort(s16 v) { return JMath::sincosTable_.sinShort(v); }
 
 inline f32 JMASCos(s16 v) { return JMASCosShort(v); }
 inline f32 JMASSin(s16 v) { return JMASinShort(v); }
+
+inline f32 JMACos(f32 v) { return JMath::sincosTable_.cos(v); }
+inline f32 JMASin(f32 v) { return JMath::sincosTable_.sin(v); }
 
 inline f32 JMAFastSqrt(register f32 x)
 {

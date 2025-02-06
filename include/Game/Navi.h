@@ -26,12 +26,14 @@
 struct Controller;
 
 enum NaviIndex {
-	NAVIID_Olimar    = 0,
-	NAVIID_Louie     = 1,
-	NAVIID_President = 2,
+	NAVIID_Olimar      = 0,
+	NAVIID_Louie       = 1, // or president
+	NAVIID_Multiplayer = 2,
+	NAVIID_Both        = 2,
 
-	NAVIID_Captain1 = NAVIID_Olimar, // 0, always olimar
-	NAVIID_Captain2 = NAVIID_Louie,  // 1, louie or president
+	NAVIID_President = 2,
+	NAVIID_Captain1  = NAVIID_Olimar, // 0, always olimar
+	NAVIID_Captain2  = NAVIID_Louie,  // 1, louie or president
 };
 
 enum AliveOrimaType {
@@ -40,6 +42,9 @@ enum AliveOrimaType {
 };
 
 #define GET_OTHER_NAVI(navi) (1 - (navi)->mNaviIndex)
+
+#define CG_NAVIPARMS(navi) (static_cast<NaviParms*>(navi->mParms)->mNaviParms)
+#define C_NAVIPARMS        (CG_NAVIPARMS(this))
 
 // Louie scale is also used for president
 #define OLIMAR_SCALE 1.3f
@@ -77,7 +82,11 @@ struct NaviFSM : public StateMachine<Navi> {
 struct NaviWhistle {
 	NaviWhistle(Navi*);
 
-	enum WhistleState { Whistle_Inactive, Whistle_Active, Whistle_Timeout };
+	enum WhistleState {
+		WS_Idle,
+		WS_Blowing,
+		WS_Ended,
+	};
 
 	void init();
 	void updatePosition();
@@ -87,6 +96,10 @@ struct NaviWhistle {
 	void setFaceDir(f32);
 	void updateWhistle();
 	void update(Vector3f&, bool);
+
+	inline f32 getTimePercentage();
+
+	inline Vector3f getPosition() const { return mPosition; }
 
 	Vector3f mNaviOffsetVec; // _00
 	Vector3f mPosition;      // _0C
@@ -115,7 +128,7 @@ struct Navi : public FakePiki, virtual public PelletView {
 	virtual void doViewCalc();                                          // _48
 	virtual void doSimulation(f32);                                     // _4C
 	virtual void doDirectDraw(Graphics& gfx);                           // _50
-	virtual void setVelocity(Vector3f& vel) { mVelocity = vel; }        // _68 (weak)
+	virtual void setVelocity(Vector3f& vel) { mTargetVelocity = vel; }  // _68 (weak)
 	virtual void onSetPosition(Vector3f& dest);                         // _70
 	virtual void inWaterCallback(WaterBox* wb);                         // _84
 	virtual void outWaterCallback();                                    // _88
@@ -212,7 +225,7 @@ struct Navi : public FakePiki, virtual public PelletView {
 	{
 		SysShape::Model* model = mModel;
 		model->loopTimer();
-		model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = static_cast<J3DMtxCalcAnmBase*>(mAnimator.mBoundAnimator.getCalc());
+		mAnimator.mBoundAnimator.setModelCalc(model, 0);
 	}
 
 	inline void setCamera(PlayCamera* cam)
@@ -237,6 +250,10 @@ struct Navi : public FakePiki, virtual public PelletView {
 
 	inline void setCurrState(StateType* state) { mCurrentState = state; }
 	inline StateType* getCurrState() { return mCurrentState; }
+	inline struct NaviParms* getParms() { return static_cast<NaviParms*>(mParms); }
+
+	inline bool canSwap();
+	inline f32 getMoveSpeed();
 
 	void GoHereSuccess();
 	void GoHereInterupted();
@@ -247,12 +264,12 @@ struct Navi : public FakePiki, virtual public PelletView {
 	// _000-_250 = FakePiki
 	// _250      = ptr to PelletView
 	CPlate* mCPlateMgr;                     // _254
-	u8 _258;                                // _258
+	u8 mPlateScaleTimer;                    // _258
 	u8 mStickCount;                         // _259
 	s32 mSprayCounts[2];                    // _25C proven signed by Navi::hasDope
 	u8 _264[4];                             // _264
-	bool mIsAlive;                          // _268
-	u8 _269;                                // _269
+	bool mHideModel;                        // _268
+	u8 mUnusedFlag;                         // _269
 	u8 mPluckingCounter;                    // _26A
 	PSM::Navi* mSoundObj;                   // _26C
 	NaviFSM* mFsm;                          // _270
@@ -270,10 +287,10 @@ struct Navi : public FakePiki, virtual public PelletView {
 	f32 mHealth;                            // _2A0
 	u8 mInvincibleTimer;                    // _2A4
 	Piki* mNextThrowPiki;                   // _2A8
-	u8 _2AC;                                // _2AC
+	u8 mUnusedFlag2;                        // _2AC
 	f32 mHoldPikiTimer;                     // _2B0
-	f32 _2B4;                               // _2B4
-	f32 _2B8;                               // _2B8
+	f32 mHoldPikiCharge;                    // _2B4, neither charge is used for anything
+	f32 mHoldPikiCharge2;                   // _2B8
 	u8 mThrowTimer;                         // _2BC, use NAVI_THROWSTATE enum
 	SysShape::Joint* mBeaconJoint;          // _2C0
 	Vector3f mBeaconPosition;               // _2C4

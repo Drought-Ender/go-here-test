@@ -49,7 +49,7 @@ struct FSMState : public Game::FSMState<TMgr> {
 };
 
 struct CardErrorStateArg : public Game::StateArg {
-	int _00;
+	ebi::CardError::TMgr::enumStart mOpenType;
 };
 
 struct FSMState_CardError : public FSMState {
@@ -69,8 +69,8 @@ struct FSMState_EmptyUpdate : public FSMState {
 	inline FSMState_EmptyUpdate()
 	    : FSMState(FSSTATE_EmptyUpdate, "EnptyUpdate") // nice devs
 	{
-		mCounter = 0;
-		_14      = 0;
+		mCounter    = 0;
+		mCounterMax = 0;
 	}
 
 	virtual void do_init(TMgr*, Game::StateArg*); // _20
@@ -78,8 +78,8 @@ struct FSMState_EmptyUpdate : public FSMState {
 
 	// _00     = VTBL
 	// _00-_0C = FSMState
-	u32 mCounter;
-	int _14;
+	u32 mCounter;    // _10
+	u32 mCounterMax; // _14, unused
 };
 
 struct FSMState_ScreenFileSelect : public FSMState {
@@ -152,7 +152,7 @@ struct FSMState_MountCheck : public FSMState_CardRequest {
 
 struct TMgr : public JKRDisposer {
 	typedef FSMState StateType;
-	enum enumEnd { End_0, End_1, End_2, End_3 };
+	enum enumEnd { End_0, End_StartNewGame, End_StartGame, End_ReturnToTitle };
 
 	TMgr();
 	virtual ~TMgr(); // _08
@@ -178,14 +178,32 @@ struct TMgr : public JKRDisposer {
 
 	static TMgr* msInstance;
 
+	inline void doLoadMenuResource()
+	{
+		mMgrFS.mMainScreen.loadResource();
+		doLoadResource(JKRGetCurrentHeap());
+	}
+
+	inline void doLoadResource(JKRHeap* heap)
+	{
+		mCardErrorMgr.mScreen.loadResource(heap);
+		static_cast<Game::MemoryCard::Mgr*>(sys->mCardMgr)->loadResource(heap);
+	}
+
+	inline void setControllers(Controller* pad)
+	{
+		mMgrFS.setController(pad);
+		mCardErrorMgr.mScreen.mController = pad;
+	}
+
 	// _00     = VTBL
 	// _00-_18 = JKRDisposer
 	FS::TMgr mMgrFS;                          // _18
 	CardError::TMgr mCardErrorMgr;            // _C78
 	u32 mCounter;                             // _F40
-	int _F44;                                 // _F44
+	int mCounterMax;                          // _F44
 	Game::MemoryCard::PlayerFileInfo mPlayer; // _F48
-	int mState;                               // _FE4
+	int mEndState;                            // _FE4
 	bool _FE8;                                // _FE8
 	bool mInError;                            // _FE9
 	FSMStateMachine mFsm;                     // _FEC
@@ -194,7 +212,6 @@ struct TMgr : public JKRDisposer {
 } // namespace FileSelect
 } // namespace ebi
 
-// this is only here because of some dtor inlining bullshit I can't fix - HP
 template <>
 void Game::StateMachine<ebi::FileSelect::TMgr>::start(ebi::FileSelect::TMgr* obj, int stateID, StateArg* stateArg)
 {

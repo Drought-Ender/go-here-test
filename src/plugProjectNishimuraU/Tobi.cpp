@@ -458,10 +458,10 @@ bool Obj::isAppearCheck()
  */
 void Obj::resetBridgeSearch()
 {
-	_2C0    = 1;
-	mBridge = nullptr;
-	_2E0    = 0.0f;
-	_2E4    = 0.0f;
+	mCanSearchBridge      = 1;
+	mBridge               = nullptr;
+	mBridgeGoalRandOffsX  = 0.0f;
+	mBridgeTargetMaxWidth = 0.0f;
 }
 
 /**
@@ -470,8 +470,8 @@ void Obj::resetBridgeSearch()
  */
 void Obj::setBridgeSearch()
 {
-	if (_2C0) {
-		_2C0 = 0;
+	if (mCanSearchBridge) {
+		mCanSearchBridge = 0;
 		setNearestBridge();
 		setCullingCheck();
 	}
@@ -483,9 +483,9 @@ void Obj::setBridgeSearch()
  */
 void Obj::setNearestBridge()
 {
-	mBridge = nullptr;
-	_2E0    = 0.0f;
-	_2E4    = 0.0f;
+	mBridge               = nullptr;
+	mBridgeGoalRandOffsX  = 0.0f;
+	mBridgeTargetMaxWidth = 0.0f;
 
 	if (ItemBridge::mgr) {
 		f32 radius = C_GENERALPARMS.mTerritoryRadius.mValue;
@@ -504,8 +504,8 @@ void Obj::setNearestBridge()
 	}
 
 	if (mBridge) {
-		f32 width = mBridge->getStageWidth() - 20.0f;
-		_2E0      = -(0.5f * width - randWeightFloat(width));
+		f32 width            = mBridge->getStageWidth() - 20.0f;
+		mBridgeGoalRandOffsX = -(0.5f * width - randWeightFloat(width));
 	}
 }
 
@@ -536,9 +536,9 @@ int Obj::checkBreakOrMove()
 		f32 width     = 20.0f + halfWidth;
 
 		if (dotX < 0.0f) {
-			_2E4 = width;
+			mBridgeTargetMaxWidth = width;
 		} else {
-			_2E4 = -width;
+			mBridgeTargetMaxWidth = -width;
 		}
 
 		if (absVal(dotX) > halfWidth) {
@@ -580,35 +580,31 @@ bool Obj::moveBridgeSide()
 	Vector3f xVec     = mBridge->getBridgeXVec();
 	Vector3f zVec     = mBridge->getBridgeZVec();
 
-	xVec *= _2E4;
+	xVec *= mBridgeTargetMaxWidth;
 	zVec *= -20.0f;
 
 	startPos += xVec;
 	startPos += zVec;
 
 	if (sqrDistanceXZ(mPosition, startPos) < 250.0f) {
-		f32 speed    = 0.75f * C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = getMoveSpeed(0.75f);
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 		return true;
 
 	} else {
-		changeFaceDir(startPos);
+		f32 val = turnToTarget2(startPos, C_GENERALPARMS.mTurnSpeed(), C_GENERALPARMS.mMaxTurnAngle());
 
-		f32 speed    = C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = getMoveSpeed();
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 		return false;
 	}
@@ -803,33 +799,29 @@ bool Obj::moveBridgeCentre()
 	Vector3f startPos = mBridge->getStartPos();
 	Vector3f xVec     = mBridge->getBridgeXVec();
 
-	xVec *= 0.7f * _2E0;
+	xVec *= 0.7f * mBridgeGoalRandOffsX;
 
 	startPos += xVec;
 
 	if (sqrDistanceXZ(mPosition, startPos) < 250.0f) {
-		f32 speed    = 0.75f * C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = getMoveSpeed(0.75f);
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 		return true;
 
 	} else {
-		changeFaceDir(startPos);
+		f32 val = turnToTarget2(startPos, C_GENERALPARMS.mTurnSpeed(), C_GENERALPARMS.mMaxTurnAngle());
 
-		f32 speed    = C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = getMoveSpeed();
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 		return false;
 	}
@@ -845,7 +837,7 @@ bool Obj::moveBridgeTop()
 	Vector3f stagePos = mBridge->getStagePos(stageID);
 	Vector3f xVec     = mBridge->getBridgeXVec();
 
-	xVec *= _2E0;
+	xVec *= mBridgeGoalRandOffsX;
 
 	stagePos += xVec;
 
@@ -855,7 +847,7 @@ bool Obj::moveBridgeTop()
 		stagePos += zVec;
 	}
 
-	changeFaceDir(stagePos);
+	f32 val = turnToTarget2(stagePos, C_GENERALPARMS.mTurnSpeed(), C_GENERALPARMS.mMaxTurnAngle());
 
 	f32 dist = sqrDistanceXZ(mPosition, stagePos);
 
@@ -864,26 +856,22 @@ bool Obj::moveBridgeTop()
 		return true;
 
 	} else if (dist < 250.0f) {
-		f32 speed    = C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = C_GENERALPARMS.mMoveSpeed();
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 
 		return true;
 
 	} else {
-		f32 speed    = C_GENERALPARMS.mMoveSpeed.mValue;
-		f32 sinTheta = sin(getFaceDir());
-		f32 y        = getTargetVelocity().y;
-		f32 cosTheta = cos(getFaceDir());
+		f32 moveSpeed = C_GENERALPARMS.mMoveSpeed();
+		f32 x         = dolsinf(getFaceDir());
+		f32 y         = getTargetVelocity().y;
+		f32 z         = dolcosf(getFaceDir());
 
-		mTargetVelocity.x = speed * sinTheta;
-		mTargetVelocity.y = y;
-		mTargetVelocity.z = speed * cosTheta;
+		mTargetVelocity = Vector3f(moveSpeed * x, y, moveSpeed * z);
 	}
 
 	return false;

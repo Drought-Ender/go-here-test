@@ -39,19 +39,19 @@ void Obj::onInit(CreatureInitArg* settings)
 	disableEvent(0, EB_LeaveCarcass);
 	enableEvent(0, EB_Untargetable);
 
-	_2C0       = 0.0f;
-	mFallTimer = 0.0f;
+	mGeneralTimer = 0.0f;
+	mFallTimer    = 0.0f;
 
 	resetShadowOffset();
 	resetShadowRadius();
 
-	mPitchRatio = 0.0f;
-	_308        = 0;
+	mPitchRatio         = 0.0f;
+	mIsWindAttackActive = false;
 
 	mEfxMatrix = mModel->getJoint("hana3")->getWorldMatrix();
 	setupEffect();
 
-	_304 = 0.0f;
+	mWindScaleTimer = 0.0f;
 
 	mFsm->start(this, MAR_Wait, nullptr);
 
@@ -96,10 +96,10 @@ void Obj::changeMaterial()
 	mMatAnimators[0].animate(30.0f);
 	mMatAnimators[1].animate(30.0f);
 
-	for (u16 i = 0; i < modelData->mMaterialTable.mMaterialNum; i++) {
-		j3dSys.mMatPacket = &model->mMatPackets[i];
-		J3DMaterial* mat  = modelData->mMaterialTable.mMaterials[i];
-		mat->diff(j3dSys.mMatPacket->mShapePacket->mDiffFlag);
+	for (u16 i = 0; i < modelData->getMaterialNum(); i++) {
+		j3dSys.setMatPacket(model->getMatPacket(i));
+		J3DMaterial* mat = modelData->getMaterialNodePointer(i);
+		mat->diff(j3dSys.getMatPacket()->getShapePacket()->mDiffFlag);
 	}
 }
 
@@ -136,7 +136,7 @@ void Obj::getShadowParam(ShadowParam& shadow)
 	shadow.mPosition                 = baseMatrix->getTranslation();
 	shadow.mPosition.y               = mPosition.y + mShadowOffset;
 	shadow.mBoundingSphere.mPosition = Vector3f(0.0f, 1.0f, 0.0f);
-	if (isFlying() || !mBounceTriangle) {
+	if (isFlying() || !mFloorTriangle) {
 		shadow.mBoundingSphere.mRadius = C_PROPERPARMS.mStandardFlightHeight.mValue + 100.0f;
 	} else {
 		shadow.mBoundingSphere.mRadius = 50.0f;
@@ -278,7 +278,7 @@ void Obj::setRandTarget()
 	Vector3f position  = getPosition();
 	Vector3f homePos   = mHomePosition;
 	Vector3f atanInput = position - homePos;
-	f32 aboutTheta     = JMath::atanTable_.atan2_(atanInput.x, atanInput.z);
+	f32 aboutTheta     = JMAAtan2Radian(atanInput.x, atanInput.z);
 
 	f32 theta = aboutTheta + randWeightFloat(PI) + HALF_PI;
 
@@ -408,7 +408,7 @@ Piki* Obj::getSearchedPikmin()
 	CI_LOOP(iPiki)
 	{
 		Piki* piki = *iPiki;
-		if (piki->isAlive() && piki->isPikmin() && piki->mBounceTriangle && !piki->isStickToMouth() && piki->mSticker != this) {
+		if (piki->isAlive() && piki->isPikmin() && piki->mFloorTriangle && !piki->isStickToMouth() && piki->mSticker != this) {
 			f32 sightDiff = getCreatureViewAngle(piki);
 			if (FABS(sightDiff) <= FOV) {
 				Vector3f pikiPos2 = piki->getPosition();
@@ -429,19 +429,13 @@ bool Obj::isTargetLost()
 {
 	Creature* target = mTargetCreature;
 	if (target && target->isAlive() && !target->isStickToMouth() && target->mSticker != this) {
-		f32 viewAngle = C_GENERALPARMS.mViewAngle.mValue;
+		f32 viewAngle = C_GENERALPARMS.mViewAngle();
 		if (mStuckPikminCount) {
 			viewAngle = 180.0f;
 		}
 
-		f32 sightRad  = C_GENERALPARMS.mSightRadius.mValue;
-		f32 privRad   = C_GENERALPARMS.mPrivateRadius.mValue;
-		f32 sightDiff = getCreatureViewAngle(target);
-
-		bool checkDist = isTargetAttackable(target, sightDiff, privRad, sightRad);
-		if (!checkDist && FABS(sightDiff) <= viewAngle * DEG2RAD * PI) {
-			return false;
-		}
+		return isTargetWithinRange(target, getCreatureViewAngle(target), C_GENERALPARMS.mPrivateRadius(), C_GENERALPARMS.mSightRadius(),
+		                           12800.0f, viewAngle);
 	}
 
 	return true;
@@ -655,10 +649,9 @@ Creature* Obj::isAttackable()
 {
 	const f32 faceDir = getFaceDir();
 	Parms* parms      = C_PARMS;
-	Vector3f vec
-	    = Vector3f(parms->mGeneral.mMaxAttackRange.mValue * sinf(faceDir), 0.0f, parms->mGeneral.mMaxAttackRange.mValue * cosf(faceDir));
+	Vector3f vec = Vector3f(parms->mGeneral.mMaxAttackRange() * sinf(faceDir), 0.0f, parms->mGeneral.mMaxAttackRange() * cosf(faceDir));
 	vec += getPosition();
-	f32 radius = SQUARE(C_GENERALPARMS.mMaxAttackAngle.mValue);
+	f32 radius = SQUARE(C_GENERALPARMS.mMaxAttackAngle());
 
 	Iterator<Piki> iter(pikiMgr);
 	CI_LOOP(iter)
@@ -937,11 +930,11 @@ lbl_80280B38:
 void Obj::updateEmit()
 {
 	if (mEfxMatrix) {
-		mEfxMatrix->getTranslation(_2E0);
+		mEfxMatrix->getTranslation(mAttackStartPos);
 	}
 
-	_2EC = Vector3f(sinf(getFaceDir()), -0.85f, cosf(getFaceDir()));
-	_2EC.normalise();
+	mAttackDirection = Vector3f(sinf(getFaceDir()), -0.85f, cosf(getFaceDir()));
+	mAttackDirection.normalise();
 }
 
 /**
@@ -950,8 +943,8 @@ void Obj::updateEmit()
  */
 Vector3f Obj::getAttackPosition()
 {
-	Vector3f vec2 = _2E0;
-	Vector3f vec1 = _2EC;
+	Vector3f vec2 = mAttackStartPos;
+	Vector3f vec1 = mAttackDirection;
 
 	vec1 *= C_GENERALPARMS.mAttackRadius.mValue;
 
@@ -987,37 +980,51 @@ Vector3f Obj::getAttackPosition()
  */
 void Obj::windTarget()
 {
-	if (_304 < 1.0f) {
-		_304 += 3.0f * sys->mDeltaTime;
-		if (_304 > 1.0f) {
-			_304 = 1.0f;
+	if (mWindScaleTimer < 1.0f) {
+		mWindScaleTimer += 3.0f * sys->mDeltaTime;
+		if (mWindScaleTimer > 1.0f) {
+			mWindScaleTimer = 1.0f;
 		}
 	}
 
-	f32 radius    = _304 * C_GENERALPARMS.mAttackRadius.mValue;
-	Vector3f vec1 = _2E0;                                                             // f16
-	Vector3f vec2 = _2EC;                                                             // f29
-	f32 slope     = (f32)tan(PI * (DEG2RAD * C_GENERALPARMS.mAttackHitAngle.mValue)); // f20
+	f32 radius                   = mWindScaleTimer * C_GENERALPARMS.mAttackRadius();
+	Vector3f attackStartPosition = mAttackStartPos;                                  // f16
+	Vector3f attackDirection     = mAttackDirection;                                 // f29
+	f32 slope                    = tan(TORADIANS(C_GENERALPARMS.mAttackHitAngle())); // f20
 
 	// this is probably a new vector
-	vec2.z = -vec2.z;
+	Vector3f attackNormal(-attackDirection.z, 0.0f, attackDirection.x);
+	attackNormal.normalise();
 
-	f32 len2 = _normalise2(vec2);
+	Vector3f crossVec = attackNormal.cross(attackDirection);
+	crossVec.normalise();
 
-	// more vector manip.
+	Vector3f attackDirection2D = attackDirection;
+	attackDirection2D.toFlatDirection();
 
 	Iterator<Navi> iterNavi(naviMgr);
 	CI_LOOP(iterNavi)
 	{
 		Navi* navi = *iterNavi;
 		if (navi->isAlive()) {
-			Vector3f naviPos = navi->getPosition();
-			Vector3f sep     = naviPos - vec1;
-			f32 dotProd      = dot(sep, vec2);
-			if (dotProd < radius && dotProd > 0.0f) {
-				// more vector math here.
-				InteractWind wind(this, 0.0f, &vec2); // not vec2
-				navi->stimulate(wind);
+			Vector3f naviPosition     = navi->getPosition();
+			Vector3f separationVector = naviPosition - attackStartPosition;
+			f32 dotProduct            = separationVector.dot(attackDirection);
+
+			if (dotProduct < radius && dotProduct > 0.0f) {
+				f32 attackRadius = dotProduct * slope;
+
+				Vector2f dots = Vector2f(attackNormal.dot(separationVector), crossVec.dot(separationVector));
+				if (dots.sqrMagnitude() < SQUARE(attackRadius)) {
+					f32 slideFactor  = dots.length() / attackRadius;
+					f32 windStrength = (1.0f - slideFactor) * 10.0f + slideFactor;
+
+					Vector3f windDirection(windStrength * (attackDirection2D.x * dots.y + attackNormal.x * dots.x), 0.0f,
+					                       windStrength * (attackDirection2D.z * dots.y + attackNormal.z * dots.x));
+
+					InteractWind wind(this, C_GENERALPARMS.mAttackDamage(), &windDirection);
+					navi->stimulate(wind);
+				}
 			}
 		}
 	}
@@ -1026,14 +1033,26 @@ void Obj::windTarget()
 	CI_LOOP(iterPiki)
 	{
 		Piki* piki = *iterPiki;
-		if (piki->isAlive()) {
-			Vector3f pikiPos = piki->getPosition();
-			Vector3f sep     = pikiPos - vec1;
-			f32 dotProd      = dot(sep, vec2);
-			if (dotProd < radius && dotProd > 0.0f) {
-				// more vector math here.
-				InteractWind wind(this, 0.0f, &vec2); // not vec2
-				piki->stimulate(wind);
+		if (piki->isAlive() && piki->isPikmin()) {
+			Vector3f pikiPosition     = piki->getPosition();
+			Vector3f separationVector = pikiPosition - attackStartPosition;
+			f32 dotProduct            = separationVector.dot(attackDirection);
+
+			if (dotProduct < radius && dotProduct > 0.0f) {
+				f32 attackRadius = dotProduct * slope;
+
+				Vector2f dots = Vector2f(attackNormal.dot(separationVector), crossVec.dot(separationVector));
+				if (dots.sqrMagnitude() < SQUARE(attackRadius)) {
+					f32 slideFactor = dots.length() / attackRadius;
+
+					f32 windStrength = (1.0f - slideFactor) * 15.0f + slideFactor * 1.5f;
+					Vector3f windDirection(windStrength * (attackDirection2D.x * dots.y + attackNormal.x * dots.x),
+					                       (1.0f - slideFactor) * 500.0f + slideFactor * 50.0f,
+					                       windStrength * (attackDirection2D.z * dots.y + attackNormal.z * dots.x));
+
+					InteractWind wind(this, C_GENERALPARMS.mAttackDamage(), &windDirection);
+					piki->stimulate(wind);
+				}
 			}
 		}
 	}

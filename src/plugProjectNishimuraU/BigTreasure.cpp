@@ -18,7 +18,7 @@
 namespace Game {
 namespace BigTreasure {
 
-#ifdef MATCHING
+#if MATCHING
 static const int unusedBigTreasureArray[] = { 0, 0, 0 };
 static const char bigTreasureName[]       = "246-BigTreasure";
 #endif
@@ -142,10 +142,7 @@ void Obj::doAnimationUpdateAnimator()
 	SysShape::BlendLinearFun linearBlend;
 	f32 animTime = EnemyAnimatorBase::defaultAnimSpeed * sys->mDeltaTime;
 	static_cast<ProperAnimator*>(mAnimator)->animate(&linearBlend, 60.0f * sys->mDeltaTime, animTime, animTime);
-
-	SysShape::Model* model = mModel;
-	model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc
-	    = static_cast<J3DMtxCalcAnmBase*>(static_cast<ProperAnimator*>(mAnimator)->mAnimator.getCalc());
+	static_cast<ProperAnimator*>(mAnimator)->mAnimator.setModelCalc(mModel, 0);
 }
 
 /**
@@ -177,21 +174,21 @@ void Obj::changeMaterial()
 	J3DModel* j3dModel      = mModel->mJ3dModel;
 	J3DModelData* modelData = j3dModel->getModelData();
 
-	u16 bodyIdx          = modelData->mMaterialTable.mMaterialNames->getIndex("mat_body");
-	J3DMaterial* bodyMat = modelData->mMaterialTable.mMaterials[bodyIdx];
-	bodyMat->mTevBlock->setTevColor(0, mCurrMatBodyColor);
+	u16 bodyIdx          = modelData->getMaterialName()->getIndex("mat_body");
+	J3DMaterial* bodyMat = modelData->getMaterialNodePointer(bodyIdx);
+	bodyMat->getTevBlock()->setTevColor(0, mCurrMatBodyColor);
 
 	J3DGXColorS10 color1(mCurrClusterEyeColor.mRgb[0], mCurrClusterEyeColor.mRgb[1], mCurrClusterEyeColor.mRgb[2], 255);
 
-	u16 eyeIdx1          = modelData->mMaterialTable.mMaterialNames->getIndex("mat_eye1");
-	J3DMaterial* eyeMat1 = modelData->mMaterialTable.mMaterials[eyeIdx1];
-	eyeMat1->mTevBlock->setTevColor(0, color1);
+	u16 eyeIdx1          = modelData->getMaterialName()->getIndex("mat_eye1");
+	J3DMaterial* eyeMat1 = modelData->getMaterialNodePointer(eyeIdx1);
+	eyeMat1->getTevBlock()->setTevColor(0, color1);
 
 	J3DGXColorS10 color2(mCurrSideEyeColor.mRgb[0], mCurrSideEyeColor.mRgb[1], mCurrSideEyeColor.mRgb[2], 255);
 
-	u16 eyeIdx2          = modelData->mMaterialTable.mMaterialNames->getIndex("mat_eye2");
-	J3DMaterial* eyeMat2 = modelData->mMaterialTable.mMaterials[eyeIdx2];
-	eyeMat2->mTevBlock->setTevColor(0, color2);
+	u16 eyeIdx2          = modelData->getMaterialName()->getIndex("mat_eye2");
+	J3DMaterial* eyeMat2 = modelData->getMaterialNodePointer(eyeIdx2);
+	eyeMat2->getTevBlock()->setTevColor(0, color2);
 
 	j3dModel->calcMaterial();
 }
@@ -392,7 +389,7 @@ void Obj::getTargetPosition()
 		} else if (sqrDistanceXZ(mPosition, mTargetPosition) < 625.0f) {
 			f32 range    = (C_GENERALPARMS.mTerritoryRadius.mValue - C_GENERALPARMS.mHomeRadius.mValue);
 			f32 randDist = C_GENERALPARMS.mHomeRadius.mValue + randWeightFloat(range);
-			f32 ang2     = JMath::atanTable_.atan2_(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
+			f32 ang2     = JMAAtan2Radian(mPosition.x - mHomePosition.x, mPosition.z - mHomePosition.z);
 			f32 ang1     = randWeightFloat(PI);
 
 			f32 ang3      = HALF_PI;
@@ -1039,7 +1036,7 @@ int Obj::getFireAttackAnimIndex()
 
 	if (navi) {
 		Vector3f naviPos = navi->getPosition();
-		angle            = JMath::atanTable_.atan2_(naviPos.x - mPosition.x, naviPos.z - mPosition.z);
+		angle            = JMAAtan2Radian(naviPos.x - mPosition.x, naviPos.z - mPosition.z);
 		clampAngle(angle);
 
 		angle -= mFaceDir;
@@ -1390,7 +1387,7 @@ void Obj::startBlendAnimation(int animIdx, bool doBlendAnim)
 		f32 time;
 
 		if (animInfo) {
-			time = animInfo->mAnm->mFrameLength;
+			time = animInfo->mAnm->mTotalFrameCount;
 		} else {
 			time = 0.0f;
 		}
@@ -1398,12 +1395,7 @@ void Obj::startBlendAnimation(int animIdx, bool doBlendAnim)
 		f32 currFrame = animator.mTimer;
 
 		if (time - 1.0f > currFrame) {
-			int newIdx;
-			if (animInfo) {
-				newIdx = animInfo->mId;
-			} else {
-				newIdx = BIGTREASUREANIM_NULL;
-			}
+			int newIdx = animator.getAnimIndex();
 
 			if (animIdx != newIdx) {
 				startBlend(newIdx, animIdx, &EnemyBlendAnimatorBase::sBlendLinearFun, 30.0f, nullptr);
@@ -1461,7 +1453,7 @@ int Obj::getCurrAnimationIndex()
 void Obj::startBossChargeBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyBigBoss::BigBossBgm_AttackPrep);
 }
 
@@ -1472,7 +1464,7 @@ void Obj::startBossChargeBGM()
 void Obj::startBossAttackBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	int jumpReqIdx = PSM::EnemyBigBoss::BigBossBgm_FlareCannon;
 	switch (mAttackIndex) {
@@ -1500,7 +1492,7 @@ void Obj::startBossAttackBGM()
 void Obj::finishBossAttackBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	int jumpReqIdx = 1;
 	int counter    = 0;
@@ -1538,7 +1530,7 @@ void Obj::finishBossAttackBGM()
 void Obj::startBossFlickBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->jumpRequest(PSM::EnemyBigBoss::BigBossBgm_NoWeaponsFlick);
 }
 
@@ -1549,7 +1541,7 @@ void Obj::startBossFlickBGM()
 void Obj::startBossItemDropBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	int jumpReqIdx = PSM::EnemyBigBoss::BigBossBgm_3Weapons;
 	int counter    = 0;
@@ -1590,7 +1582,7 @@ void Obj::startBossItemDropBGM()
 void Obj::updateBossBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	if (mStuckPikminCount) {
 		soundObj->postPikiAttack(true);
@@ -1606,7 +1598,7 @@ void Obj::updateBossBGM()
 void Obj::resetBossAppearBGM()
 {
 	PSM::EnemyBoss* soundObj = static_cast<PSM::EnemyBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 	soundObj->setAppearFlag(false);
 }
 
@@ -1617,7 +1609,7 @@ void Obj::resetBossAppearBGM()
 void Obj::setBossAppearBGM()
 {
 	PSM::EnemyBigBoss* soundObj = static_cast<PSM::EnemyBigBoss*>(mSoundObj);
-	PSM::checkBoss(soundObj);
+	PSM::assertIsBoss(soundObj);
 
 	int counter, jumpReqIdx;
 	jumpReqIdx = 1;
@@ -1740,7 +1732,7 @@ void Obj::createOnGroundEffect(int footIdx, WaterBox* wbox)
 		waterWalk.create(&fxArg);
 		PSM::SeSound* sound = PSStartSoundVec(PSSE_EV_ITEM_LAND_WATER1_XL, (Vec*)&mJointPositions[footIdx][3]);
 		if (sound) {
-			sound->setPitch(1.2f, 0, 0);
+			sound->setPitch(1.2f, 0, SOUNDPARAM_Unk0);
 		}
 
 	} else {
@@ -1751,8 +1743,8 @@ void Obj::createOnGroundEffect(int footIdx, WaterBox* wbox)
 	}
 
 	PSStartSoundVec(PSSE_EN_BIGTAKARA_WALK, (Vec*)&mJointPositions[footIdx][3]);
-	cameraMgr->startVibration(6, effectPos, 2);
-	rumbleMgr->startRumble(14, effectPos, RUMBLEID_Both);
+	cameraMgr->startVibration(VIBTYPE_LightFastShort, effectPos, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, effectPos, RUMBLEID_Both);
 }
 
 /**

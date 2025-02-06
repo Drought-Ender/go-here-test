@@ -29,20 +29,17 @@ enum EnemyDropMode {
 struct BaseGen : public CNode {
 	/**
 	 * Spawn type used by BaseGen (caves).
-	 * UNUSED_3 is player 1 spawn in vs mode? (see
-	 * Game::Cave::RandMapMgr::getStartPosition)
 	 */
 	enum CaveGenType {
-		CGT_EnemyEasy = 0, // AKA TekiA / Easy Teki
-		CGT_EnemyHard,     // AKA TekiB / Hard Teki
-		CGT_TreasureItem,
-		CGT_Unknown3,
-		CGT_HoleOrGeyser,
-		CGT_DoorSeam,
-		CGT_Plant,
-		CGT_Start,
-		CGT_EnemySpecial, // AKA TekiF / Special Teki, contribute 0 to score, spawn individually
-		CGT_Alcove
+		CGT_EnemyEasy = 0, // 0, AKA TekiA / Easy Teki
+		CGT_EnemyHard,     // 1, AKA TekiB / Hard Teki
+		CGT_TreasureItem,  // 2, AKA stand-alone treasures
+		CGT_Unknown3,      // 3, unused
+		CGT_HoleOrGeyser,  // 4
+		CGT_DoorSeam,      // 5, AKA seam hazards
+		CGT_Plant,         // 6
+		CGT_Start,         // 7, AKA pod/ship
+		CGT_EnemySpecial,  // 8, AKA TekiF / Special Teki, contribute 0 to score, spawn individually
 	};
 
 	BaseGen();
@@ -170,14 +167,11 @@ struct FloorInfo : public CNode {
 		ParmString mVrBox;            // _1B4  /* f00A */
 		Parm<int> mIsHoleClogged;     // _1D4  /* f010 */
 		ParmEnum mFloorAlphaType;     // _1FC  /* f011 */
-
-		ParmEnum mFloorBetaType; // _220  /* f012 */
-
-		ParmEnum mFloorHidden; // _244  /* f013 */
-
-		Parm<int> mVersion;          // _268  /* f015 */
-		Parm<f32> mWaterwraithTimer; // _290  /* f016 */
-		Parm<int> mGlitchySeesaw;    // _2B8  /* f017 */
+		ParmEnum mFloorBetaType;      // _220  /* f012 */
+		ParmEnum mFloorHidden;        // _244  /* f013 */
+		Parm<int> mVersion;           // _268  /* f015 */
+		Parm<f32> mWaterwraithTimer;  // _290  /* f016 */
+		Parm<int> mGlitchySeesaw;     // _2B8  /* f017 */
 
 		// void* mEnd;                  // _2E0
 	};
@@ -229,7 +223,7 @@ struct CaveInfo : public CNode {
 	struct Parms : Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "CaveInfo")
-		    , mFloorMax(this, 'c000', "ŠK‘w", 1, 1, 128) // 'floor'
+		    , mFloorMax(this, 'c000', "éšŽå±¤", 1, 1, 128) // 'floor'
 		{
 		}
 
@@ -245,6 +239,8 @@ struct CaveInfo : public CNode {
 	int getFloorMax();
 	FloorInfo* getFloorInfo(int floorIndex);
 	static CaveInfo* load(char* path);
+
+	inline bool isFinalFloor(u32 floorIndex) { return getFloorMax() - 1 == floorIndex; }
 
 	// _00     = VTBL
 	// _00-_18 = CNode

@@ -276,10 +276,10 @@ void TChannel::init()
  */
 void TChannel::playStart()
 {
-	_10C = 0;
-	_60  = 0;
-	_08  = 1;
-	_66  = 0;
+	_10C       = 0;
+	_60        = 0;
+	mIsPlaying = 1;
+	_66        = 0;
 
 	for (s32 i = 0; i < 4; i++) {
 		_78[i] = 0;
@@ -357,8 +357,8 @@ void TChannel::setWaveInfo(JASWaveInfo const& info, u32 dataOffset, u32 blockCou
 	static u8 COMP_BLOCKBYTES[8]   = { 0x9, 0x5, 0x8, 0x10, 0x1, 0x1, 0x1, 0x1 };
 
 	mDataOffset      = dataOffset;
-	mSamplesPerBlock = COMP_BLOCKSAMPLES[info.mBlockType];
-	mBytesPerBlock   = COMP_BLOCKBYTES[info.mBlockType];
+	mSamplesPerBlock = COMP_BLOCKSAMPLES[info.mFormat];
+	mBytesPerBlock   = COMP_BLOCKBYTES[info.mFormat];
 
 	mBlockCount = 0;
 
@@ -366,29 +366,29 @@ void TChannel::setWaveInfo(JASWaveInfo const& info, u32 dataOffset, u32 blockCou
 		return;
 	}
 
-	_11C = info._1C;
-	_102 = info._10;
-	if (_102 != 0) {
+	mSampleCount = info.mSampleCount;
+	mLoopOffset  = info.mLoopOffset;
+	if (mLoopOffset != 0) {
 		if (blockCount == 1) {
-			blockCount = info.mBlockCount;
+			blockCount = info.mLoopStartOffset;
 		}
 
-		_110 = info.mBlockCount;
-		_114 = info._18;
-		_104 = info._20;
-		_106 = info._22;
+		mLoopStartOffset  = info.mLoopStartOffset;
+		mNextSampleOffset = info.mLoopEndOffset;
+		mLast             = info.mLast;
+		mPenult           = info.mPenult;
 	} else {
-		_114 = _11C;
+		mNextSampleOffset = mSampleCount;
 	}
 
-	if (blockCount != 0 && _114 > blockCount) {
-		switch (info.mBlockType) {
+	if (blockCount != 0 && mNextSampleOffset > blockCount) {
+		switch (info.mFormat) {
 		case 0:
 		case 1:
 			mBlockCount = blockCount;
 			mDataOffset += blockCount * mBytesPerBlock >> 4;
-			_110 -= blockCount;
-			_114 -= blockCount;
+			mLoopStartOffset -= blockCount;
+			mNextSampleOffset -= blockCount;
 			break;
 		case 2:
 		case 3:
@@ -406,11 +406,11 @@ void TChannel::setWaveInfo(JASWaveInfo const& info, u32 dataOffset, u32 blockCou
  * @note Address: 0x800A58A0
  * @note Size: 0x18
  */
-void TChannel::setOscInfo(u32 oscInfo)
+void TChannel::setOscInfo(u32 bytesPerBlock)
 {
 	mDataOffset      = 0;
 	mSamplesPerBlock = 0x10;
-	mBytesPerBlock   = oscInfo;
+	mBytesPerBlock   = bytesPerBlock;
 }
 
 /**
@@ -431,10 +431,10 @@ void TChannel::initAutoMixer()
  * @note Address: 0x800A58E4
  * @note Size: 0x2C
  */
-void TChannel::setAutoMixer(u16 level, u8 p2, u8 p3, u8 p4, u8 p5)
+void TChannel::setAutoMixer(u16 level, u8 volume, u8 pan, u8 fxMix, u8 dolby)
 {
-	_50                 = (p2 << 8) | p3;
-	_52                 = (p4 << 8) | (p4 << 1);
+	mVolumeAndPan       = (volume << 8) | pan;
+	mFxMixAndDolby      = (fxMix << 8) | (fxMix << 1);
 	mMixerLevel         = level;
 	mIsMixerInitialized = 1;
 }
@@ -539,10 +539,8 @@ void TChannel::setPauseFlag(u8 pauseFlag) { mPauseFlag = pauseFlag; }
 /**
  * @note Address: 0x800A59C4
  * @note Size: 0x24
- * TODO: Sizeof?
- * flush__Q26JASDsp8TChannelFv
  */
-void TChannel::flush() { DCFlushRange(this, 0x180); }
+void TChannel::flush() { DCFlushRange(this, sizeof(TChannel)); }
 
 /**
  * @note Address: 0x800A59E8
@@ -612,11 +610,11 @@ void TChannel::setDistFilter(s16 distFilter) { mDistFilter = distFilter; }
  * @note Address: 0x800A5AD8
  * @note Size: 0x20
  */
-void TChannel::setBusConnect(u8 index, u8 p2)
+void TChannel::setBusConnect(u8 index, u8 connectType)
 {
 	static const u16 connect_table[12] = { 0x000, 0xD00, 0xD60, 0xDC0, 0xE20, 0xE80, 0xEE0, 0xCA0, 0xF40, 0xFA0, 0xB00, 0x9A0 };
 	TMixer* mixer                      = &mMixer[index];
-	mixer->mBusConnect                 = connect_table[p2];
+	mixer->mBusConnect                 = connect_table[connectType];
 }
 
 } // namespace JASDsp

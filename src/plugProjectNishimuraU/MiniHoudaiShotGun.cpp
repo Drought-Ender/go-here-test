@@ -84,14 +84,14 @@ bool MiniHoudaiShotGunNode::update()
 	Sys::Sphere moveSphere(startPos, 10.0f); // 0x78
 
 	MoveInfo moveInfo(&moveSphere, &mVelocity, 0.0f); // 0x1B0
-	moveInfo.mInfoOrigin = mOwner;
+	moveInfo.mMovingCreature = mOwner;
 	mapMgr->traceMove(moveInfo, sys->mDeltaTime);
 
 	setPosition(moveSphere.mPosition);
 
 	mVelocity.y -= 20.0f;
 
-	if (moveInfo.mBounceTriangle || moveInfo.mWallTriangle) {
+	if (moveInfo.mFloorTriangle || moveInfo.mWallTriangle) {
 		Vector3f groundPos = mPosition;
 		groundPos.y        = mapMgr->getMinY(groundPos);
 
@@ -112,8 +112,8 @@ bool MiniHoudaiShotGunNode::update()
 			PSM::SeSound* sound = PSStartSoundVec(PSSE_EV_ITEM_LAND_WATER1_L, (Vec*)&mPosition);
 
 			if (sound) {
-				sound->setPitch(1.3f, 0, 0);
-				sound->setVolume(0.7f, 0, 0);
+				sound->setPitch(1.3f, 0, SOUNDPARAM_Unk0);
+				sound->setVolume(0.7f, 0, SOUNDPARAM_Unk0);
 			}
 
 		} else {
@@ -127,8 +127,8 @@ bool MiniHoudaiShotGunNode::update()
 		PSStartSoundVec(PSSE_PK_SE_BOMB, (Vec*)&mPosition);
 
 		if (_18) {
-			cameraMgr->startVibration(15, effectPos, 2);
-			rumbleMgr->startRumble(14, effectPos, 2);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, effectPos, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed14, effectPos, RUMBLEID_Both);
 		}
 
 		result = true;
@@ -180,13 +180,13 @@ bool MiniHoudaiShotGunNode::update()
 			Vector3f creaturePos = target->getPosition();
 			Vector3f sep         = creaturePos - startPos;
 
-			f32 dot2 = dot(vec2, sep);
+			f32 dot2 = vec2.dot(sep);
 			if (absVal(dot2) < radius) {
 
-				f32 dot3 = dot(vec3, sep);
+				f32 dot3 = vec3.dot(sep);
 				if (absVal(dot3) < radius) {
 
-					f32 dot1 = dot(vec1, sep);
+					f32 dot1 = vec1.dot(sep);
 					if (dot1 > -radius && dot1 < searchRadius) {
 
 						if (target->isNavi() || (target->isPiki() && static_cast<Piki*>(target)->isPikmin())) {
@@ -1797,10 +1797,7 @@ bool MiniHoudaiShotGunMgr::searchShotGunRotation()
 
 	mAngle = (mAngle < 0.0f) ? TAU + mAngle : (mAngle >= TAU) ? mAngle - TAU : mAngle;
 
-	if (absAng < 0.01f) {
-		return true;
-	}
-	return false;
+	return (absAng < 0.01f);
 	/*
 	stwu     r1, -0x10(r1)
 	mflr     r0

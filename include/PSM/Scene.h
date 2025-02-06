@@ -62,7 +62,6 @@ struct SceneMgr : public PSGame::PikSceneMgr {
 
 	// _00      = VTBL
 	// _00-_0D  = PikSceneMgr
-	u8 _10; // _10, unknown
 };
 
 //////////// GLOBAL SCENE
@@ -236,9 +235,9 @@ struct Scene_Cave : public Scene_Game {
 
 	// _00      = VTBL
 	// _00-_5C  = Scene_Game
-	bool _5C;           // _5C
-	f32 mSceneFx;       // _60
-	int mPollutUpTimer; // _64
+	bool mHasStartedBossBgm; // _5C
+	f32 mSceneFx;            // _60
+	int mPollutUpTimer;      // _64
 };
 
 /**
@@ -317,7 +316,14 @@ inline PSSystem::SceneMgr* PSMGetSceneMgr()
 inline PSSystem::SceneMgr* PSMGetSceneMgrCheck()
 {
 	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(mgr);
+	PSSystem::validateSceneMgr(mgr);
+	return mgr;
+}
+
+inline PSGame::PikSceneMgr* PSMGetPikSceneMgrCheck()
+{
+	PSGame::PikSceneMgr* mgr = static_cast<PSGame::PikSceneMgr*>(PSSystem::getSceneMgr());
+	PSSystem::validateSceneMgr(mgr);
 	return mgr;
 }
 
@@ -339,9 +345,8 @@ inline PSM::Scene_Game* PSMGetGameScene()
 
 inline PSM::MiddleBossSeq* PSMGetMiddleBossSeq()
 {
-	PSSystem::SceneMgr* mgr = PSMGetSceneMgrCheck();
-	mgr->checkScene();
-	PSM::Scene_Objects* scene = static_cast<PSM::Scene_Objects*>(mgr->mScenes->mChild);
+	PSGame::PikSceneMgr* mgr = PSMGetPikSceneMgrCheck();
+	PSGame::PikScene* scene  = mgr->getChildPikScene();
 	return !scene ? nullptr : scene->getMiddleBossBgm();
 }
 
@@ -369,24 +374,16 @@ inline PSSystem::SeqBase* PSSystemGetSeqCheck(int id)
 	return PSSystem::getSeqDataCheck(mgr, id);
 }
 
-inline PSSystem::SeqBase* PSSystemChildSceneData(int id)
+inline JAISound* PSSystemChildSceneData(int id)
 {
-	PSSystem::SceneMgr* mgr = PSMGetSceneMgrCheck();
-	return mgr->getChildScene()->mSeqMgr.getSeq(id);
+	PSSystem::SeqBase* seq = PSMGetChildScene()->getSeqMgr()->getSeq(id);
+	return (seq) ? seq->getHandle() : nullptr;
 }
 
 inline PSGame::SceneInfo* PSGameGetSceneInfo()
 {
 	PSSystem::SceneMgr* mgr = PSMGetSceneMgrCheck();
 	return static_cast<PSM::SceneBase*>(mgr->getChildScene())->getSceneInfoA();
-}
-
-inline void PSMStartMainSeq()
-{
-	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(mgr);
-	mgr->checkScene();
-	mgr->mScenes->mChild->startMainSeq();
 }
 
 #endif

@@ -55,8 +55,8 @@ void FSMState::do_exec(TMgr*) { }
  */
 void FSMState_EmptyUpdate::do_init(TMgr* mgr, Game::StateArg* arg)
 {
-	mCounter = 2;
-	_14      = 2;
+	mCounter    = 2;
+	mCounterMax = 2;
 }
 
 /**
@@ -87,15 +87,13 @@ void FSMState_CardRequest::do_exec(TMgr* mgr)
 {
 	switch (mState) {
 	case 0:
-		bool check2 = (!sys->mCardMgr->mIsCard) && (sys->mCardMgr->checkStatus() != 11);
-		if (check2) {
+		if (sys->mCardMgr->isSaveInvalid()) {
 			P2ASSERTLINE(90, do_cardRequest(mgr));
 			mState = 1;
 		}
 		break;
 	case 1:
-		bool check3 = (!sys->mCardMgr->mIsCard) && (sys->mCardMgr->checkStatus() != 11);
-		if (check3) {
+		if (sys->mCardMgr->isSaveInvalid()) {
 			mCardStatus = (int)static_cast<Game::MemoryCard::Mgr*>(sys->mCardMgr)->getCardStatus();
 			static_cast<Game::MemoryCard::Mgr*>(sys->mCardMgr)->getCardStatus();
 			mState = 2;
@@ -140,8 +138,8 @@ void FSMState_CardRequest::do_exec(TMgr* mgr)
 			do_transitCardPlayerDataBroken(mgr);
 			break;
 		default:
-			JUT_PANICLINE(150, "※メモリーカードエラー:想定外のケースです\n");
-			JUT_PANICLINE(151, "P2Assert");
+			JUT_PANICLINE(150, "窶ｻ繝｡繝｢繝ｪ繝ｼ繧ｫ繝ｼ繝峨お繝ｩ繝ｼ:諠ｳ螳壼､悶�ｮ繧ｱ繝ｼ繧ｹ縺ｧ縺兔n");
+			P2ASSERTLINE(151, false);
 			break;
 		}
 	}
@@ -154,7 +152,7 @@ void FSMState_CardRequest::do_exec(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardNoCard(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_NoCard;
+	arg.mOpenType = CardError::TMgr::Start_NoCard_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -165,7 +163,7 @@ void FSMState_CardRequest::do_transitCardNoCard(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardIOError(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_IOError;
+	arg.mOpenType = CardError::TMgr::Start_IOError_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -176,7 +174,7 @@ void FSMState_CardRequest::do_transitCardIOError(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardWrongDevice(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_WrongDevice;
+	arg.mOpenType = CardError::TMgr::Start_WrongDevice_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -187,7 +185,7 @@ void FSMState_CardRequest::do_transitCardWrongDevice(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardWrongSector(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_WrongSector;
+	arg.mOpenType = CardError::TMgr::Start_WrongSector_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -198,7 +196,7 @@ void FSMState_CardRequest::do_transitCardWrongSector(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardBroken(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_DataBrokenAndDoYouFormat;
+	arg.mOpenType = CardError::TMgr::Start_DataBrokenAndDoYouFormat_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -209,7 +207,7 @@ void FSMState_CardRequest::do_transitCardBroken(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardEncoding(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_DataBrokenAndDoYouFormat;
+	arg.mOpenType = CardError::TMgr::Start_DataBrokenAndDoYouFormat_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -220,7 +218,7 @@ void FSMState_CardRequest::do_transitCardEncoding(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardNoFileSpace(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_OverCapacity;
+	arg.mOpenType = CardError::TMgr::Start_OverCapacity_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -231,7 +229,7 @@ void FSMState_CardRequest::do_transitCardNoFileSpace(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardNoFileEntry(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_OverCapacity;
+	arg.mOpenType = CardError::TMgr::Start_OverCapacity_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -242,7 +240,7 @@ void FSMState_CardRequest::do_transitCardNoFileEntry(TMgr* mgr)
 void FSMState_CardRequest::do_transitCardFileOpenError(TMgr* mgr)
 {
 	CardErrorStateArg arg;
-	arg._00 = CardError::TMgr::Start_DoYouCreateNewFile;
+	arg.mOpenType = CardError::TMgr::Start_DoYouCreateNewFile_FS;
 	transit(mgr, FSSTATE_CardError, &arg);
 }
 
@@ -258,7 +256,7 @@ void FSMState_CardRequest::do_transitCardPlayerDataBroken(TMgr* mgr) { do_transi
  */
 void FSMState_CardRequest::do_transitCardSerialNoError(TMgr* mgr)
 {
-	JUT_PANICLINE(224, "※ロードでシリアルエラーはありえない\n"); // * There is no serial error during loading
+	JUT_PANICLINE(224, "窶ｻ繝ｭ繝ｼ繝峨〒繧ｷ繝ｪ繧｢繝ｫ繧ｨ繝ｩ繝ｼ縺ｯ縺ゅｊ縺医↑縺Ыn"); // * There is no serial error during loading
 	JUT_PANICLINE(225, "P2Assert");
 }
 
@@ -314,18 +312,18 @@ void FSMState_ScreenFileSelect::do_exec(TMgr* mgr)
 {
 	if (mgr->mMgrFS.isFinish()) {
 		switch (mgr->mMgrFS.mEndStat) {
-		case 1:
-		case 2:
+		case FS::TMgr::END_StartNoCard:
+		case FS::TMgr::END_2:
 			transit(mgr, FSSTATE_MountCheck, nullptr);
 			break;
-		case 3:
-			mgr->goEnd_(TMgr::End_2);
+		case FS::TMgr::END_OpenSaveFile:
+			mgr->goEnd_(TMgr::End_StartGame);
 			break;
-		case 4:
-			mgr->goEnd_(TMgr::End_1);
+		case FS::TMgr::END_StartNewFile:
+			mgr->goEnd_(TMgr::End_StartNewGame);
 			break;
-		case 5:
-			mgr->goEnd_(TMgr::End_3);
+		case FS::TMgr::END_Cancel:
+			mgr->goEnd_(TMgr::End_ReturnToTitle);
 			break;
 		}
 	}
@@ -339,7 +337,7 @@ void FSMState_CardError::do_init(TMgr* mgr, Game::StateArg* arg)
 {
 	CardErrorStateArg* carg = static_cast<CardErrorStateArg*>(arg);
 	P2ASSERTLINE(319, arg);
-	mgr->mCardErrorMgr.startSeq((CardError::TMgr::enumStart)carg->_00);
+	mgr->mCardErrorMgr.startSeq(carg->mOpenType);
 }
 
 /**
@@ -350,15 +348,15 @@ void FSMState_CardError::do_exec(TMgr* mgr)
 {
 	if (mgr->mCardErrorMgr.isGetEnd()) {
 		switch (mgr->mCardErrorMgr.mEndStat) {
-		case 1:
+		case CardError::TMgr::End_StartWithoutSave:
 			static_cast<Game::MemoryCard::Mgr*>(sys->mCardMgr)->loadPlayerForNoCard(0);
-			mgr->goEnd_(TMgr::End_1);
+			mgr->goEnd_(TMgr::End_StartNewGame);
 			break;
-		case 2:
+		case CardError::TMgr::End_OpenFileSelect:
 			mgr->start();
 			break;
 		default:
-			JUT_PANICLINE(342, "※　mgr->mCardErrorMgr->getEnd=%d ってありえない！\n", mgr->mCardErrorMgr.mEndStat);
+			JUT_PANICLINE(342, "窶ｻ縲mgr->mCardErrorMgr->getEnd=%d 縺｣縺ｦ縺ゅｊ縺医↑縺��ｼ―n", mgr->mCardErrorMgr.mEndStat);
 			JUT_PANICLINE(343, "P2Assert");
 		}
 	}
@@ -370,7 +368,7 @@ void FSMState_CardError::do_exec(TMgr* mgr)
  */
 TMgr::TMgr()
     : mCounter(0)
-    , _F44(0)
+    , mCounterMax(0)
 {
 	mFsm.init(this);
 	mFsm.start(this, FSSTATE_Standby, 0);
@@ -444,8 +442,8 @@ void TMgr::onDvdErrorRecovered()
  */
 void TMgr::start()
 {
-	_FE8   = true;
-	mState = 0;
+	_FE8      = true;
+	mEndState = End_0;
 	mFsm.start(this, FSSTATE_EmptyUpdate, nullptr);
 }
 
@@ -514,7 +512,7 @@ bool TMgr::isFinish()
  */
 void TMgr::goEnd_(enumEnd end)
 {
-	mState = end;
+	mEndState = end;
 	mFsm.transit(this, FSSTATE_Standby, nullptr);
 	mMgrFS.forceQuitSeq();
 	mCardErrorMgr.forceQuitSeq();

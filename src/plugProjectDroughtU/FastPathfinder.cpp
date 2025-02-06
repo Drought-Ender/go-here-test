@@ -1,206 +1,293 @@
-#include "Drought/FibonacciHeap.h"
 #include "Drought/Pathfinder.h"
 #include "Game/pathfinder.h"
-
+#include "Game/MapMgr.h"
 #include "Game/routeMgr.h"
 
-namespace Drought
+namespace Drought {
+PathNode::PathNode(s16 idx, PathNode* p, f32 g, f32 h)
+    : mWaypointIndex(idx)
+    , mParent(p)
+    , mGroundCost(g)
+    , mHeuristicCost(h)
+    , mFinalCost(g + h)
 {
+}
 
-struct WaypointFloatArrayEval : FibonacciEvalStruct<s16>
+Path::Path()
+    : mWaypointList(nullptr)
+    , mLength(0)
 {
-    WaypointFloatArrayEval(f32* arr) : mArray(arr) 
-    {
-    }
-
-    f32* mArray;
-    virtual f32 eval(s16 idx) const {
-        return mArray[idx];
-    }
-};
-
-enum PathFindFlags2 {
-	PATHFLAG_RequireOpen                = 0x1,
-	PATHFLAG_PathThroughWater           = 0x2,
-	PATHFLAG_DisallowUnfinishedBridges  = 0x4,
-	PATHFLAG_Unk4                       = 0x8,
-	PATHFLAG_DisallowVsRed              = 0x10,
-	PATHFLAG_DisallowVsBlue             = 0x20,
-	PATHFLAG_AllowUnvisited             = 0x40,
-	PATHFLAG_TwoWayPathing              = 0x80 // used for Panmodoki and BlackMan
-};
-
-inline Game::WayPoint* getWaypoint(s16 idx) {
-    return Game::PathfindContext::routeMgr->getWayPoint(idx);
 }
 
-static f32 heuristic(s16 first, s16 second) {
-    f32 XZDistance = getWaypoint(first)->mPosition.sqrDistanceXZ(getWaypoint(second)->mPosition);
-    // f32 heightDifference = getWaypoint(first)->mPosition.y - getWaypoint(second)->mPosition.y;
-    // f32 sqrHeight = heightDifference;
-    return XZDistance;
+Path::~Path()
+{
+	if (mWaypointList) {
+		delete[] mWaypointList;
+	}
 }
 
-Path::Path() {
-    mRoot = nullptr;
+void Path::allocate(u16 size)
+{
+	clear();
+
+	mWaypointList = new s16[size];
+	mLength       = size;
 }
 
-PathNode::PathNode(s16 wpIdx) {
-    mWpIdx = wpIdx;
-    mNext = nullptr;
+NodeList::NodeList(u32 initialCapacity)
+    : mCapacity(initialCapacity)
+    , mSize(0)
+{
+	mNodeList = new PathNode*[mCapacity];
 }
 
-void Path::prepend(PathNode* node) {
-    node->mNext = mRoot;
-    mRoot = node;
+NodeList::~NodeList() { delete[] mNodeList; }
+
+void NodeList::add(PathNode* node)
+{
+	if (mSize >= mCapacity) {
+		// Grow array if needed
+		u32 newCapacity     = mCapacity * 2;
+		PathNode** newNodes = new PathNode*[newCapacity];
+		for (u32 i = 0; i < mSize; i++) {
+			newNodes[i] = mNodeList[i];
+		}
+		delete[] mNodeList;
+		mNodeList = newNodes;
+		mCapacity = newCapacity;
+	}
+	mNodeList[mSize++] = node;
 }
 
-f32 Path::getDistance() {
-    PathNode* node = mRoot;
-    if (!node) {
-        return 0.0f;
-    }
-
-    f32 travelDistance = 0.0f;
-
-    Vector3f prevPos = getWaypoint(node->mWpIdx)->mPosition;
-
-    node = node->mNext;
-
-    while (node)
-    {
-        Vector3f newPos = getWaypoint(node->mWpIdx)->mPosition;
-        travelDistance += prevPos.distance(newPos);
-        prevPos = newPos;
-    }
-    return travelDistance;
+void NodeList::remove(PathNode* node)
+{
+	for (u32 i = 0; i < mSize; i++) {
+		if (mNodeList[i] == node) {
+			// Shift remaining elements left
+			for (u32 j = i; j < mSize - 1; j++) {
+				mNodeList[j] = mNodeList[j + 1];
+			}
+			mSize--;
+			return;
+		}
+	}
 }
 
-u32 reconstruct_path(Path& path, s16* arr, s16 current) {
-    u32 count = 0;
-    while (current != -1)
-    {
-        path.prepend(new PathNode(current));
-        current = arr[current];
-        count++;
-    }
-    return count;
+PathNode* NodeList::findLowestFCost()
+{
+	if (mSize == 0)
+		return nullptr;
+
+	PathNode* lowest = mNodeList[0];
+	for (u32 i = 1; i < mSize; i++) {
+		if (mNodeList[i]->mFinalCost < lowest->mFinalCost) {
+			lowest = mNodeList[i];
+		}
+	}
+	return lowest;
 }
 
+NodeMap::NodeMap(u32 size)
+    : mLength(size)
+{
+	mBucketList = new NodeMapEntry*[mLength];
+	for (u32 i = 0; i < mLength; i++) {
+		mBucketList[i] = nullptr;
+	}
+}
 
-u32 Pathfinder::search_fast(s16 startWpID, s16 endWpID, Path& path, u8 requestFlag) {
+NodeMap::~NodeMap()
+{
+	for (u32 i = 0; i < mLength; i++) {
+		NodeMapEntry* entry = mBucketList[i];
+		while (entry) {
+			NodeMapEntry* next = entry->mNext;
+			delete entry;
+			entry = next;
+		}
+	}
+	delete[] mBucketList;
+}
 
-    size_t waypointCount = Game::PathfindContext::routeMgr->mCount;
+void NodeMap::put(s16 key, PathNode* value)
+{
+	u32 bucket          = (u32)key % mLength;
+	NodeMapEntry* entry = mBucketList[bucket];
 
-    // the real score - used to track true distance
-    f32* gScore = new f32[waypointCount];
-    for (u32 i = 0; i < waypointCount; i++) {
-        gScore[i] = 1E38f;
-    }
+	while (entry) {
+		if (entry->mKey == key) {
+			entry->mValue = value;
+			return;
+		}
+		entry = entry->mNext;
+	}
 
-    gScore[startWpID] = 0.0f;
+	// Create new entry
+	entry               = new NodeMapEntry;
+	entry->mKey         = key;
+	entry->mValue       = value;
+	entry->mNext        = mBucketList[bucket];
+	mBucketList[bucket] = entry;
+}
 
-    // the heuristic score - used to nudge towards the goal node
-    f32* fScore = new f32[waypointCount];
-    for (u32 i = 0; i < waypointCount; i++) {
-        fScore[i] = 1E38f;
-    }
-    fScore[endWpID] = heuristic(startWpID, endWpID);
+PathNode* NodeMap::get(s16 key)
+{
+	u32 bucket          = (u32)key % mLength;
+	NodeMapEntry* entry = mBucketList[bucket];
 
-    WaypointFloatArrayEval eval (fScore);
+	while (entry) {
+		if (entry->mKey == key) {
+			return entry->mValue;
+		}
+		entry = entry->mNext;
+	}
 
+	return nullptr;
+}
 
-    bool* inTree = new bool[waypointCount];
-    for (u32 i = 0; i < waypointCount; i++) {
-        inTree[i] = false;
-    }
+inline f32 WaypointPathfinder::calculateHeuristic(Game::WayPoint* from, Game::WayPoint* to)
+{
+	Vector3f diff = to->mPosition - from->mPosition;
+	diff.y *= 2500.0f; // Weight Y axis more heavily
+	return diff.sqrMagnitude();
+}
 
-    FibonacciHeap<s16> openSet(&eval);
-    openSet.insert(startWpID);
-    inTree[startWpID] = true;
+void WaypointPathfinder::reconstructPath(PathNode* endNode, Path& outPath)
+{
+	// First count nodes
+	u16 pathLength    = 0;
+	PathNode* current = endNode;
+	while (current) {
+		pathLength++;
+		current = current->mParent;
+	}
 
-    s16* cameFrom = new s16[waypointCount];
-    for (u32 i = 0; i < waypointCount; i++) {
-        cameFrom[i] = -1;
-    }
-    fScore[startWpID] = 0;
+	// Allocate and fill path
+	outPath.allocate(pathLength);
+	current = endNode;
+	for (s16 i = pathLength - 1; i >= 0; i--) {
+		outPath.mWaypointList[i] = current->mWaypointIndex;
+		current                  = current->mParent;
+	}
+}
 
-    while (openSet.mRoot)
-    {
-        s16 current = openSet.extractMin();
-        inTree[current] = false;
-        if (current == endWpID) {
-            u32 count = reconstruct_path(path, cameFrom, current);
-            delete[] gScore;
-            delete[] fScore;
-            delete[] cameFrom;
-            delete[] inTree;
-            return count;
-        }
+void WaypointPathfinder::cleanup(NodeList& openList, NodeList& closedList)
+{
+	for (u32 i = 0; i < openList.mSize; i++) {
+		delete openList.mNodeList[i];
+	}
+	for (u32 i = 0; i < closedList.mSize; i++) {
+		delete closedList.mNodeList[i];
+	}
+}
 
-        for (u16 i = 0; i < getWaypoint(current)->mNumToLinks; i++) {
-            
-            s16 neighbor = getWaypoint(current)->mToLinks[i];
+u16 WaypointPathfinder::findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, bool isDesperate, Path& outPath)
+{
+	if (startIdx == destIdx) {
+		outPath.allocate(1);
+		outPath.mWaypointList[0] = startIdx;
+		return 1;
+	}
 
-            Game::WayPoint* neighborWP = getWaypoint(neighbor);
-            
-            if ((((requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
-				|| (!(requestFlag & PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water))
-				|| ((requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
-				|| ((neighborWP->mFlags & Game::WPF_Water) && (requestFlag & PATHFLAG_DisallowUnfinishedBridges) && (neighborWP->mFlags & Game::WPF_Bridge))
-				|| ((requestFlag & PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed))
-				|| ((requestFlag & PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)))) {
+	NodeList openList(128);
+	NodeList closedList(128);
+	NodeMap nodeMap(256);
+
+	// Create start node
+	Game::WayPoint* startWP = Game::getWaypointAt(startIdx);
+	PathNode* startNode     = new PathNode(startIdx, nullptr, 0.0f, calculateHeuristic(startWP, Game::getWaypointAt(destIdx)));
+	openList.add(startNode);
+	nodeMap.put(startIdx, startNode);
+
+	while (openList.mSize > 0) {
+		PathNode* current = openList.findLowestFCost();
+
+		if (current->mWaypointIndex == destIdx) {
+			reconstructPath(current, outPath);
+			cleanup(openList, closedList);
+			return outPath.mLength;
+		}
+
+		openList.remove(current);
+		closedList.add(current);
+
+		// Process neighbors using WayPointIterator
+		Game::WayPoint* currentWP = Game::getWaypointAt(current->mWaypointIndex);
+		Game::WayPointIterator wpIter(currentWP, true); // true to consider both directions
+
+		CI_LOOP(wpIter)
+		{
+			s16 neighborIdx = *wpIter;
+
+			// Skip if in closed list
+			if (closedList.contains(neighborIdx)) {
 				continue;
 			}
-            f32 tentative_gScore = gScore[current] + neighborWP->mPosition.sqrDistance(getWaypoint(current)->mPosition);
-            if (tentative_gScore < gScore[neighbor]) {
-                cameFrom[neighbor] = current;
-                gScore[neighbor] = tentative_gScore;
-                fScore[neighbor] = tentative_gScore + heuristic(neighbor, endWpID);
-                if (!inTree[neighbor]) {
-                    openSet.insert(neighbor);
-                }
-            }
-        }
 
-        // I hate this too
-        if (requestFlag & PATHFLAG_TwoWayPathing == 0) {
-            continue;
-        }
-
-        for (u16 i = 0; i < getWaypoint(current)->mNumFromLinks; i++) {
-            
-            s16 neighbor = getWaypoint(current)->mFromLinks[i];
-
-            Game::WayPoint* neighborWP = getWaypoint(neighbor);
-            
-            if ((((requestFlag & PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) 
-				|| (!(requestFlag & PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water))
-				|| ((requestFlag & PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited))
-				|| ((neighborWP->mFlags & Game::WPF_Water) && (requestFlag & PATHFLAG_DisallowUnfinishedBridges) && (neighborWP->mFlags & Game::WPF_Bridge))
-				|| ((requestFlag & PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed))
-				|| ((requestFlag & PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)))) {
+			Game::WayPoint* neighborWP = Game::getWaypointAt(neighborIdx);
+			if (!neighborWP)
 				continue;
+
+			if (!(allowedFlags & Game::PATHFLAG_PathThroughWater) && (neighborWP->mFlags & Game::WPF_Water)) {
+				continue; // Skip water waypoints when water paths are disallowed
 			}
-            f32 tentative_gScore = gScore[current] + neighborWP->mPosition.sqrDistance(getWaypoint(current)->mPosition);
-            if (tentative_gScore < gScore[neighbor]) {
-                cameFrom[neighbor] = current;
-                gScore[neighbor] = tentative_gScore;
-                fScore[neighbor] = tentative_gScore + heuristic(neighbor, endWpID);
-                if (!inTree[neighbor]) {
-                    openSet.insert(neighbor);
-                }
-            }
-        }
-        
 
-    }
-    delete[] gScore;
-    delete[] fScore;
-    delete[] cameFrom;
-    delete[] inTree;
+			if ((neighborWP->mFlags & Game::WPF_Water) && (allowedFlags & Game::PATHFLAG_DisallowUnfinishedBridges)
+			    && (neighborWP->mFlags & Game::WPF_Bridge)) {
+				continue; // Skip unfinished bridges in water
+			}
 
-    return 0;
+			if ((allowedFlags & Game::PATHFLAG_DisallowVsRed) && (neighborWP->mFlags & Game::WPF_VersusRed)) {
+				continue; // Skip red versus waypoints when disallowed
+			}
+
+			if ((allowedFlags & Game::PATHFLAG_DisallowVsBlue) && (neighborWP->mFlags & Game::WPF_VersusBlue)) {
+				continue; // Skip blue versus waypoints when disallowed
+			}
+
+			// Is this waypoint on a slippery slope?
+			if (!isDesperate) {
+				// Check path restrictions
+				if ((allowedFlags & Game::PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) {
+					continue; // Skip closed waypoints when open is required
+				}
+
+				if ((allowedFlags & Game::PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited)) {
+					continue; // Skip unvisited waypoints when only allowing unvisited
+				}
+
+				// Leave the expensive till last
+				Game::CurrTriInfo triangleAtWp;
+				triangleAtWp.mPosition          = neighborWP->mPosition;
+				triangleAtWp.mGetTopPolygonInfo = false;
+				Game::mapMgr->getCurrTri(triangleAtWp);
+				if (!triangleAtWp.mTriangle || triangleAtWp.mTriangle->mCode.getSlipCode() != MapCode::Code::SlipCode_NoSlip) {
+					continue;
+				}
+			}
+
+			f32 newGCost           = current->mGroundCost + calculateHeuristic(currentWP, neighborWP);
+			PathNode* neighborNode = nodeMap.get(neighborIdx);
+
+			if (!neighborNode || newGCost < neighborNode->mGroundCost) {
+				f32 hCost = calculateHeuristic(neighborWP, Game::getWaypointAt(destIdx));
+
+				if (!neighborNode) {
+					neighborNode = new PathNode(neighborIdx, current, newGCost, hCost);
+					nodeMap.put(neighborIdx, neighborNode);
+					openList.add(neighborNode);
+				} else {
+					neighborNode->mParent        = current;
+					neighborNode->mGroundCost    = newGCost;
+					neighborNode->mHeuristicCost = hCost;
+					neighborNode->mFinalCost     = newGCost + hCost;
+				}
+			}
+		}
+	}
+
+	// No path found at all
+	outPath.allocate(0);
+	return 0;
 }
-
 } // namespace Drought

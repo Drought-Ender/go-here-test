@@ -58,7 +58,7 @@ struct MgrCommand : public CNode {
 	// _00     = VTBL
 	// _00-_18 = CNode
 	int mArgType;                               // _18
-	char* mScreenArgBufferPtr;                  // _1C
+	void* mScreenArgBufferPtr;                  // _1C
 	char mScreenArgBuffer[0x40];                // _20
 	og::Screen::DispMemberBase* mDispBufferPtr; // _60
 	char mDispBuffer[0x400];                    // _64
@@ -187,7 +187,7 @@ struct SceneBase {
 	inline Mgr* getScreenMgr() { return mScreenMgr; }
 
 	// _00 = VTBL
-	char mName[256];                                                   // _004
+	char mName[PATH_MAX];                                              // _004
 	Controller* mController;                                           // _104
 	Mgr* mScreenMgr;                                                   // _108
 	Delegate1<SceneBase, Resource::MgrCommand*> mUserCallbackDelegate; // _10C

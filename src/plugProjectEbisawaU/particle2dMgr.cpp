@@ -9,15 +9,16 @@
 #include "TParticle2dMgr.h"
 #include "nans.h"
 
-static const char idk[] = "\0\0\0\0\0\0\0\0\0";
 TParticle2dMgr* particle2dMgr;
 TParticle2dMgr* TParticle2dMgr::_instance;
+
+static void strippedFunc_1() { OSReport("\0\0\0\0\0\0\0\0\0\0\0"); }
 
 /**
  * @note Address: N/A
  * @note Size: 0xE4
  */
-void _Print(char* name, ...) { OSReport("particle2dMgr"); }
+static void _Print(char* name, ...) { OSReport("particle2dMgr"); }
 
 /**
  * @note Address: 0x803B9064
@@ -108,7 +109,7 @@ void TParticle2dMgr::createMgr(char* path, u32 u1, u32 u2, u32 u3)
 	backup->becomeCurrentHeap();
 
 	mResourceManager = new (mSolidHeap, 0) JPAResourceManager(file, mSolidHeap);
-	mActiveEmitter   = new (mSolidHeap, 0) JPAEmitterManager(a, b, mSolidHeap, 8, 2); // screaming shitting crying
+	mActiveEmitter   = new (mSolidHeap, 0) JPAEmitterManager(a, b, mSolidHeap, 8, 2);
 
 	mActiveEmitter->entryResourceManager(mResourceManager, 0);
 	mSolidHeap->adjustSize();
@@ -228,11 +229,11 @@ void TParticle2dMgr::setXfb(const ResTIMG*)
  * @note Address: 0x803B971C
  * @note Size: 0x4C
  */
-JPABaseEmitter* TParticle2dMgr::create(u16 p1, Vector2<f32>& p2, u8 p3, u8 p4)
+JPABaseEmitter* TParticle2dMgr::create(u16 id, Vector2<f32>& p2, u8 group, u8 resMgrId)
 {
 	JGeometry::TVec3f vec;
 	vec.set(p2.x, p2.y, 0.0f);
-	return mActiveEmitter->createSimpleEmitterID(vec, p1, p3, p4, nullptr, nullptr);
+	return mActiveEmitter->createSimpleEmitterID(vec, id, group, resMgrId, nullptr, nullptr);
 }
 
 /**
@@ -253,7 +254,7 @@ void TParticle2dMgr::kill(JPABaseEmitter* emitter)
 void TParticle2dMgr::fade(JPABaseEmitter* emitter)
 {
 	if (emitter) {
-		emitter->mFlags |= 1;
+		emitter->setFlag(JPAEMIT_StopEmitting);
 		emitter->mMaxFrame = 1;
 	}
 }
@@ -270,8 +271,7 @@ void TParticle2dMgr::killAll() { mActiveEmitter->forceDeleteAllEmitter(); }
  */
 void TParticle2dMgr::killGroup(u8 p1) { mActiveEmitter->forceDeleteGroupEmitter((int)p1); }
 
-static const char* dummy = "IP2_dummy";
-
+static void strippedFunc_2() { OSReport("IP2_dummy"); }
 /**
  * @note Address: N/A
  * @note Size: 0x4

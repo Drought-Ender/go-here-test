@@ -451,9 +451,22 @@ struct ActBridgeArg : public ActionArg {
 	Game::ItemBridge::Item* mBridge; // _04
 };
 
-#define PIKIAI_BRIDGE_DEFAULT     0
-#define PIKIAI_BRIDGE_GOTOPOS     1
-#define PIKIAI_BRIDGE_STICKATTACK 2
+/**
+ * @brief The ActBridgeState struct represents the different states of a bridge-related action for a Piki AI.
+ */
+struct ActBridgeState {
+	enum State {
+		GoToPosition  = 0, /**< The AI is moving directly towards the bridge. */
+		FollowTowards = 1, /**< The AI is following a vector field towards the bridge. */
+		StickAttack   = 2, /**< The AI is attacking the bridge. */
+	};
+
+	enum CollisionPartType {
+		NoCollisionPart = 0, /**< No collision part. */
+		Breakable       = 1, /**< The bridge is breakable. */
+		Other           = 2, /**< Another part of the bridge. */
+	};
+};
 
 struct ActBridge : public Action, virtual SysShape::MotionListener {
 	ActBridge(Game::Piki* p);
@@ -617,8 +630,8 @@ struct ActEnter : public Action, virtual SysShape::MotionListener {
 	f32 mHorizSuckDist;    // _48, distance left to travel before entering ship, XZ
 	u8 mInsideOnyon;       // _4C
 	Vector3f mSuckPos;     // _50, current suck position
-	f32 mBaseScale;        // _54
-	                       // _58 = MotionListener
+	f32 mBaseScale;        // _5C
+	                       // _60 = MotionListener
 };
 
 struct ActExit : public Action {
@@ -733,21 +746,32 @@ struct ActFollowVectorField : public Action {
 struct ActFormationInitArg : public CreatureActionArg {
 	inline ActFormationInitArg(Game::Creature* navi, bool b1)
 	    : CreatureActionArg(navi)
-	    , _08(b1)
+	    , mIsDemoFollow(b1)
+	    , mDoUseTouchCooldown(false)
 	{
 	}
 
-	inline ActFormationInitArg(Game::Creature* navi)
+	inline ActFormationInitArg(Game::FakePiki* navi)
 	    : CreatureActionArg(navi)
-	    , _08(false)
-	    , _09(0)
+	    , mIsDemoFollow(false)
+	    , mDoUseTouchCooldown(false)
+	{
+	}
+
+	/*
+	used to match ActFormation::ActFormation(Game::Piki*)
+	if unnecessary, change the above inline back to Game::Creature* for the argument
+	*/
+	inline ActFormationInitArg(Game::Creature* navi) // used to match ActFormation::ActFormation(Game::Piki*)
+	    : CreatureActionArg(navi)
+	    , mIsDemoFollow(false)
 	{
 	}
 
 	// _00     = VTBL
 	// _00-_08 = CreatureActionArg, Creature* = Navi*
-	bool _08; // _08
-	u8 _09;   // _09
+	bool mIsDemoFollow;       // _08, dont check if the piki is too far away? true for dayend/geyser demo
+	bool mDoUseTouchCooldown; // _09, if true, pikmin cant be c-sticked into things for 45 frames upon joining
 };
 
 #define FORMATION_SORT_NONE    (0)
@@ -782,8 +806,8 @@ struct ActFormation : public Action, virtual Game::SlotChangeListener, virtual S
 	u16 mDistanceType;             // _2A
 	u16 mOldDistanceType;          // _2C
 	u16 mDistanceCounter;          // _2E
-	u8 _30;                        // _30
-	u8 _31;                        // _31
+	u8 mHasReleasedSlot;           // _30
+	u8 mUnusedVal;                 // _31
 	int mSlotID;                   // _34
 	u8 mTouchingNaviCooldownTimer; // _38
 	Game::Footmark* mFootmark;     // _3C
@@ -791,12 +815,12 @@ struct ActFormation : public Action, virtual Game::SlotChangeListener, virtual S
 	int mFrameTimer;               // _44
 	int mFootmarkFlags;            // _48
 	int mAnimationTimer;           // _4C
-	f32 _50;                       // _50
+	f32 mTripCheckMoveDist;        // _50, how much the piki has moved since the last trip
 	u8 mIsAnimating;               // _54
 	f32 mLostPikiTimer;            // _58, timer?
 	Game::CPlate* mCPlate;         // _5C
-	bool _60;                      // _60
-	bool _61;                      // _61
+	bool mHasLostNumbness;         // _60, thats what the parameter calls it
+	bool mHadNumbnessLastFrame;    // _61, what the above value was previously
 	                               // _64 = SlotChangeListener
 	                               // _6C = MotionListener
 };
@@ -1031,8 +1055,8 @@ struct ActPathMove : public Action {
 	Vector3f mGoalPosition;             // _24
 	Game::Pellet* mPellet;              // _30
 	Game::Onyon* mOnyon;                // _34
-	f32 _38;                            // _38, unused??
-	u8 _3C;                             // _3C, unused??
+	f32 mUnusedSlotId;                  // _38, unused??
+	u8 mUnusedPathFlag;                 // _3C, unused??
 	u8 mVsWayPointCounter;              // _3D, something to do with vs mode
 	int mPathFindCounter;               // _40, how many frames have we been pathfinding for?
 	Game::PathNode* mStartNode;         // _44
@@ -1241,7 +1265,7 @@ struct ActTeki : public Action, virtual SysShape::MotionListener {
 	// _00-_0C = Action
 	// _0C-_10 = MotionListener*
 	Game::EnemyBase* mFollowingTeki;  // _10
-	bool mToPanicFinish;              // _14
+	bool mIsLeafChappy;               // _14
 	bool mToEmote;                    // _15
 	Game::Footmark* mTargetFootprint; // _18
 	s32 mUnused0;                     // _1C
@@ -1265,8 +1289,8 @@ struct ActTransportArg : public ActionArg {
 	// _00 = VTBL
 	Game::Pellet* mPellet; // _04
 	Game::Onyon* mGoal;    // _08
-	Vector3f _0C;          // _0C
-	s16 _18;               // _18, slot maybe?
+	Vector3f mUnusedPos;   // _0C
+	s16 mUnusedSlotVal;    // _18, slot maybe?
 };
 
 struct ActTransport : public Action, virtual SysShape::MotionListener {

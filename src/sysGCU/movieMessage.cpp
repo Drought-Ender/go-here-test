@@ -49,12 +49,12 @@ void WindowPane::update()
 		if (mTimer > mMaxTime) {
 			mTimer = mMaxTime;
 			if (mCurrPosition.length() < 10.0f) {
-				mState = 2;
+				mState = WINDOWPANE_2;
 			}
 		}
 		mCurrAngle = (mTimer / mMaxTime) * 180.0f + 90.0f;
 		break;
-	case 3:
+	case WINDOWPANE_Finish:
 		mTimer += sys->mDeltaTime;
 		if (mTimer > mMaxTime) {
 			mState = WINDOWPANE_4;
@@ -69,17 +69,16 @@ void WindowPane::update()
 /**
  * @note Address: 0x804350E0
  * @note Size: 0x278
+ * TODO: match!!!
  */
 void WindowPane::moveWindow(bool flag)
 {
-	f32 angle = DEG2RAD;
-	angle *= mCurrAngle;
-	// f32 radAngle = mCurrAngle * DEG2RAD;
-	angle        = PI * angle;
-	Vector3f vec = mInitialPosition;
-	vec.x += 500.0f;
+	f32 xoff = 500.0f;
+	Vector2f startPosition(mInitialPosition.x + xoff, mInitialPosition.y);
+	f32 angleRadians = TORADIANS(mCurrAngle);
 
-	Vector3f offset = Vector3f(sinf(angle) * 500.0f + vec.x, cosf(angle) * 500.0f + vec.y, 0.0f);
+	Vector3f offset = Vector3f(sinf(angleRadians) * 500.0f + startPosition.x, cosf(angleRadians) * 500.0f + startPosition.y, 0.0f);
+
 	if (flag) {
 		mNewPosition  = offset;
 		mCurrPosition = Vector3f(0.0f);
@@ -90,183 +89,15 @@ void WindowPane::moveWindow(bool flag)
 		mCurrPosition *= 0.72f;
 		mNewPosition += mCurrPosition;
 	}
+
 	mPane->setOffset(mNewPosition.x, mNewPosition.y);
-	f32 newangle = JMath::atanTable_.atan2_(mNewPosition.x - vec.x, mNewPosition.y - vec.y);
+
+	f32 newangle = JMAAtan2Radian(mNewPosition.x - startPosition.x, mNewPosition.y - startPosition.y);
 	f32 scale    = roundAng(mCurrAngle);
 	f64 newScale = fabs((scale - 270.0f) / 180.f);
 	scale        = (f32)newScale + 1.0f;
-	mPane->setAngle(newangle * 57.295776f + 90.0f);
+	mPane->setAngle(newangle * RAD2DEG + 90.0f);
 	mPane->updateScale(scale);
-	/*
-	stwu     r1, -0x50(r1)
-	mflr     r0
-	stw      r0, 0x54(r1)
-	stfd     f31, 0x40(r1)
-	psq_st   f31, 72(r1), 0, qr0
-	stfd     f30, 0x30(r1)
-	psq_st   f30, 56(r1), 0, qr0
-	stw      r31, 0x2c(r1)
-	mr       r31, r3
-	lfs      f1, lbl_805207D4@sda21(r2)
-	lfs      f0, 0x34(r3)
-	lfs      f2, lbl_805207D0@sda21(r2)
-	fmuls    f1, f1, f0
-	lfs      f4, 0x28(r3)
-	lfs      f3, lbl_805207CC@sda21(r2)
-	lfs      f0, lbl_805207B8@sda21(r2)
-	fmuls    f5, f2, f1
-	lfs      f30, 0x2c(r3)
-	fadds    f31, f4, f3
-	fmr      f1, f5
-	fcmpo    cr0, f5, f0
-	bge      lbl_8043513C
-	fneg     f1, f5
-
-lbl_8043513C:
-	lfs      f2, lbl_805207D8@sda21(r2)
-	lis      r3, sincosTable___5JMath@ha
-	lfs      f0, lbl_805207B8@sda21(r2)
-	addi     r5, r3, sincosTable___5JMath@l
-	fmuls    f1, f1, f2
-	lfs      f3, lbl_805207CC@sda21(r2)
-	fcmpo    cr0, f5, f0
-	fctiwz   f0, f1
-	stfd     f0, 8(r1)
-	lwz      r0, 0xc(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	add      r3, r5, r0
-	lfs      f0, 4(r3)
-	fmadds   f4, f3, f0, f30
-	bge      lbl_8043519C
-	lfs      f0, lbl_805207DC@sda21(r2)
-	fmuls    f0, f5, f0
-	fctiwz   f0, f0
-	stfd     f0, 0x10(r1)
-	lwz      r0, 0x14(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	lfsx     f0, r5, r0
-	fneg     f0, f0
-	b        lbl_804351B4
-
-lbl_8043519C:
-	fmuls    f0, f5, f2
-	fctiwz   f0, f0
-	stfd     f0, 0x18(r1)
-	lwz      r0, 0x1c(r1)
-	rlwinm   r0, r0, 3, 0x12, 0x1c
-	lfsx     f0, r5, r0
-
-lbl_804351B4:
-	clrlwi.  r0, r4, 0x18
-	fmadds   f2, f3, f0, f31
-	beq      lbl_804351E0
-	stfs     f2, 0x38(r31)
-	lfs      f0, lbl_805207B8@sda21(r2)
-	stfs     f4, 0x3c(r31)
-	stfs     f0, 0x40(r31)
-	stfs     f0, 0x44(r31)
-	stfs     f0, 0x48(r31)
-	stfs     f0, 0x4c(r31)
-	b        lbl_80435288
-
-lbl_804351E0:
-	lfs      f1, 0x38(r31)
-	lfs      f0, 0x3c(r31)
-	fsubs    f5, f2, f1
-	lfs      f2, lbl_805207E0@sda21(r2)
-	fsubs    f6, f4, f0
-	lfs      f0, 0x44(r31)
-	lfs      f3, 0x40(r31)
-	fmuls    f5, f5, f2
-	lfs      f4, lbl_805207B8@sda21(r2)
-	fmuls    f6, f6, f2
-	lfs      f1, lbl_805207E4@sda21(r2)
-	fadds    f0, f0, f5
-	fsubs    f3, f4, f3
-	stfs     f0, 0x44(r31)
-	fmuls    f3, f3, f2
-	lfs      f0, 0x48(r31)
-	fadds    f0, f0, f6
-	stfs     f0, 0x48(r31)
-	lfs      f0, 0x4c(r31)
-	fadds    f0, f0, f3
-	stfs     f0, 0x4c(r31)
-	lfs      f0, 0x44(r31)
-	fmuls    f0, f0, f1
-	stfs     f0, 0x44(r31)
-	lfs      f0, 0x48(r31)
-	fmuls    f0, f0, f1
-	stfs     f0, 0x48(r31)
-	lfs      f0, 0x4c(r31)
-	fmuls    f0, f0, f1
-	stfs     f0, 0x4c(r31)
-	lfs      f1, 0x38(r31)
-	lfs      f0, 0x44(r31)
-	fadds    f0, f1, f0
-	stfs     f0, 0x38(r31)
-	lfs      f1, 0x3c(r31)
-	lfs      f0, 0x48(r31)
-	fadds    f0, f1, f0
-	stfs     f0, 0x3c(r31)
-	lfs      f1, 0x40(r31)
-	lfs      f0, 0x4c(r31)
-	fadds    f0, f1, f0
-	stfs     f0, 0x40(r31)
-
-lbl_80435288:
-	lwz      r3, 0x18(r31)
-	lfs      f1, 0x3c(r31)
-	lfs      f0, 0x38(r31)
-	stfs     f0, 0xd4(r3)
-	stfs     f1, 0xd8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 0x38(r31)
-	lis      r3, atanTable___5JMath@ha
-	lfs      f0, 0x3c(r31)
-	addi     r3, r3, atanTable___5JMath@l
-	fsubs    f1, f1, f31
-	fsubs    f2, f0, f30
-	bl       "atan2___Q25JMath18TAtanTable<1024,f>CFff"
-	fmr      f30, f1
-	lfs      f1, 0x34(r31)
-	bl       roundAng__Ff
-	lfs      f0, lbl_805207E8@sda21(r2)
-	lfs      f2, lbl_805207C4@sda21(r2)
-	fsubs    f3, f1, f0
-	lfs      f1, lbl_805207EC@sda21(r2)
-	lfs      f0, lbl_805207C0@sda21(r2)
-	lwz      r3, 0x18(r31)
-	fdivs    f3, f3, f2
-	lfs      f2, lbl_805207C8@sda21(r2)
-	fmadds   f0, f1, f30, f0
-	fabs     f1, f3
-	stfs     f0, 0xc0(r3)
-	frsp     f0, f1
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	fadds    f30, f2, f0
-	mtctr    r12
-	bctrl
-	lwz      r3, 0x18(r31)
-	stfs     f30, 0xcc(r3)
-	stfs     f30, 0xd0(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	psq_l    f31, 72(r1), 0, qr0
-	lfd      f31, 0x40(r1)
-	psq_l    f30, 56(r1), 0, qr0
-	lfd      f30, 0x30(r1)
-	lwz      r0, 0x54(r1)
-	lwz      r31, 0x2c(r1)
-	mtlr     r0
-	addi     r1, r1, 0x50
-	blr
-	*/
 }
 
 /**
@@ -302,10 +133,10 @@ void WindowPane::close(f32 duration)
  */
 AbtnPane::AbtnPane(u8 state)
 {
-	mState  = state;
-	mTimer1 = 0.0f;
-	mTimer2 = 0.0f;
-	mTimer1 = -0.0f;
+	mState       = state;
+	mAnimAlpha   = 0.0f;
+	mAppearAlpha = 0.0f;
+	mAnimAlpha   = -0.0f;
 }
 
 /**
@@ -326,31 +157,31 @@ void AbtnPane::doInit()
 void AbtnPane::update()
 {
 	f32 one   = 1.0f;
-	f32 alpha = (mTimer1 * TAU) / one;
+	f32 alpha = (mAnimAlpha * TAU) / one;
 	alpha     = cosf(alpha);
 	alpha     = (1.0f - alpha) * 0.5f;
 	switch (mState) {
 	case 0:
-		mTimer2 += -(sys->mDeltaTime * 2.0f);
-		if (mTimer2 < 0.0f) {
-			mTimer2 = 0.0f;
+		mAppearAlpha += -(sys->mDeltaTime * 2.0f);
+		if (mAppearAlpha < 0.0f) {
+			mAppearAlpha = 0.0f;
 		}
 		break;
 	case 1:
-		mTimer2 += sys->mDeltaTime * 2.0f;
-		if (mTimer2 > 1.0f) {
-			mTimer2 = 1.0f;
+		mAppearAlpha += sys->mDeltaTime * 2.0f;
+		if (mAppearAlpha > 1.0f) {
+			mAppearAlpha = 1.0f;
 		}
 		break;
 	}
 
-	mTimer1 += sys->mDeltaTime;
-	if (mTimer1 > 1.0f) {
-		mTimer1 = 0.0f;
+	mAnimAlpha += sys->mDeltaTime;
+	if (mAnimAlpha > 1.0f) {
+		mAnimAlpha = 0.0f;
 	}
 
 	J2DPane* pane = mPane;
-	alpha         = alpha * 255.0f * mTimer2;
+	alpha         = alpha * 255.0f * mAppearAlpha;
 	pane->setAlphaFromFloat(alpha);
 }
 
@@ -359,16 +190,19 @@ void AbtnPane::update()
  * @note Size: 0xCC
  */
 PodIconScreen::PodIconScreen()
+    : mState(-1)
+    , mAnmColor(nullptr)
+    , mAnmColorTimer(0.0f)
+    , mAnmTrans(nullptr)
+    , mAnmTransTimer(0.0f)
+    , mAnmTexPattern(nullptr)
+    , mAnmTexPatternTimer(0.0f)
 {
-	mState              = -1;
-	mAnmColor           = nullptr;
-	mAnmColorTimer      = 0.0f;
-	mAnmTrans           = nullptr;
-	mAnmTransTimer      = 0.0f;
-	mAnmTexPattern      = nullptr;
-	mAnmTexPatternTimer = 0.0f;
+	u16 y = sys->getRenderModeHeight();
+	u16 x = sys->getRenderModeWidth();
+	mInitialPos.set(x * 0.75f, y, 100.0f);
 	reset();
-	disappear();
+	hide();
 }
 
 /**
@@ -377,7 +211,7 @@ PodIconScreen::PodIconScreen()
  */
 void PodIconScreen::setTrans()
 {
-	if (Game::playData->mStoryFlags & Game::STORY_DebtPaid) {
+	if (Game::playData->isStoryFlag(Game::STORY_DebtPaid)) {
 		setXY(mInitialPos.x - 250.0f, mInitialPos.y - 25.0f);
 	} else {
 		setXY(mInitialPos.x - 250.0f, mInitialPos.y - 10.0f);
@@ -390,9 +224,10 @@ void PodIconScreen::setTrans()
  */
 void PodIconScreen::reset()
 {
-	u16 y       = sys->getRenderModeObj()->efbHeight;
-	u16 x       = sys->getRenderModeObj()->fbWidth;
-	mInitialPos = Vector3f(x * 0.75f, y, 100.0f);
+	mMomentum.set(1.0f, randFloat(), 0.0f);
+	mMomentum.normalise(); // Needs to be here, but we are reaching limits of inline complexity
+	mPosition.set(0.0f, 0.0f, 0.0f);
+	setTrans();
 }
 
 /**
@@ -431,27 +266,27 @@ void PodIconScreen::update()
 {
 	if (mState != -1) {
 		mAnmTexPatternTimer += 1.0f;
-		if (mAnmTexPatternTimer >= mAnmTexPattern->mFrameLength) {
-			mAnmTexPatternTimer -= mAnmTexPattern->mFrameLength;
+		if (mAnmTexPatternTimer >= mAnmTexPattern->getFrameMax()) {
+			mAnmTexPatternTimer -= mAnmTexPattern->getFrameMax();
 		}
-		mAnmTexPattern->mCurrentFrame = mAnmTexPatternTimer;
+		mAnmTexPattern->setFrame(mAnmTexPatternTimer);
 
 		mAnmTransTimer += 1.0f;
-		if (mAnmTransTimer >= mAnmTrans->mFrameLength) {
-			mAnmTransTimer -= mAnmTrans->mFrameLength;
+		if (mAnmTransTimer >= mAnmTrans->getFrameMax()) {
+			mAnmTransTimer -= mAnmTrans->getFrameMax();
 		}
-		mAnmTrans->mCurrentFrame = mAnmTransTimer;
+		mAnmTrans->setFrame(mAnmTransTimer);
 
 		mAnmColorTimer += 1.0f;
-		if (mAnmColorTimer >= mAnmColor->mFrameLength) {
-			mAnmColorTimer -= mAnmColor->mFrameLength;
+		if (mAnmColorTimer >= mAnmColor->getFrameMax()) {
+			mAnmColorTimer -= mAnmColor->getFrameMax();
 		}
-		mAnmColor->mCurrentFrame = mAnmColorTimer;
+		mAnmColor->setFrame(mAnmColorTimer);
 
 		animation();
 
 		Vector3f diff = mPosition - mInitialPos;
-		f32 length    = _length(diff);
+		f32 length    = diff.length();
 
 		if (length > 1.0E-4f) {
 			f32 norm = 1.0f / length;
@@ -836,21 +671,14 @@ void MessageWindowScreen::set(JKRArchive* arc)
  * @note Size: 0x80
  */
 TControl::TControl()
+    : mMessageWindow(nullptr)
+    , mPodIcon(nullptr)
+    , mPaneMgDemo(nullptr)
+    , mIsActive(false)
+    , mModeFlag(MODEFLAG_Inactive)
 {
-	mMessageWindow      = nullptr;
-	mPodIcon            = nullptr;
-	mPaneMgDemo         = nullptr;
-	mIsActive           = false;
-	mModeFlag           = MODEFLAG_Inactive;
-	mFlags.bytesView[0] = 0;
-	mFlags.bytesView[1] = 0;
-	mFlags.bytesView[2] = 0;
-	mFlags.bytesView[3] = 0;
-	mFlags.bytesView[0] = 0;
-	mFlags.bytesView[1] = 0;
-	mFlags.bytesView[2] = 0;
-	mFlags.bytesView[3] = 0;
-	mFlags.dwordView |= 1;
+	mFlags.clear();
+	mFlags.set(ControlFlag_UnsuspendOnFinish);
 }
 
 /**
@@ -881,7 +709,7 @@ bool TControl::onInit()
 	sys->heapStatusStart("podIcon", nullptr);
 
 	char* path = "new_screen/cmn/pod_for_message_window.szs";
-	if (Game::playData->mStoryFlags & Game::STORY_DebtPaid) {
+	if (Game::playData->isStoryFlag(Game::STORY_DebtPaid)) {
 		path = "new_screen/cmn/gold_pod_for_message_window.szs";
 	}
 	arc = JKRMountArchive(path, JKRArchive::EMM_Mem, nullptr, JKRArchive::EMD_Head);
@@ -895,10 +723,10 @@ bool TControl::onInit()
 	sys->heapStatusEnd("podIcon");
 	sys->heapStatusEnd("PMT_onInit_arc");
 	sys->heapStatusStart("PMT_onInit_initRenderingProcessor", nullptr);
-	initRenderingProcessor(0x400);
+	initRenderingProcessor(1024); // max 1024 characters can be animated at once
 	sys->heapStatusEnd("PMT_onInit_initRenderingProcessor");
 	sys->heapStatusEnd("P2JME::Movie::TControl::onInit");
-	// return 1;
+	return 1;
 	/*
 	stwu     r1, -0x40(r1)
 	mflr     r0
@@ -1469,31 +1297,31 @@ TControl::EModeFlag TControl::setMode(EModeFlag mode)
 	case MODEFLAG_Inactive:
 		mIsActive = false;
 		mMessageWindow->mWindowPane->mPane->hide();
-		mSequenceProc->mFlags.set(1);
+		mSequenceProc->setFlag(TSequenceProcessor::SeqProc_IsActive);
 		break;
 	case MODEFLAG_Start:
 		PSSystem::spSysIF->playSystemSe(PSSE_MP_SHIP_CALLING_01, 0);
 		mMessageWindow->open(0.5f);
 		mPodIcon->appear();
-		mSequenceProc->mFlags.set(1);
+		mSequenceProc->setFlag(TSequenceProcessor::SeqProc_IsActive);
 		break;
 	case MODEFLAG_Writing:
-		mSequenceProc->mFlags.unset(1);
+		mSequenceProc->resetFlag(TSequenceProcessor::SeqProc_IsActive);
 		break;
 	case MODEFLAG_Finish:
 		PSSystem::spSysIF->playSystemSe(PSSE_MP_SHIP_PERIOD_01, 0);
-		WindowPane* windowPane        = mMessageWindow->mWindowPane;
-		windowPane->mPane->mIsVisible = true;
-		windowPane->mState            = 3;
-		windowPane->mTimer            = 0.0f;
-		windowPane->mMaxTime          = 0.5f;
-		PodIconScreen* podIconScreen  = mPodIcon;
-		if ((rand() * 2.0)) {
+		WindowPane* windowPane = mMessageWindow->mWindowPane;
+		windowPane->mPane->show();
+		windowPane->mState           = 3;
+		windowPane->mTimer           = 0.0f;
+		windowPane->mMaxTime         = 0.5f;
+		PodIconScreen* podIconScreen = mPodIcon;
+		if ((randFloat() * 2.0f)) {
 			_GXRenderModeObj* renderObj = System::getRenderModeObj();
 			u16 efbHeight               = renderObj->efbHeight;
 			renderObj                   = System::getRenderModeObj();
 			u16 fbWidth                 = renderObj->fbWidth;
-			podIconScreen->mPosition.x  = (rand() * 0.5f + 0.3f) * fbWidth;
+			podIconScreen->mPosition.x  = (randFloat() * 0.5f + 0.3f) * fbWidth;
 			podIconScreen->mPosition.y  = efbHeight * 0.65f;
 			podIconScreen->mPosition.z  = 100.0f;
 		} else {
@@ -1501,11 +1329,11 @@ TControl::EModeFlag TControl::setMode(EModeFlag mode)
 			u16 efbHeight               = renderObj->efbHeight;
 			renderObj                   = System::getRenderModeObj();
 			u16 fbWidth                 = renderObj->fbWidth;
-			podIconScreen->mPosition.x  = (rand() * 0.5f + 0.3f) * fbWidth;
+			podIconScreen->mPosition.x  = (randFloat() * 0.5f + 0.3f) * fbWidth;
 			podIconScreen->mPosition.y  = efbHeight * 1.25f;
 			podIconScreen->mPosition.z  = 100.0f;
 		}
-		podIconScreen->mMomentum.x = rand() * 0.5f + 0.5f;
+		podIconScreen->mMomentum.x = randFloat() * 0.5f + 0.5f;
 		podIconScreen->mMomentum.y = rand();
 		podIconScreen->mMomentum.z = 0.0f;
 		podIconScreen->mMomentum.normalise();
@@ -1877,7 +1705,7 @@ void MessageWindowScreen::open(f32 duration) { mWindowPane->open(duration); }
 bool TControl::update(Controller* pad1, Controller* pad2)
 {
 	bool ret = Window::TControl::update(pad1, pad2); // matching bs when this is bool
-	if (mFlags.dwordView & 1 && Game::moviePlayer && (Game::moviePlayer->mFlags.isSet(2))) {
+	if (mFlags.isSet(ControlFlag_UnsuspendOnFinish) && Game::moviePlayer && Game::moviePlayer->isFlag(Game::MVP_IsFinished)) {
 		if (mIsActive) {
 			reset();
 			Game::moviePlayer->unsuspend(1, false);
@@ -1909,20 +1737,20 @@ bool TControl::update(Controller* pad1, Controller* pad2)
 			}
 			break;
 		case MODEFLAG_Writing:
-			if (mStatus.typeView & 2) {
+			if (mStatus.isSet(2)) {
 				setMode(MODEFLAG_Finish);
 			}
 			break;
 		case MODEFLAG_Finish:
 			if (mMessageWindow->mWindowPane->mState == 4 && mPodIcon->mState == 3) {
 				reset();
-				if ((mFlags.dwordView & 1) && Game::moviePlayer) {
+				if (mFlags.isSet(ControlFlag_UnsuspendOnFinish) && Game::moviePlayer) {
 					Game::moviePlayer->unsuspend(1, true);
 				}
 			}
 		}
 
-		if (mSequenceProc->mFlags.isSet(2)) { // done writing, can press A
+		if (mSequenceProc->isFlag(TSequenceProcessor::SeqProc_IsWaitingPressA)) { // done writing, can press A
 			MessageWindowScreen* window = mMessageWindow;
 			window->mAButton->mState    = 1;
 			window->mArrowPane->mState  = 1;

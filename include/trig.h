@@ -16,9 +16,9 @@ inline int GetTableIdxPos(f32 x) { return x *= 325.9493f; }
 inline f32 sinf(f32 x)
 {
 	if (x < 0.0f) {
-		return -JMath::sincosTable_.mTable[(int)(x *= -325.9493f) & 0x7ffU].first;
+		return -JMath::sincosTable_.mTable[GetTableIdxNeg(x) & 0x7ffU].first;
 	}
-	return JMath::sincosTable_.mTable[(int)(x *= 325.9493f) & 0x7ffU].first;
+	return JMath::sincosTable_.mTable[GetTableIdxPos(x) & 0x7ffU].first;
 }
 
 inline f32 sinfc(const f32 x)
@@ -73,15 +73,13 @@ inline f32 angXZ(f32 x, f32 z, Vector3f& vec)
 	return roundAng(JMAAtan2Radian(x - pos.x, z - pos.z));
 }
 
-inline f32 _angXZ(f32 x1, f32 z1, f32 x2, f32 z2) { return roundAng(JMAAtan2Radian(x1 - x2, z1 - z2)); }
-
-inline f32 altSin(f32 x)
+inline f32 _angXZ(f32 x1, f32 z1, f32 x2, f32 z2)
 {
-	if (x < 0.0f) {
-		return -JMath::sincosTable_.mTable[GetTableIdxNeg(x) & 0x7ffU].first;
-	}
-	return JMath::sincosTable_.mTable[GetTableIdxPos(x) & 0x7ffU].first;
+	f32 angle = JMAAtan2Radian(x1 - x2, z1 - z2);
+	return roundAng(angle);
 }
+
+inline f32 angXZ(f32 x, f32 z) { return roundAng(JMAAtan2Radian(x, z)); }
 
 inline f32 absF(f32 val)
 {
@@ -89,7 +87,7 @@ inline f32 absF(f32 val)
 	return (f32)newVal;
 }
 
-inline f32 scaledSin(f32 theta) { return altSin(theta * TAU); }
+inline f32 scaledSin(f32 theta) { return sinf(theta * TAU); }
 
 inline f32 absVal(f32 val) { return (val > 0.0f) ? val : -val; }
 
@@ -104,6 +102,55 @@ inline f32 adjustVal(f32 y, f32 x, f32 delta)
 	return (diff < delta) ? x : (y < x) ? y + delta : y - delta;
 }
 
+inline f32 adjustVal(f32& diff, f32 y, f32 x, f32 delta)
+{
+	diff = absVal(y - x);
+
+	return (diff < delta) ? x : (y < x) ? y + delta : y - delta;
+}
+
+inline f32 _normaliseAngle(f32 angle)
+{
+	f32 normalisedAngle = 0.0f;
+	if (normalisedAngle >= angle) {
+		f32 delta = normalisedAngle - angle;
+		if (TAU - delta < delta) {
+			normalisedAngle -= TAU;
+		}
+	} else {
+		f32 delta = angle - normalisedAngle;
+		if (TAU - delta < delta) {
+			normalisedAngle += TAU;
+		}
+	}
+
+	return normalisedAngle;
+}
+
+inline f32 _normaliseAngle(f32 angle, f32 start)
+{
+	f32 normalisedAngle = start;
+	if (normalisedAngle >= angle) {
+		f32 delta = normalisedAngle - angle;
+		if (TAU - delta < delta) {
+			normalisedAngle -= TAU;
+		}
+	} else {
+		f32 delta = angle - normalisedAngle;
+		if (TAU - delta < delta) {
+			normalisedAngle += TAU;
+		}
+	}
+
+	return normalisedAngle;
+}
+
+inline f32 _clampAngle(f32 angle, f32 difference, f32 limit)
+{
+	f32 angDistance = absVal(angle - difference);
+	return angDistance < limit ? difference : (angle < difference) ? angle + limit : angle - limit;
+}
+
 inline int adjustValInt(int current, int dest, const int delta)
 {
 	return (absVal(current - dest) < delta) ? dest : (current < dest ? current += delta : current -= delta);
@@ -115,10 +162,21 @@ inline Vector3f getRotation(f32 angle) { return Vector3f(-sinf(angle), 0.0f, cos
 
 inline f32 clamp(f32 val, f32 limit)
 {
-	// f64 abs = fabs(val);
 	if (absF(val) > limit) {
 		val = (val > 0.0f) ? limit : -limit;
 	}
+
+	return val;
+}
+
+inline f32 clamp(f32 val, f32 min, f32 max)
+{
+	if (val < min) {
+		val = min;
+	} else if (val > max) {
+		val = max;
+	}
+
 	return val;
 }
 

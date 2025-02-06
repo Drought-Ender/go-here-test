@@ -1,9 +1,9 @@
 JSTUDIO_JSTAGE_FILES:=\
-	$(BUILD_DIR)/asm/JSystem/JStudio_JStage/object-light.o\
+	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object-light.o\
 	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object.o\
-	$(BUILD_DIR)/asm/JSystem/JStudio_JStage/object-actor.o\
+	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object-actor.o\
 	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object-ambientlight.o\
-	$(BUILD_DIR)/asm/JSystem/JStudio_JStage/object-camera.o\
+	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object-camera.o\
 	$(BUILD_DIR)/src/JSystem/JStudio_JStage/object-fog.o\
 	$(BUILD_DIR)/src/JSystem/JStudio_JStage/control.o\
 

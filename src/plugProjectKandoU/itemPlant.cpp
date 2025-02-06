@@ -1471,7 +1471,7 @@ void Plant::onInit(CreatureInitArg* initArg)
 	_254           = 0;
 	mBlendStepTime = 0.0f;
 
-	mBlendAnimator.setModelCalc(mModel);
+	mBlendAnimator.setModelCalc(mModel, 0);
 
 	Matrixf mtx;
 	PSMTXIdentity(mtx.mMatrix.mtxView);
@@ -2041,7 +2041,7 @@ void Plant::doAI()
 {
 	mFsm->exec(this);
 
-	if (gameSystem->isFlag(GAMESYS_IsPlaying) && gameSystem->isFlag(GAMESYS_IsSoundFXActive)) {
+	if (gameSystem->isFlag(GAMESYS_IsPlaying) && gameSystem->isFlag(GAMESYS_IsSoundSceneActive)) {
 		if (mGrowState != PLANTGROW_Mold) {
 			// if no mold, add "near spiderwort" sound mix
 			static_cast<PSM::Tsuyukusa*>(mSoundObj)->noukouFrameWork(true);
@@ -2108,7 +2108,7 @@ void Plant::startMotion(int motionState)
 
 		startColorMotion(PLANTCOLOR_Disappear);
 
-		if (gameSystem->isFlag(GAMESYS_IsSoundFXActive)) {
+		if (gameSystem->isFlag(GAMESYS_IsSoundSceneActive)) {
 			mSoundObj->startSound(PSSE_EV_TSUYUKUSA_WITHER, 0);
 		}
 		break;
@@ -2162,7 +2162,7 @@ void Plant::doAnimation()
 	mFruits->update();
 	SysShape::BlendQuadraticFunc quadFunc;
 	mBlendAnimator.animate(&quadFunc, 30.0f * sys->mDeltaTime, mAnimSpeed * sys->mDeltaTime, mBlendStepTime * sys->mDeltaTime);
-	mBlendAnimator.setModelCalc(mModel);
+	mBlendAnimator.setModelCalc(mModel, 0);
 
 	if (mModel) {
 		PSMTXCopy(mBaseTrMatrix.mMatrix.mtxView, mModel->mJ3dModel->mPosMtx);
@@ -2266,7 +2266,7 @@ bool Plant::interactEat(InteractEat& eat)
 
 	if (slot) {
 		Pellet* fruit = slot->mFruit;
-		if (fruit->getKind() == PELTYPE_BERRY) {
+		if (fruit->getKind() == PelletType::Berry) {
 			Vector3f fruitPos = fruit->getPosition();
 			efx::Arg fxArg(fruitPos);
 			if (fruit->mPelletColor == PELCOLOR_SPICY) {
@@ -2306,12 +2306,12 @@ Mgr::Mgr()
 	mItemName = "Plant";
 	setModelSize(1);
 	mObjectPathComponent = "user/Kando/objects/plants";
-	mParms               = new PlantParms();
+	mParms               = new PlantParms;
 	void* data = JKRDvdRipper::loadToMainRAM("user/Abe/item/plantParms.txt", nullptr, Switch_0, 0, nullptr, JKRDvdRipper::ALLOC_DIR_BOTTOM,
 	                                         0, nullptr, nullptr);
-	if (data != nullptr) {
+	if (data) {
 		RamStream input(data, -1);
-		input.resetPosition(true, 1);
+		input.setMode(STREAM_MODE_TEXT, 1);
 		mParms->read(input);
 		delete[] data;
 	}
@@ -2343,7 +2343,7 @@ BaseItem* Mgr::birth()
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("model.bmd", 0, 0x20020000);
+	loadBmd("model.bmd", 0, J3DMODEL_Unk26 | J3DMODEL_CreateNewDL);
 	mAnmColor = static_cast<J3DAnmColor*>(J3DAnmLoaderDataBase ::load(JKRFileLoader::getGlbResource("model.bpk", nullptr)));
 
 	JKRArchive* textArc = openTextArc("texts.szs");
@@ -2380,7 +2380,7 @@ void Mgr::generatorWrite(Stream& input, GenItemParm* genParm)
 
 	input.textWriteTab(input.mTabCount);
 	input.writeShort(plantParm->mPlantType);
-	input.textWriteText("\t#ŽÀƒ^ƒCƒv\r\n"); // '#actual type'
+	input.textWriteText("\t#å®Ÿã‚¿ã‚¤ãƒ—\r\n"); // '#actual type'
 }
 
 /**
@@ -2484,8 +2484,9 @@ void Fruits::update()
 void Fruits::bearAll(u16 plantType)
 {
 	for (int i = 0; i < mSlotCount; i++) {
-		FruitSlot* slot = &mSlots[i];
-		Pellet* fruit   = slot->mFruit;
+		FruitSlot* slot = getSlot(i);
+		Pellet* fruit   = slot->getFruit();
+
 		if (!fruit) {
 			PelletInitArg pelletArg;
 			pelletArg.mTextIdentifier = "fruit";
@@ -2508,8 +2509,8 @@ void Fruits::bearAll(u16 plantType)
 			}
 
 			pelletArg.mPelletIndex = 0;
-			pelletArg.mState       = PELSTATE_Goal;
-			pelletArg.mPelletType  = PELTYPE_BERRY;
+			pelletArg.mState       = PelBirthType_Appear;
+			pelletArg.mPelletType  = PelletType::Berry;
 
 			Pellet* pellet = pelletMgr->birth(&pelletArg);
 			if (!pellet) {
@@ -2519,13 +2520,20 @@ void Fruits::bearAll(u16 plantType)
 			Matrixf mtx;
 			PSMTXIdentity(mtx.mMatrix.mtxView);
 
-			f32 positions[5][3] = {
+			const f32 positions[5][3] = {
 				{ 33.965f, 0.0f, 0.0f },   { 25.463f, 8.0f, -8.0f }, { 25.463f, 8.0f, 8.0f },
 				{ 25.463f, -8.0f, -8.0f }, { 25.463f, -8.0f, 8.0f },
 			};
 
-			Vector3f pos = ((Vector3f*)positions)[i];
-			mtx.makeT(pos);
+			Vector3f pos[5];
+			pos[0].set(positions[0][0], positions[0][1], positions[0][2]);
+			pos[1].set(positions[1][0], positions[1][1], positions[1][2]);
+			pos[2].set(positions[2][0], positions[2][1], positions[2][2]);
+			pos[3].set(positions[3][0], positions[3][1], positions[3][2]);
+			pos[4].set(positions[4][0], positions[4][1], positions[4][2]);
+
+			Vector3f T(pos[i].x, pos[i].y, pos[i].z);
+			mtx.makeT(T);
 
 			slot->setFruit(pellet, mMatrix, mtx);
 		}

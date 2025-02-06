@@ -18,7 +18,7 @@ void JAInter::HeapMgr::init(u8 stayCount, u32 stayPtrSize, u8 autoCount, u32 aut
 	sAutoHeap = new (JAIBasic::getCurrentJAIHeap(), 0x20) HeapBlock[autoCount];
 	for (u32 i = 0; i < autoCount; i++) {
 		getAutoHeap(i)->setStatus(0);
-		getAutoHeap(i)->set0C(0);
+		getAutoHeap(i)->setHeapCount(0);
 		getAutoHeap(i)->setSoundID(-1);
 		getAutoHeap(i)->setUsedHeapID(-1);
 		getAutoHeap(i)->setPointer(new (JAIBasic::getCurrentJAIHeap(), 0x20) u8[autoPtrSize]);
@@ -29,7 +29,7 @@ void JAInter::HeapMgr::init(u8 stayCount, u32 stayPtrSize, u8 autoCount, u32 aut
 
 	for (u32 i = 0; i < stayCount; i++) {
 		getStayHeap(i)->setStatus(0);
-		getStayHeap(i)->set0C(0);
+		getStayHeap(i)->setHeapCount(0);
 		getStayHeap(i)->setSoundID(-1);
 		getStayHeap(i)->setUsedHeapID(-1);
 	}
@@ -239,7 +239,7 @@ u32 JAInter::HeapMgr::getStayHeapCount()
  * @note Address: 0x800B059C
  * @note Size: 0x100
  */
-void* JAInter::HeapMgr::checkOnMemory(u32 soundID, u8* p2)
+void* JAInter::HeapMgr::checkOnMemory(u32 soundID, u8* outHeapIndex)
 {
 	for (u8 i = 0; i < JAIGlobalParameter::getParamAutoHeapMax(); i++) {
 		if (soundID != sAutoHeap[i].mSoundID) {
@@ -248,8 +248,8 @@ void* JAInter::HeapMgr::checkOnMemory(u32 soundID, u8* p2)
 		if (sAutoHeap[i].mStatus == 1) {
 			return (void*)-1;
 		}
-		if (p2) {
-			*p2 = i;
+		if (outHeapIndex) {
+			*outHeapIndex = i;
 		}
 		return sAutoHeap[i].getPointer();
 	}
@@ -257,8 +257,8 @@ void* JAInter::HeapMgr::checkOnMemory(u32 soundID, u8* p2)
 		if (soundID != sStayHeap[i].mSoundID) {
 			continue;
 		}
-		if (p2) {
-			*p2 = 255;
+		if (outHeapIndex) {
+			*outHeapIndex = 255;
 		}
 		return sStayHeap[i].getPointer();
 	}
@@ -302,9 +302,9 @@ u8 JAInter::HeapMgr::checkUsefulAutoHeapPosition()
 	}
 	if (i == JAIGlobalParameter::getParamAutoHeapMax()) {
 		for (i = 0; i < JAIGlobalParameter::getParamAutoHeapMax(); i++) {
-			if (r29 > getAutoHeap(i)->_0C && getAutoHeap(i)->getUsedHeapID() == -1) {
+			if (r29 > getAutoHeap(i)->mHeapCount && getAutoHeap(i)->getUsedHeapID() == -1) {
 				r28 = i;
-				r29 = getAutoHeap(i)->_0C;
+				r29 = getAutoHeap(i)->mHeapCount;
 			}
 		}
 		if (r29 != -1) {
@@ -323,7 +323,7 @@ void* JAInter::HeapMgr::getFreeAutoHeapPointer(u8 index, u32 soundID)
 	getAutoHeap(index)->mSoundID = soundID;
 	void* ptr                    = getAutoHeap(index)->mPointer;
 	getAutoHeap(index)->setUsedHeapID(sAutoHeapCount);
-	getAutoHeap(index)->_0C = sAutoHeapCount;
+	getAutoHeap(index)->mHeapCount = sAutoHeapCount;
 	sAutoHeapCount++;
 	return ptr;
 }
@@ -420,7 +420,7 @@ void JAInter::HeapMgr::setStayHeapLoadedFlag(u8 index, u8 flag) { sStayHeap[inde
  */
 JAInter::HeapBlock::HeapBlock()
 {
-	_0C      = 0;
-	mSoundID = -1;
+	mHeapCount = 0;
+	mSoundID   = -1;
 	setUsedHeapID(-1);
 }

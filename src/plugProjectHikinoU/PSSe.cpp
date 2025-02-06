@@ -4,6 +4,7 @@
 #include "JSystem/JAudio/JALCalc.h"
 #include "PSSystem/PSSystemIF.h"
 #include "trig.h"
+#include "CNode.h"
 
 namespace PSGame {
 f32 Rappa::cRatio                  = 15.0f;
@@ -24,14 +25,14 @@ SeMgr::SeMgr()
 		mSetSeList[i] = nullptr;
 	}
 
-	mSetSeList[0] = new SetSe("ƒsƒLSEŠÔˆø‚«İ’è", 0, 3);               // "Pixel SE thinning setting"
-	mSetSeList[1] = new SetSe("ƒsƒL•¨‰^‚Ñ‰¹", 9, 9);                   // "piki hauling sound"
-	mSetSeList[2] = new SetSe("ƒsƒLd–’@‚«‰¹", 0, 5);                 // "Piki job tapping sound"
-	mSetSeList[4] = new SetSe("ƒsƒL“Û‚İ‚Ü‚ê‚à‚ª‚«º", 20, 20);       // "Piki swallowed and struggle voice"
-	mSetSeList[5] = new SetSe("ƒ`ƒƒƒŒƒ“ƒWƒ‚[ƒh‚Ìƒgƒbƒv‰æ–Ê—p", 0, 2); // "For challenge mode top screen"
-	mSetSeList[6] = new SetSe("ƒsƒL’……‰¹—p", 2, 5);                   // "For Piki landing sound"
-	mSetSeList[7] = new SetSe("ƒsƒLƒpƒjƒbƒNƒ‰ƒ“—p", 4, 10);            // "For Piki Panic Run"
-	mSetSeList[3] = new SetSe("“G”Ä—p", 20, 9);                        // "Enemy General Purpose"
+	mSetSeList[0] = new SetSe("ãƒ”ã‚­SEé–“å¼•ãè¨­å®š", 0, 3);               // "Pixel SE thinning setting"
+	mSetSeList[1] = new SetSe("ãƒ”ã‚­ç‰©é‹ã³éŸ³", 9, 9);                   // "piki hauling sound"
+	mSetSeList[2] = new SetSe("ãƒ”ã‚­ä»•äº‹å©ãéŸ³", 0, 5);                 // "Piki job tapping sound"
+	mSetSeList[4] = new SetSe("ãƒ”ã‚­å‘‘ã¿è¾¼ã¾ã‚Œã‚‚ãŒãå£°", 20, 20);       // "Piki swallowed and struggle voice"
+	mSetSeList[5] = new SetSe("ãƒãƒ£ãƒ¬ãƒ³ã‚¸ãƒ¢ãƒ¼ãƒ‰ã®ãƒˆãƒƒãƒ—ç”»é¢ç”¨", 0, 2); // "For challenge mode top screen"
+	mSetSeList[6] = new SetSe("ãƒ”ã‚­ç€æ°´éŸ³ç”¨", 2, 5);                   // "For Piki landing sound"
+	mSetSeList[7] = new SetSe("ãƒ”ã‚­ãƒ‘ãƒ‹ãƒƒã‚¯ãƒ©ãƒ³ç”¨", 4, 10);            // "For Piki Panic Run"
+	mSetSeList[3] = new SetSe("æ•µæ±ç”¨", 20, 9);                        // "Enemy General Purpose"
 
 	for (u8 i = 0; i < 8; i++) {
 		P2ASSERTLINE(44, mSetSeList[i]);
@@ -103,13 +104,15 @@ Rappa::Rappa()
  */
 void Rappa::init(u16 id)
 {
-	bool check  = true;
-	int idCheck = 1 - id;
-	if ((idCheck <= 0) == 0) {
+	bool check = true;
+	// something dumb along these lines
+	if (bool(-id) == 1) {
 		check = false;
 	}
 	P2ASSERTLINE(180, check);
-	mId        = ((id == 0) >> 5 & 1) + 14;
+
+	u32 val    = -(id == 0);
+	mId        = val + 14;
 	sRappa[id] = this;
 	/*
 	stwu     r1, -0x10(r1)
@@ -563,11 +566,11 @@ void EnvSe_AutoPan::setPanAndDolby(JAISound* sound)
  * @note Size: 0x21C
  */
 Builder_EvnSe_Perspective::Builder_EvnSe_Perspective(JGeometry::TBox3f box)
-    : _18(0)
-    , _1C(0)
-    , _20(0)
+    : mDoSkipSizeCheck(false)
+    , mGridSizeX(0)
+    , mGridSizeZ(0)
     , mBox(box)
-    , _3C(0.0f)
+    , mYPosition(0.0f)
 {
 	mBox.absolute();
 	/*
@@ -739,9 +742,46 @@ lbl_80340310:
  * @note Address: 0x8034032C
  * @note Size: 0x2D0
  */
-void Builder_EvnSe_Perspective::build(f32 p1, PSSystem::EnvSeMgr* mgr)
+void Builder_EvnSe_Perspective::build(f32 volume, PSSystem::EnvSeMgr* mgr)
 {
 	P2ASSERTLINE(596, mgr);
+	f32 totalSizeX = mBox.mMax.x - mBox.mMin.x;
+	f32 totalSizeZ = mBox.mMax.z - mBox.mMin.z;
+
+	if (!mDoSkipSizeCheck) {
+		f32* temp = &totalSizeX;
+		int* val  = &mGridSizeX;
+		while (*val = *temp / 1000.0f, val != &mGridSizeZ) {
+			temp = &totalSizeZ;
+			val  = &mGridSizeZ;
+		}
+	} else {
+		P2ASSERTBOOLLINE(639, mGridSizeX > 0 && mGridSizeZ > 0);
+	}
+
+	Vec pos;
+	pos.y = mYPosition;
+
+	f32 unitSizeX = totalSizeX / f32(mGridSizeX);
+	f32 startPosX = mBox.mMin.x + unitSizeX / 2;
+
+	f32 unitSizeZ = totalSizeZ / f32(mGridSizeZ);
+	f32 startPosZ = mBox.mMin.z + unitSizeZ / 2;
+
+	for (int x = 0; x < mGridSizeX; x++) {
+		pos.x = unitSizeX * f32(x) + startPosX;
+		for (int z = 0; z < mGridSizeZ; z++) {
+			pos.z = unitSizeZ * f32(z) + startPosZ;
+
+			mList.setNextLink();
+
+			EnvSe_Perspective* se = newSeObj(mList.mNextLink->mId, volume, pos);
+			P2ASSERTLINE(662, se);
+			onBuild(se);
+			mgr->mEnvList.append(se);
+		}
+	}
+
 	/*
 	stwu     r1, -0xc0(r1)
 	mflr     r0
@@ -963,70 +1003,6 @@ EnvSe_Perspective* Builder_EvnSe_Perspective::newSeObj(u32 soundID, f32 volume, 
  * @note Address: 0x803406A8
  * @note Size: 0xC8
  */
-Builder_EvnSe_Perspective::~Builder_EvnSe_Perspective()
-{
-	/*
-	stwu     r1, -0x20(r1)
-	mflr     r0
-	stw      r0, 0x24(r1)
-	stw      r31, 0x1c(r1)
-	stw      r30, 0x18(r1)
-	mr       r30, r4
-	stw      r29, 0x14(r1)
-	or.      r29, r3, r3
-	beq      lbl_80340750
-	lis      r3, __vt__Q26PSGame25Builder_EvnSe_Perspective@ha
-	addic.   r0, r29, 0x40
-	addi     r0, r3, __vt__Q26PSGame25Builder_EvnSe_Perspective@l
-	stw      r0, 0(r29)
-	beq      lbl_80340734
-	b        lbl_80340714
-
-lbl_803406E4:
-	mr       r4, r31
-	addi     r3, r29, 0x40
-	bl       remove__10JSUPtrListFP10JSUPtrLink
-	lwz      r31, 0(r31)
-	cmplwi   r31, 0
-	beq      lbl_80340714
-	beq      lbl_8034070C
-	mr       r3, r31
-	li       r4, 0
-	bl       __dt__10JSUPtrLinkFv
-
-lbl_8034070C:
-	mr       r3, r31
-	bl       __dl__FPv
-
-lbl_80340714:
-	lwz      r31, 0x40(r29)
-	cmplwi   r31, 0
-	bne      lbl_803406E4
-	addic.   r0, r29, 0x40
-	beq      lbl_80340734
-	addi     r3, r29, 0x40
-	li       r4, 0
-	bl       __dt__10JSUPtrListFv
-
-lbl_80340734:
-	mr       r3, r29
-	li       r4, 0
-	bl       __dt__11JKRDisposerFv
-	extsh.   r0, r30
-	ble      lbl_80340750
-	mr       r3, r29
-	bl       __dl__FPv
-
-lbl_80340750:
-	lwz      r0, 0x24(r1)
-	mr       r3, r29
-	lwz      r31, 0x1c(r1)
-	lwz      r30, 0x18(r1)
-	lwz      r29, 0x14(r1)
-	mtlr     r0
-	addi     r1, r1, 0x20
-	blr
-	*/
-}
+Builder_EvnSe_Perspective::~Builder_EvnSe_Perspective() { }
 
 } // namespace PSGame

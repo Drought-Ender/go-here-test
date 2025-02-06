@@ -54,6 +54,28 @@ struct Generator : public CNode {
 		}
 	}
 
+	inline int getInactives()
+	{
+		int count = 0;
+		FOREACH_NODE(Generator, mChild, child)
+		{
+			if (child->mIsInactive == FALSE) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	// These represent the "reserved" value from the gen file entry
+	enum ReservedFlag {
+		Reserved_Null            = 0, // This value should always be used in defaultgen, plantgen, or day gens
+		Reserved_doSaveGen       = 1, // needed to save gen info, such as object type and pellet info
+		Reserved_doSaveCreature  = 2, // needed to save creature info, mostly needed for position and item specific properties
+		Reserved_doTrackDeath    = 4, // needed for respawn days to take effect? This ones weird, but enemies that respawn use it
+		Reserved_doTrackPosition = 8, // used for pellets to save current position between loads, might work for enemies
+	};
+	inline bool isReservedFlag(u8 flag) { return mReservedNum & flag; }
+
 	GenObject* mObject;        // _18
 	u32 mId;                   // _1C /* Initialized to '____' */
 	char mGenObjName[32];      // _20 /* shift-jis name given in generator files */
@@ -68,16 +90,19 @@ struct Generator : public CNode {
 	int mDaysTillResurrection; // _70
 	u32 mDeathCount;           // _74
 	u32 mDayNum;               // _78
-	u32 _7C;                   // _7C
+	u32 mUnusedVal;            // _7C, set to 0 in a few places, never used
 	u8 _80[4];                 // _80
 	int mDayLimit;             // _84
 	u8 _88[12];                // _88
 	Vector3f mPosition;        // _94
 	Vector3f mOffset;          // _A0
-	u8 mIsInactive;            // _AC
+	u8 mIsInactive;            // _AC, if true, the object wont spawn or need its assets loaded
 	int mIndex;                // _B0
 
-	enum RamMode { RM_Disc = 0, RM_MemoryCache };
+	enum RamMode {
+		RM_Disc        = 0,
+		RM_MemoryCache = 1,
+	};
 	static u8 ramMode;
 };
 
@@ -108,21 +133,21 @@ struct GeneratorMgr : public CNode {
 	GeneratorMgr* mParentMgr; // _20
 	Vector3f mCursorPosition; // _24
 	Generator* mGenerator;    // _30
-	ID32 _34;                 // _34
+	ID32 mAltVersionID;       // _34, set to 'v0.1' and never used
 	ID32 mVersionID;          // _40
 	int mGeneratorCount;      // _4C
-	ID32 _50;                 // _50
+	ID32 mUnusedID;           // _50, entirely never touched
 	Vector3f mStartPos;       // _5C
 	f32 mStartDir;            // _68, v0.1 adds the start direction
-	u8 _6C;                   // _6C
-	u8 _6D;                   // _6D
+	u8 mUnusedFlag;           // _6C, set to true for nonloop/loop, not used
+	u8 mUnusedFlag2;          // _6D
 
 	static Delegate1<struct BaseGameSection, Vector3f&>* cursorCallback;
 };
 
 struct GenArg : public CreatureInitArg {
 
-	inline GenArg(Vector3f& vec) { mPosition = vec; }
+	inline GenArg(const Vector3f& vec) { mPosition = vec; }
 
 	inline GenArg() { }
 
@@ -227,7 +252,7 @@ struct GenNumberPelletParm : public GenPelletParm {
  */
 struct GenItem : public GenObject {
 	inline GenItem()
-	    : GenObject('item', "object type", "ITEM ÇÉZÉbÉg")
+	    : GenObject('item', "object type", "ITEM „Çí„Çª„ÉÉ„Éà")
 	{
 		mMgrIndex   = -1;
 		mRotation.z = 0.0f;
@@ -250,6 +275,14 @@ struct GenItem : public GenObject {
 
 	static void initialise();
 
+	inline Vector3f getRadiansRotation()
+	{
+		f32 z = TORADIANS(mRotation.z);
+		f32 y = TORADIANS(mRotation.y);
+		f32 x = TORADIANS(mRotation.x);
+		return Vector3f(x, y, z);
+	}
+
 	// _0C     = VTBL
 	// _00-_24 = GenObject
 	int mMgrIndex;         // _24
@@ -260,7 +293,7 @@ struct GenItem : public GenObject {
 
 struct GenPellet : public GenObject {
 	inline GenPellet()
-	    : GenObject('pelt', "object type", "PELLET ÇÉZÉbÉg")
+	    : GenObject('pelt', "object type", "PELLET „Çí„Çª„ÉÉ„Éà")
 	{
 		mPelType    = 255;
 		mRotation.z = 0.0f;
@@ -292,10 +325,10 @@ struct GenPellet : public GenObject {
 
 struct GenObjectPiki : public GenObject {
 	GenObjectPiki()
-	    : GenObject('piki', "object type", "PIKMIN ÇÉZÉbÉg")
-	    , mColourParm(this, 'p000', "êF", 0, 0, PikiColorCount)
-	    , mAmountParm(this, 'p001', "êî", 1, 1, 100)
-	    , mIsWildPikminParm(this, 'p002', "é©äà(1=yes)", 0, 0, 1)
+	    : GenObject('piki', "object type", "PIKMIN „Çí„Çª„ÉÉ„Éà")
+	    , mColourParm(this, 'p000', "Ëâ≤", 0, 0, PikiColorCount)
+	    , mAmountParm(this, 'p001', "Êï∞", 1, 1, 100)
+	    , mIsWildPikminParm(this, 'p002', "Ëá™Ê¥ª(1=yes)", 0, 0, 1)
 	{
 	}
 
@@ -397,8 +430,8 @@ struct GenObjectFactoryFactory {
 
 struct GenObjectNavi : public GenObject {
 	GenObjectNavi()
-	    : GenObject('navi', "object type", "NAVI ÇÉZÉbÉg")  // set the NAVI
-	    , mRotation(this, 'p000', "ÉXÉ^Å[Égå¸Ç´", 0, 0, 360) // start direction
+	    : GenObject('navi', "object type", "NAVI „Çí„Çª„ÉÉ„Éà")  // set the NAVI
+	    , mRotation(this, 'p000', "„Çπ„Çø„Éº„ÉàÂêë„Åç", 0, 0, 360) // start direction
 	{
 	}
 

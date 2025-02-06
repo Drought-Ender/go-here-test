@@ -99,7 +99,7 @@ void ObjKantei::doCreate(JKRArchive* arc)
 		if (disp->isID(OWNER_OGA, MEMBER_DUMMY)) {
 			mDisp = new og::Screen::DispMemberKantei;
 		} else {
-			JUT_PANICLINE(258, "ERR! in ObjKantei CreateŽ¸”sI\n");
+			JUT_PANICLINE(258, "ERR! in ObjKantei Createå¤±æ•—ï¼\n");
 		}
 	}
 
@@ -158,7 +158,7 @@ void ObjKantei::doCreate(JKRArchive* arc)
 	mPokoCounterCurr = og::Screen::setCallBack_CounterSlot(mScreenOkWindow, 'PSota1', &mDisp->mPelletValue, 4, true, true, arc);
 	mPokoCounterCurr->hide();
 	mPokoCounterCurr->setPuyoParam(msVal.mPokoPuyo1, msVal.mPokoPuyo2, msVal.mPokoPuyo3);
-	mPokoCounterCurr->_C8 = PSSE_SY_COIN_COUNT;
+	mPokoCounterCurr->mChangeSoundID = PSSE_SY_COIN_COUNT;
 
 	mScreenBG = new P2DScreen::Mgr_tuning;
 	mScreenBG->set("ok_bg_normal.blo", 0x1040000, arc);
@@ -182,7 +182,7 @@ void ObjKantei::doCreate(JKRArchive* arc)
 
 	mTControl = new P2JME::Movie::TControl;
 	mTControl->init();
-	mTControl->mFlags.dwordView &= 0xfffffffe;
+	mTControl->mFlags.unset(P2JME::Movie::TControl::ControlFlag_UnsuspendOnFinish);
 	mInTextBox = false;
 
 	og::Screen::CallBack_Picture* pic = og::Screen::setCallBack_3DStick(arc, mScreenButton, 'ota3dl');
@@ -332,8 +332,8 @@ bool ObjKantei::doUpdate()
 
 	case Kantei_PokoAppearDelay:
 		mStartTimer += sys->mDeltaTime;
-		if (mStartTimer >= msVal.mNameAppearDelay || pad->mButton.mButtonDown & Controller::PRESS_A
-		    || (mDisp->mSecondaryController && mDisp->mSecondaryController->mButton.mButtonDown & Controller::PRESS_A)) {
+		if (mStartTimer >= msVal.mNameAppearDelay || pad->getButtonDown() & Controller::PRESS_A
+		    || (mDisp->mSecondaryController && mDisp->mSecondaryController->getButtonDown() & Controller::PRESS_A)) {
 			mState              = Kantei_SetPokoValue;
 			mDisp->mPelletValue = 0;
 			mPokoCounterCurr->startSlot(msVal.mPokoSlotFactor);
@@ -369,8 +369,8 @@ bool ObjKantei::doUpdate()
 	case Kantei_Idle:
 		if (mIdleStateTimer > 0.0f) {
 			mIdleStateTimer -= sys->mDeltaTime;
-		} else if (pad && pad->mButton.mButtonDown & Controller::PRESS_A
-		           || (mDisp->mSecondaryController && mDisp->mSecondaryController->mButton.mButtonDown & Controller::PRESS_A)) {
+		} else if (pad && pad->getButtonDown() & Controller::PRESS_A
+		           || (mDisp->mSecondaryController && mDisp->mSecondaryController->getButtonDown() & Controller::PRESS_A)) {
 			mShipMessageBoxID = mDisp->mPelletMessageID;
 			// if the tagID exists, open ship message box, unless in E3 mode
 			if (mShipMessageBoxID != 0 && !Game::gGameConfig.mParms.mE3version.mData) {
@@ -392,9 +392,6 @@ bool ObjKantei::doUpdate()
 		if (!mTControl->mIsActive) {
 			finishKantei();
 		}
-
-	default:
-		break;
 	}
 
 	commonUpdate();
@@ -483,7 +480,7 @@ bool ObjKantei::doStart(::Screen::StartSceneArg const*)
 	mFadeLevel2 = 0.0f;
 	if (mDisp->mDoPlayBGM) {
 		PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-		PSSystem::checkSceneMgr(mgr);
+		PSSystem::validateSceneMgr(mgr);
 		PSM::Scene_Game* scene = static_cast<PSM::Scene_Game*>(mgr->getChildScene());
 		PSSystem::checkChildScene(scene)->startMainSeq();
 	}

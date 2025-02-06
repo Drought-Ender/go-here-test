@@ -44,12 +44,12 @@ void Obj::onInit(CreatureInitArg* initArg)
 	disableEvent(0, EB_LeaveCarcass);
 	enableEvent(0, EB_Untargetable);
 	disableEvent(0, EB_DeathEffectEnabled);
-	mNextState  = ONIKURAGE_NULL;
-	mStateTimer = 0.0f;
-	mFallTimer  = 0.0f;
-	_2C8        = 3.5f;
-	mSuckedPiki = 0;
-	mIsSucking  = false;
+	mNextState      = ONIKURAGE_NULL;
+	mStateTimer     = 0.0f;
+	mFallTimer      = 0.0f;
+	mMovePitchTimer = 3.5f;
+	mSuckedPiki     = 0;
+	mIsSucking      = false;
 
 	mSuckedNavis[1] = nullptr;
 	mSuckedNavis[0] = nullptr;
@@ -243,7 +243,7 @@ void Obj::initMouthSlots()
 
 	for (int i = 0; i < mMouthSlots.getMax(); i++) {
 		MouthCollPart* slot = mMouthSlots.getSlot(i);
-		slot->_6C           = 1;
+		slot->mIsOniKurage  = true;
 		f32 offset          = cDefaultKamuJointOffset[i];
 		slot->mRadius       = 1.0f;
 		slot->mOffset.x     = offset;
@@ -287,13 +287,13 @@ void Obj::setRandTarget()
  */
 f32 Obj::getMovePitchOffset()
 {
-	_2C8 += sys->mDeltaTime * PI;
+	mMovePitchTimer += sys->mDeltaTime * PI;
 
-	if (_2C8 > TAU) {
-		_2C8 -= TAU;
+	if (mMovePitchTimer > TAU) {
+		mMovePitchTimer -= TAU;
 	}
 
-	return 20.0f * sinf(_2C8);
+	return 20.0f * sinf(mMovePitchTimer);
 }
 
 /**
@@ -839,7 +839,7 @@ bool Obj::suckNavi(f32 offset)
 
 						Vector3f sep = naviPos - partPos;
 						InteractSarai suck(this, 100.0f, nullptr);
-						slot->mOffset = Vector3f(dot(xVec, sep), dot(yVec, sep), dot(zVec, sep));
+						slot->mOffset = Vector3f(xVec.dot(sep), yVec.dot(sep), zVec.dot(sep));
 
 						if (currNavi->stimulate(suck)) {
 							mSuckedNavis[i] = currNavi;
@@ -1292,8 +1292,8 @@ void Obj::updateCollPartOffset()
 						mSuckedNavis[i]->mSoundObj->startSound(PSSE_EN_ONIKURAGE_GET_ORIMA, 0);
 					}
 					Vector3f pos = getPosition();
-					cameraMgr->startVibration(2, pos, 2);
-					rumbleMgr->startRumble(10, pos, 2);
+					cameraMgr->startVibration(VIBTYPE_LightSlowLong, pos, CAMNAVI_Both);
+					rumbleMgr->startRumble(RUMBLETYPE_Fixed10, pos, RUMBLEID_Both);
 				}
 			}
 		}
@@ -1815,8 +1815,8 @@ void Obj::escapeCheckNavi()
 			} else {
 				createFlickNaviEffect();
 				Vector3f pos = getPosition();
-				cameraMgr->startVibration(0, pos, 2);
-				rumbleMgr->startRumble(10, pos, 2);
+				cameraMgr->startVibration(VIBTYPE_LightSlowShort, pos, CAMNAVI_Both);
+				rumbleMgr->startRumble(RUMBLETYPE_Fixed10, pos, RUMBLEID_Both);
 				mSuckedNavis[i]->mSoundObj->startSound(PSSE_EN_ONIKURAGE_VOMIT, 0);
 			}
 			mSuckedNavis[i] = nullptr;

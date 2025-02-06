@@ -65,23 +65,23 @@ bool TControl::setRubyFont(JUTFont* font)
  */
 bool TControl::init()
 {
-	sys->heapStatusStart("JMessageŽÀ‘•ƒNƒ‰ƒX", nullptr);
+	sys->heapStatusStart("JMessageå®Ÿè£…ã‚¯ãƒ©ã‚¹", nullptr);
 	createReference();
 	createResourceContainer();
 	createSequenceProcessor();
 	createRenderingProcessor();
-	sys->heapStatusEnd("JMessageŽÀ‘•ƒNƒ‰ƒX");
+	sys->heapStatusEnd("JMessageå®Ÿè£…ã‚¯ãƒ©ã‚¹");
 
 	mReference->mResource = mResContainer;
 	mBaseProcSeq          = mSequenceProc;
 	mBaseProcRender       = mTextRenderProc;
 
-	sys->heapStatusStart("ŒÂ•Ê‰Šú‰»", nullptr); // "Individual Initialization"
+	sys->heapStatusStart("å€‹åˆ¥åˆæœŸåŒ–", nullptr); // "Individual Initialization"
 	bool ret = false;
 	if (onInit()) {
 		ret = true;
 	}
-	sys->heapStatusEnd("ŒÂ•Ê‰Šú‰»");
+	sys->heapStatusEnd("å€‹åˆ¥åˆæœŸåŒ–");
 	return ret;
 }
 
@@ -172,11 +172,11 @@ void TControl::setMessageID(char* mesg)
  * @note Address: 0x80439020
  * @note Size: 0x84
  */
-BOOL TControl::setMessageID(u32 part1, u32 part2)
+BOOL TControl::setMessageID(u32 lowerHalf, u32 upperHalf)
 {
 	reset();
-	bool ret = JMessage::TControl::setMessageID(part1, part2, nullptr);
-	mTextRenderProc->preProcID(part1, part2);
+	bool ret = JMessage::TControl::setMessageID(lowerHalf, upperHalf, nullptr);
+	mTextRenderProc->preProcID(lowerHalf, upperHalf);
 	return ret;
 }
 

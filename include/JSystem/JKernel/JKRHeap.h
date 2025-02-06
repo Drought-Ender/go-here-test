@@ -13,7 +13,7 @@ struct JKRHeap : public JKRDisposer {
 		HEAPALLOC_Unk1 = 1,
 	};
 
-	struct TState { // NB: this struct doesn't agree with TP's struct
+	struct TState {
 		struct TLocation {
 			TLocation()
 			    : _00(nullptr)
@@ -21,15 +21,15 @@ struct JKRHeap : public JKRDisposer {
 			{
 			}
 
-			const char* _00; // _00
-			int _04;         // _04
+			char* _00; // _00
+			int _04;   // _04
 		};
 
 		struct TArgument {
-			TArgument(const JKRHeap* heap, u32 p2, bool p3)
+			TArgument(const JKRHeap* heap, u32 id, bool compareOnDestruct)
 			    : mHeap((heap) ? heap : JKRHeap::sCurrentHeap)
-			    , mId(p2)
-			    , mIsCompareOnDestructed(p3)
+			    , mId(id)
+			    , mIsCompareOnDestructed(compareOnDestruct)
 			{
 			}
 
@@ -55,7 +55,7 @@ struct JKRHeap : public JKRDisposer {
 
 		~TState();
 		void dump() const { mArgument.mHeap->state_dump(*this); }
-		bool isVerbose() { return bVerbose_; };
+		static inline bool isVerbose() { return bVerbose_; };
 		bool isCompareOnDestructed() const { return mArgument.mIsCompareOnDestructed; };
 		u32 getUsedSize() const { return mUsedSize; }
 		u32 getCheckCode() const { return mCheckCode; }
@@ -200,7 +200,7 @@ struct JKRHeap : public JKRDisposer {
 
 	// _00     = VTBL
 	// _00-_18 = JKRDisposer
-	OSMutex mMutex;                     // _18
+	mutable OSMutex mMutex;             // _18
 	u8* mStartAddress;                  // _30
 	u8* mEndAddress;                    // _34
 	u32 mHeapSize;                      // _38
@@ -364,9 +364,9 @@ struct JKRSolidHeap : public JKRHeap {
 
 inline void* operator new(size_t size, void* mem) { return mem; } // fabricated?
 void* operator new(size_t, JKRHeap*, int);
-void* operator new(u32 byteCount, int p2);
+void* operator new(size_t byteCount, int p2);
 void* operator new[](size_t, JKRHeap*, int);
-void* operator new[](u32 byteCount, int p2);
+void* operator new[](size_t byteCount, int p2);
 
 static void JKRDefaultMemoryErrorRoutine(void* heap, u32 size, int alignment);
 

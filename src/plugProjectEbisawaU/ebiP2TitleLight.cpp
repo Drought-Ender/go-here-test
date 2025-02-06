@@ -14,7 +14,7 @@ void TTitleLightMgr::loadSettingFile(JKRArchive* arc, char* path)
 	void* file = arc->getResource(path);
 	if (file) {
 		RamStream stream(file, -1);
-		stream.resetPosition(true, 1);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 
 		mSetting.mAmbParms.read(stream);
 		mSetting.mMainParms.read(stream);
@@ -36,18 +36,19 @@ void TTitleLightMgr::setParam_()
 	    = Vector3f(mSetting.mMainParms.mPosX.mValue, mSetting.mMainParms.mPosY.mValue, mSetting.mMainParms.mPosZ.mValue);
 
 	Vector3f temp(mSetting.mMainParms.mRotX, mSetting.mMainParms.mRotY, mSetting.mMainParms.mRotZ);
-	_normalise2(temp);
+	temp.normalise();
 	mLightObjMain.mElevation = temp;
 
 	setRefValues(mSetting.mMainParms.mLightRange, mSetting.mMainParms.mLightBrightness, mSetting.mMainParms.mCutoffAngle);
-	mLightObjMain.mDistAttnFn = 1;
-	mLightObjMain.mSpotFn     = 3;
+	mLightObjMain.mDistAttnFn = GX_DA_GENTLE;
+	mLightObjMain.mSpotFn     = GX_SP_COS2;
 
 	mLightObjSpec.mColor = Color4(mSetting.mSpecParms.mLightColR, mSetting.mSpecParms.mLightColG, mSetting.mSpecParms.mLightColB,
 	                              mSetting.mSpecParms.mLightColA);
-	Vector3f temp2(mSetting.mSpecParms.mRotX, mSetting.mSpecParms.mRotY, mSetting.mSpecParms.mRotZ);
-	_normalise(temp2);
-	mLightObjSpec.mElevation = temp2;
+
+	temp.set(mSetting.mSpecParms.mRotX, mSetting.mSpecParms.mRotY, mSetting.mSpecParms.mRotZ);
+	temp.normalise();
+	mLightObjSpec.mElevation = temp;
 	mLightObjSpec.mKScale    = mSetting.mSpecParms.mGlossAmount;
 }
 

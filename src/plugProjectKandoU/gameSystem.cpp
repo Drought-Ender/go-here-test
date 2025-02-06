@@ -61,7 +61,7 @@ void GameSystem::init()
 	GameStat::clear();
 
 	mIsFrozen     = false;
-	_49           = 0;
+	mUnused       = 0;
 	mIsPaused     = 0;
 	mIsPausedSoft = false;
 
@@ -101,8 +101,8 @@ void GameSystem::startFrame()
 	cellMgr->initFrame();
 	collisionUpdateMgr->update();
 
-	if (!paused() && !mIsFrozen && !isFlag(GAMESYS_DisablePause) && !paused_soft() && (!moviePlayer || moviePlayer->mDemoState == 0)
-	    && (int)gameSystem->mTimeMgr->mDayCount != 0) {
+	if (!paused() && !mIsFrozen && !isFlag(GAMESYS_DisablePause) && !paused_soft()
+	    && (!moviePlayer || moviePlayer->mDemoState == DEMOSTATE_Inactive) && (int)gameSystem->mTimeMgr->mDayCount != 0) {
 		mTimeMgr->update();
 	}
 }
@@ -429,8 +429,8 @@ TObjectNode<GenericObjectMgr>* GameSystem::detachObjectMgr_reuse(GenericObjectMg
  */
 OptimiseController::OptimiseController()
     : Parameters(nullptr, "Dynamics")
-    , mPikminNeck(this, 'c000', "ƒsƒNƒ~ƒ“ñ", true, false, true)                          // 'pikmin neck'
-    , mCollisionBufferEnabled(this, 'c001', "ƒRƒŠƒWƒ‡ƒ“ƒoƒbƒtƒ@—LŒø", false, false, true) // 'collision buffer enabled'
+    , mPikminNeck(this, 'c000', "ãƒ”ã‚¯ãƒŸãƒ³é¦–", true, false, true)                          // 'pikmin neck'
+    , mCollisionBufferEnabled(this, 'c001', "ã‚³ãƒªã‚¸ãƒ§ãƒ³ãƒãƒƒãƒ•ã‚¡æœ‰åŠ¹", false, false, true) // 'collision buffer enabled'
 {
 }
 

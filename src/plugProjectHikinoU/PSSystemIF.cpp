@@ -22,9 +22,9 @@ MakeSeCallback PSSystem::SysIF::sMakeJAISeCallback;
  */
 u32 getObject(JASTrack* track, u8 p2)
 {
-	u32 hi = track->readReg16(p2);
-	u32 lo = track->readReg16(p2 + 1);
-	return ((hi << 16) & 0xFFFF0000 | (lo)&0x0000FFFF);
+	u16 hi = track->readReg16(p2);
+	u16 lo = track->readReg16(p2 + 1);
+	return ((hi << 16) & 0xFFFF0000 | (lo) & 0x0000FFFF);
 }
 
 /**
@@ -66,7 +66,7 @@ SysIF::SysIF(const SetupArg& arg)
 void SysIF::stopSoundSystem()
 {
 	SceneMgr* mgr = getSceneMgr();
-	checkSceneMgr(mgr);
+	validateSceneMgr(mgr);
 	Scene* scene = mgr->mScenes;
 	P2ASSERTLINE(183, scene);
 	scene->stopAllSound(5);
@@ -125,7 +125,7 @@ JAISe* SysIF::makeSe()
  */
 void SysIF::mainLoop()
 {
-	if (mChecker._18 == 1) {
+	if (mChecker.mIsEnabled == 1) {
 		getSceneMgr()->exec();
 		getSeMgrInstance()->execAllSe();
 		processFrameWork();
@@ -144,7 +144,7 @@ void SysIF::setConfigVol_Se(f32 volume)
 		if (seq) {
 			JAISound* se = *seq->getHandleP();
 			if (se) {
-				se->setVolume(volume, 3, 8);
+				se->setVolume(volume, 3, SOUNDPARAM_Unk8);
 			}
 		}
 	}
@@ -166,7 +166,7 @@ void SysIF::setConfigVol_Bgm(f32 volume)
 			{
 				JAISound* se = *(link)->getObject()->getHandleP();
 				if (se) {
-					se->setVolume(volume, 3, 8);
+					se->setVolume(volume, 3, SOUNDPARAM_Unk8);
 				}
 			}
 		}
@@ -203,7 +203,7 @@ bool TextDataBase::load(const char* path, JKRDvdRipper::EAllocDirection directio
 	onlyLoad(path, direction);
 	if (mFile) {
 		RamStream stream(mFile, -1);
-		stream.resetPosition(true, 1);
+		stream.setMode(STREAM_MODE_TEXT, 1);
 		return read(stream);
 	}
 	return false;

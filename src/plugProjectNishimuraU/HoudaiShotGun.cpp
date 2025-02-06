@@ -93,12 +93,12 @@ bool HoudaiShotGunNode::update()
 	Sys::Sphere moveSphere(startPos, 10.0f); // 0x78
 
 	MoveInfo moveInfo(&moveSphere, &mVelocity, 0.0f); // 0x1B0
-	moveInfo.mInfoOrigin = mOwner;
+	moveInfo.mMovingCreature = mOwner;
 	mapMgr->traceMove(moveInfo, sys->mDeltaTime);
 
 	setPosition(moveSphere.mPosition);
 
-	if (moveInfo.mBounceTriangle || moveInfo.mWallTriangle) {
+	if (moveInfo.mFloorTriangle || moveInfo.mWallTriangle) {
 		Vector3f groundPos = mPosition;
 		groundPos.y        = mapMgr->getMinY(groundPos);
 
@@ -117,7 +117,7 @@ bool HoudaiShotGunNode::update()
 			efx::THdamaHit3 hitFX;
 			hitFX.create(&fxArg);
 
-		} else if (moveInfo.mBounceTriangle) {
+		} else if (moveInfo.mFloorTriangle) {
 			if (moveInfo.mMapCode.getAttribute() == (MapCode::Code::Attribute2 + MapCode::Code::Attribute3)) {
 				efx::Arg fxArg(effectPos);
 				efx::THdamaHit2 hitFX;
@@ -130,7 +130,7 @@ bool HoudaiShotGunNode::update()
 
 		} else if (moveInfo.mWallTriangle) {
 			efx::ArgDir fxArg(effectPos);
-			fxArg.mAngle = moveInfo.mReflectPosition;
+			fxArg.mAngle = moveInfo.mWallNormal;
 			efx::THdamaHit2W hitFX;
 			hitFX.create(&fxArg);
 		}
@@ -143,7 +143,7 @@ bool HoudaiShotGunNode::update()
 			PSStartSoundVec(PSSE_EN_HOUDAI_IMPACT, (Vec*)&mPosition);
 		}
 
-		rumbleMgr->startRumble(11, effectPos, 2);
+		rumbleMgr->startRumble(RUMBLETYPE_Fixed11, effectPos, RUMBLEID_Both);
 
 	} else {
 		Vector3f houdaiPos = mOwner->getPosition();
@@ -190,17 +190,17 @@ bool HoudaiShotGunNode::update()
 			Vector3f creaturePos = target->getPosition();
 			Vector3f sep         = creaturePos - startPos;
 
-			f32 dot2 = dot(vec2, sep);
+			f32 dot2 = vec2.dot(sep);
 			if (!(absVal(dot2) < radius)) {
 				continue;
 			}
 
-			f32 dot3 = dot(vec3, sep);
+			f32 dot3 = vec3.dot(sep);
 			if (!(absVal(dot3) < radius)) {
 				continue;
 			}
 
-			f32 dot1 = dot(vec1, sep);
+			f32 dot1 = vec1.dot(sep);
 			if (!(dot1 > -radius)) {
 				continue;
 			}
@@ -1147,23 +1147,27 @@ void HoudaiShotGunMgr::emitShotGun()
 		return;
 	}
 
-	Vector3f xVec, gunPos;
-	mGunMtx->getColumn(0, xVec);
-	mGunMtx->getColumn(3, gunPos);
+	Vector3f xVec   = mGunMtx->getBasis(0);
+	Vector3f gunPos = mGunMtx->getTranslation();
 
 	xVec.normalise();
 
-	f32 factor = 2.0f * CG_GENERALPARMS(mOwner).mAttackHitAngle();
+	Game::EnemyParmsBase::Parms& parms = CG_GENERALPARMS(mOwner);
 
-	xVec.x += randWeightFloat(factor) - CG_GENERALPARMS(mOwner).mAttackHitAngle();
-	xVec.y += randWeightFloat(factor) - CG_GENERALPARMS(mOwner).mAttackHitAngle();
-	xVec.z += randWeightFloat(factor) - CG_GENERALPARMS(mOwner).mAttackHitAngle();
+	const f32 factor = parms.mAttackHitAngle.mValue * 2.0f;
+	xVec.x += randWeightFloat(factor) - parms.mAttackHitAngle.mValue;
+	xVec.y += randWeightFloat(factor) - parms.mAttackHitAngle.mValue;
+	xVec.z += randWeightFloat(factor) - parms.mAttackHitAngle.mValue;
 
 	xVec.normalise();
 
-	gunPos += (xVec * 45.0f);
+	Vector3f right = xVec;
+	right.scale(45.0f);
+	gunPos += right;
+
 	node->setPosition(gunPos);
-	xVec *= 600.0f;
+
+	xVec.scale(600.0f);
 	node->setVelocity(xVec);
 
 	node->startShotGun();
@@ -1506,12 +1510,14 @@ void HoudaiShotGunMgr::forceFinishShotGun()
  */
 bool HoudaiShotGunMgr::searchShotGunRotation()
 {
-	Vector3f sep  = mTargetPosition - mGunMtx->getColumn(3);
-	f32 headPitch = JMAAtan2Radian(mHeadMtx->mMatrix.mtxView[0][1], mHeadMtx->mMatrix.mtxView[2][1]);
-	f32 turnAngle = JMAAtan2Radian(-sep.x, -sep.z);
-	f32 angleDist = angDist(headPitch, turnAngle);
+	Vector3f sep = mTargetPosition - mGunMtx->getColumn(3);
 
-	f32 absDist = absVal(angleDist);
+	Vector3f headVec = mHeadMtx->getColumn(1);
+	f32 headPitch    = JMAAtan2Radian(headVec.x, headVec.z);
+	f32 turnAngle    = JMAAtan2Radian(-sep.x, -sep.z);
+
+	f32 angleDist = angDist(headPitch, turnAngle);
+	f32 absDist   = absVal(angleDist);
 
 	if (absDist > 0.05f) {
 		mYaw -= 0.05f * (angleDist / absDist);
@@ -1536,181 +1542,6 @@ bool HoudaiShotGunMgr::searchShotGunRotation()
 
 	mPitch = (mPitch < 0.0f) ? TAU + mPitch : (mPitch >= TAU) ? mPitch - TAU : mPitch;
 	return true;
-	/*
-	stwu     r1, -0x50(r1)
-	mflr     r0
-	stw      r0, 0x54(r1)
-	stfd     f31, 0x40(r1)
-	psq_st   f31, 72(r1), 0, qr0
-	stfd     f30, 0x30(r1)
-	psq_st   f30, 56(r1), 0, qr0
-	stfd     f29, 0x20(r1)
-	psq_st   f29, 40(r1), 0, qr0
-	stfd     f28, 0x10(r1)
-	psq_st   f28, 24(r1), 0, qr0
-	stw      r31, 0xc(r1)
-	mr       r31, r3
-	lis      r3, atanTable___5JMath@ha
-	lwz      r5, 0x14(r31)
-	addi     r3, r3, atanTable___5JMath@l
-	lfs      f2, 0x20(r31)
-	lfs      f0, 0x2c(r5)
-	lfs      f3, 0x1c(r31)
-	fsubs    f29, f2, f0
-	lfs      f1, 0x1c(r5)
-	lfs      f2, 0x18(r31)
-	lfs      f0, 0xc(r5)
-	fsubs    f30, f3, f1
-	lwz      r4, 0x10(r31)
-	fsubs    f31, f2, f0
-	lfs      f1, 4(r4)
-	lfs      f2, 0x24(r4)
-	bl       "atan2___Q25JMath18TAtanTable<1024,f>CFff"
-	fmr      f28, f1
-	lis      r3, atanTable___5JMath@ha
-	fneg     f1, f31
-	addi     r3, r3, atanTable___5JMath@l
-	fneg     f2, f29
-	bl       "atan2___Q25JMath18TAtanTable<1024,f>CFff"
-	fmr      f2, f1
-	fmr      f1, f28
-	bl       angDist__Fff
-	lfs      f0, lbl_8051C588@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_802C4E34
-	fmr      f0, f1
-	b        lbl_802C4E38
-
-lbl_802C4E34:
-	fneg     f0, f1
-
-lbl_802C4E38:
-	lfs      f2, lbl_8051C5D8@sda21(r2)
-	fcmpo    cr0, f0, f2
-	ble      lbl_802C4E58
-	fdivs    f1, f1, f0
-	lfs      f0, 8(r31)
-	fnmsubs  f0, f2, f1, f0
-	stfs     f0, 8(r31)
-	b        lbl_802C4E64
-
-lbl_802C4E58:
-	lfs      f0, 8(r31)
-	fsubs    f0, f0, f1
-	stfs     f0, 8(r31)
-
-lbl_802C4E64:
-	lfs      f1, 8(r31)
-	lfs      f0, lbl_8051C588@sda21(r2)
-	fcmpo    cr0, f1, f0
-	bge      lbl_802C4E80
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fadds    f1, f0, f1
-	b        lbl_802C4E94
-
-lbl_802C4E80:
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fcmpo    cr0, f1, f0
-	cror     2, 1, 2
-	bne      lbl_802C4E94
-	fsubs    f1, f1, f0
-
-lbl_802C4E94:
-	fmuls    f2, f29, f29
-	lfs      f0, lbl_8051C588@sda21(r2)
-	stfs     f1, 8(r31)
-	fmadds   f1, f31, f31, f2
-	fcmpo    cr0, f1, f0
-	ble      lbl_802C4EBC
-	ble      lbl_802C4EC0
-	frsqrte  f0, f1
-	fmuls    f1, f0, f1
-	b        lbl_802C4EC0
-
-lbl_802C4EBC:
-	fmr      f1, f0
-
-lbl_802C4EC0:
-	fmr      f2, f30
-	lis      r3, atanTable___5JMath@ha
-	addi     r3, r3, atanTable___5JMath@l
-	bl       "atan2___Q25JMath18TAtanTable<1024,f>CFff"
-	lfs      f2, lbl_8051C5E0@sda21(r2)
-	lfs      f0, lbl_8051C588@sda21(r2)
-	fadds    f2, f2, f1
-	fcmpo    cr0, f2, f0
-	bge      lbl_802C4EF0
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fadds    f2, f0, f2
-	b        lbl_802C4F04
-
-lbl_802C4EF0:
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fcmpo    cr0, f2, f0
-	cror     2, 1, 2
-	bne      lbl_802C4F04
-	fsubs    f2, f2, f0
-
-lbl_802C4F04:
-	lfs      f1, 0xc(r31)
-	bl       angDist__Fff
-	lfs      f0, lbl_8051C588@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_802C4F20
-	fmr      f0, f1
-	b        lbl_802C4F24
-
-lbl_802C4F20:
-	fneg     f0, f1
-
-lbl_802C4F24:
-	lfs      f2, lbl_8051C5D8@sda21(r2)
-	fcmpo    cr0, f0, f2
-	ble      lbl_802C4F44
-	fdivs    f1, f1, f0
-	lfs      f0, 0xc(r31)
-	fnmsubs  f0, f2, f1, f0
-	stfs     f0, 0xc(r31)
-	b        lbl_802C4F50
-
-lbl_802C4F44:
-	lfs      f0, 0xc(r31)
-	fsubs    f0, f0, f1
-	stfs     f0, 0xc(r31)
-
-lbl_802C4F50:
-	lfs      f1, 0xc(r31)
-	lfs      f0, lbl_8051C588@sda21(r2)
-	fcmpo    cr0, f1, f0
-	bge      lbl_802C4F6C
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fadds    f1, f0, f1
-	b        lbl_802C4F80
-
-lbl_802C4F6C:
-	lfs      f0, lbl_8051C5DC@sda21(r2)
-	fcmpo    cr0, f1, f0
-	cror     2, 1, 2
-	bne      lbl_802C4F80
-	fsubs    f1, f1, f0
-
-lbl_802C4F80:
-	stfs     f1, 0xc(r31)
-	li       r3, 1
-	psq_l    f31, 72(r1), 0, qr0
-	lfd      f31, 0x40(r1)
-	psq_l    f30, 56(r1), 0, qr0
-	lfd      f30, 0x30(r1)
-	psq_l    f29, 40(r1), 0, qr0
-	lfd      f29, 0x20(r1)
-	psq_l    f28, 24(r1), 0, qr0
-	lfd      f28, 0x10(r1)
-	lwz      r0, 0x54(r1)
-	lwz      r31, 0xc(r1)
-	mtlr     r0
-	addi     r1, r1, 0x50
-	blr
-	*/
 }
 
 /**
@@ -1719,29 +1550,13 @@ lbl_802C4F80:
  */
 bool HoudaiShotGunMgr::returnShotGunRotation()
 {
-	f32 val = 0.0f;
-	if (val >= mYaw) {
-		if (TAU - (val - mYaw) < (val - mYaw)) {
-			val -= TAU;
-		}
-	} else if (TAU - (mYaw - val) < (mYaw - val)) {
-		val += TAU;
-	}
+	const f32 yawDifference = _normaliseAngle(mYaw);
+	mYaw                    = _clampAngle(mYaw, yawDifference, 0.025f);
 
-	mYaw = (absVal(mYaw - val) < 0.025f) ? val : (mYaw < val) ? mYaw + 0.025f : mYaw - 0.025f;
+	const f32 pitchDifference = _normaliseAngle(mPitch);
+	mPitch                    = _clampAngle(mPitch, pitchDifference, 0.025f);
 
-	f32 val3 = 0.0f;
-	if (val3 >= mPitch) {
-		if (TAU - (val3 - mPitch) < (val3 - mPitch)) {
-			val3 -= TAU;
-		}
-	} else if (TAU - (mPitch - val3) < (mPitch - val3)) {
-		val3 += TAU;
-	}
-
-	mPitch = (absVal(mPitch - val3) < 0.025f) ? val3 : (mPitch < val3) ? mPitch + 0.025f : mPitch - 0.025f;
-
-	if (absVal(mYaw - val) < 0.01f && absVal(mPitch - val3) < 0.01f) {
+	if (absVal(mYaw - yawDifference) < 0.01f && absVal(mPitch - pitchDifference) < 0.01f) {
 		return true;
 	}
 

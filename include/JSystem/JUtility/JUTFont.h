@@ -44,6 +44,13 @@ struct ResFONT {
 
 	// MAP1, size: 0x14
 	struct MapBlock : public BlockHeader {
+		enum MappingMethod {
+			MM_Direct         = 0,
+			MM_SjisConversion = 1,
+			MM_Indexed        = 2,
+			MM_BinarySearch   = 3,
+		};
+
 		// _00 = BlockHeader
 		u16 mMappingMethod; // _08
 		u16 mStartCode;     // _0A
@@ -105,7 +112,7 @@ struct JUTFont {
 	void initialize_state();
 	void setCharColor(JUtility::TColor color);
 	void setGradColor(JUtility::TColor bottomColor, JUtility::TColor topColor);
-	f32 drawString_size_scale(f32, f32, f32, f32, const char*, u32, bool);
+	f32 drawString_size_scale(f32 posX, f32 posY, f32 scaleX, f32 scaleY, const char* string, u32 length, bool unused);
 
 	void drawString(int posX, int posY, const char* str, bool visible) { drawString_size(posX, posY, str, strlen(str), visible); }
 
@@ -130,9 +137,9 @@ struct JUTFont {
 	bool isFixed() const { return mIsFixed; }
 	int getFixedWidth() const { return mFixedWidth; }
 
-	static bool isLeadByte_1Byte(int);
-	static bool isLeadByte_2Byte(int);
-	static bool isLeadByte_ShiftJIS(int);
+	static bool isLeadByte_1Byte(int) { return false; }
+	static bool isLeadByte_2Byte(int) { return true; }
+	static bool isLeadByte_ShiftJIS(int c) { return (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC); }
 
 	// _00 = VTBL
 	bool mIsValid;            // _04
@@ -239,7 +246,7 @@ struct JUTResFont : public JUTFont {
 	u16 mWidthBlockCount;               // _60
 	u16 mGlyphBlockCount;               // _62
 	u16 mMapBlockCount;                 // _64
-	u16 _66;                            // _66
+	u16 mCurrentGlyphBlockIndex;        // _66
 	u16 mMaxCode;                       // _68
 	const IsLeadByte* mIsLeadByte;      // _6C
 };

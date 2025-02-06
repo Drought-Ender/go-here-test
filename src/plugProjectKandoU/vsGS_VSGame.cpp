@@ -17,7 +17,7 @@ namespace VsGame {
  * @note Address: 0x8022EA94
  * @note Size: 0x44
  */
-VSState::VSState() { mId = 3; }
+VSState::VSState() { mId = VGS_VS; }
 
 /**
  * @note Address: 0x8022EAD8
@@ -27,13 +27,10 @@ void VSState::do_init(VsGameSection* gameSection)
 {
 	gameSystem->mMode = GSM_VERSUS_MODE;
 
-	gameSection->setPlayerMode(2);
+	gameSection->setPlayerMode(NAVIID_Multiplayer);
 	gameSection->setCamController();
 
-	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	mgr->checkScene();
-
-	mgr->mScenes->mChild->startMainSeq();
+	PSSystem::getSceneMgr()->doStartMainSeq();
 
 	gameSection->createFallPikmins(gameSection->mContainer1, 0);
 }

@@ -16,107 +16,39 @@ static f32 Unit01[] = { 0.0f, 1.0f };
  * @note Address: 0x8005EE78
  * @note Size: 0xF0
  */
-void J3DCalcBBoardMtx(Mtx mtx)
+void J3DCalcBBoardMtx(register Mtx mtx)
 {
-	f32 x = (mtx[0][0] * mtx[0][0]) + (mtx[1][0] * mtx[1][0]) + (mtx[2][0] * mtx[2][0]);
-	f32 y = (mtx[0][1] * mtx[0][1]) + (mtx[1][1] * mtx[1][1]) + (mtx[2][1] * mtx[2][1]);
-	f32 z = (mtx[0][2] * mtx[0][2]) + (mtx[1][2] * mtx[1][2]) + (mtx[2][2] * mtx[2][2]);
+	f32 x, y, z;
+
+	x = SQUARE(mtx[0][0]) + SQUARE(mtx[1][0]) + SQUARE(mtx[2][0]);
+	y = SQUARE(mtx[0][1]) + SQUARE(mtx[1][1]) + SQUARE(mtx[2][1]);
+	z = SQUARE(mtx[0][2]) + SQUARE(mtx[1][2]) + SQUARE(mtx[2][2]);
 	if (x > 0.0f) {
-		x *= sqrtf(x);
+		x = JMAFastSqrt(x);
 	}
 	if (y > 0.0f) {
-		y *= sqrtf(y);
+		y = JMAFastSqrt(y);
 	}
 	if (z > 0.0f) {
-		z *= sqrtf(z);
+		z = JMAFastSqrt(z);
 	}
 
+	register f32 zero = 0.0f;
+
+// zero out gaps of zeroes
+#ifdef __MWERKS__ // clang-format off
+    asm {
+        psq_st zero, 0x04(mtx), 0, 0
+      
+        psq_st zero, 0x20(mtx), 0, 0
+    }
+#endif // clang-format on
+
 	mtx[0][0] = x;
-	mtx[1][0] = 0.0f;
+	mtx[1][0] = zero;
 	mtx[1][1] = y;
-	mtx[1][2] = 0.0f;
+	mtx[1][2] = zero;
 	mtx[2][2] = z;
-
-	/*
-	lfs      f2, 0(r3)
-	lfs      f1, 0x10(r3)
-	fmuls    f2, f2, f2
-	lfs      f3, 0x20(r3)
-	fmuls    f1, f1, f1
-	lfs      f5, 4(r3)
-	lfs      f4, 0x14(r3)
-	fmuls    f7, f3, f3
-	lfs      f3, 8(r3)
-	fadds    f6, f2, f1
-	lfs      f2, 0x18(r3)
-	fmuls    f5, f5, f5
-	fmuls    f4, f4, f4
-	lfs      f8, 0x24(r3)
-	lfs      f9, 0x28(r3)
-	fmuls    f3, f3, f3
-	lfs      f1, lbl_80516998@sda21(r2)
-	fmuls    f2, f2, f2
-	fadds    f7, f7, f6
-	fmuls    f6, f8, f8
-	fadds    f5, f5, f4
-	fmuls    f4, f9, f9
-	fadds    f2, f3, f2
-	fcmpo    cr0, f7, f1
-	fadds    f3, f6, f5
-	fadds    f2, f4, f2
-	ble      lbl_8005EEFC
-	ble      lbl_8005EEF4
-	frsqrte  f1, f7
-	fmuls    f1, f1, f7
-	b        lbl_8005EEF8
-
-lbl_8005EEF4:
-	fmr      f1, f7
-
-lbl_8005EEF8:
-	fmr      f7, f1
-
-lbl_8005EEFC:
-	lfs      f1, lbl_80516998@sda21(r2)
-	fcmpo    cr0, f3, f1
-	ble      lbl_8005EF20
-	ble      lbl_8005EF18
-	frsqrte  f1, f3
-	fmuls    f1, f1, f3
-	b        lbl_8005EF1C
-
-lbl_8005EF18:
-	fmr      f1, f3
-
-lbl_8005EF1C:
-	fmr      f3, f1
-
-lbl_8005EF20:
-	lfs      f1, lbl_80516998@sda21(r2)
-	fcmpo    cr0, f2, f1
-	ble      lbl_8005EF44
-	ble      lbl_8005EF3C
-	frsqrte  f1, f2
-	fmuls    f1, f1, f2
-	b        lbl_8005EF40
-
-lbl_8005EF3C:
-	fmr      f1, f2
-
-lbl_8005EF40:
-	fmr      f2, f1
-
-lbl_8005EF44:
-	lfs      f0, lbl_80516998@sda21(r2)
-	psq_st   f0, 4(r3), 0, qr0
-	psq_st   f0, 32(r3), 0, qr0
-	stfs     f7, 0(r3)
-	stfs     f0, 0x10(r3)
-	stfs     f3, 0x14(r3)
-	stfs     f0, 0x18(r3)
-	stfs     f2, 0x28(r3)
-	blr
-	*/
 }
 
 /**
@@ -125,14 +57,14 @@ lbl_8005EF44:
  */
 void J3DCalcYBBoardMtx(Mtx mtx)
 {
-	f32 x = (mtx[0][0] * mtx[0][0]) + (mtx[1][0] * mtx[1][0]) + (mtx[2][0] * mtx[2][0]);
-	f32 z = (mtx[0][2] * mtx[0][2]) + (mtx[1][2] * mtx[1][2]) + (mtx[2][2] * mtx[2][2]);
+	f32 x = SQUARE(mtx[0][0]) + SQUARE(mtx[1][0]) + SQUARE(mtx[2][0]);
+	f32 z = SQUARE(mtx[0][2]) + SQUARE(mtx[1][2]) + SQUARE(mtx[2][2]);
 
 	if (x > 0.0f) {
-		x *= sqrtf(x);
+		x = JMAFastSqrt(x);
 	}
 	if (z > 0.0f) {
-		z *= sqrtf(z);
+		z = JMAFastSqrt(z);
 	}
 
 	Vec vec = { 0.0f, -mtx[2][1], mtx[1][1] };
@@ -145,99 +77,6 @@ void J3DCalcYBBoardMtx(Mtx mtx)
 	mtx[1][2] = vec.y * z;
 	mtx[2][0] = 0.0f;
 	mtx[2][2] = vec.z * z;
-	/*
-	stwu     r1, -0x40(r1)
-	mflr     r0
-	stw      r0, 0x44(r1)
-	stfd     f31, 0x30(r1)
-	psq_st   f31, 56(r1), 0, qr0
-	stfd     f30, 0x20(r1)
-	psq_st   f30, 40(r1), 0, qr0
-	stw      r31, 0x1c(r1)
-	mr       r31, r3
-	lfs      f0, lbl_80516998@sda21(r2)
-	lfs      f2, 0(r3)
-	lfs      f1, 0x10(r3)
-	fmuls    f2, f2, f2
-	lfs      f3, 0x20(r3)
-	fmuls    f1, f1, f1
-	lfs      f6, 8(r3)
-	lfs      f5, 0x18(r3)
-	fmuls    f4, f3, f3
-	fadds    f3, f2, f1
-	lfs      f7, 0x28(r3)
-	fmuls    f2, f6, f6
-	fmuls    f1, f5, f5
-	fadds    f31, f4, f3
-	fmuls    f3, f7, f7
-	fadds    f1, f2, f1
-	fcmpo    cr0, f31, f0
-	fadds    f30, f3, f1
-	ble      lbl_8005EFF0
-	ble      lbl_8005EFE8
-	frsqrte  f0, f31
-	fmuls    f0, f0, f31
-	b        lbl_8005EFEC
-
-lbl_8005EFE8:
-	fmr      f0, f31
-
-lbl_8005EFEC:
-	fmr      f31, f0
-
-lbl_8005EFF0:
-	lfs      f0, lbl_80516998@sda21(r2)
-	fcmpo    cr0, f30, f0
-	ble      lbl_8005F014
-	ble      lbl_8005F00C
-	frsqrte  f0, f30
-	fmuls    f0, f0, f30
-	b        lbl_8005F010
-
-lbl_8005F00C:
-	fmr      f0, f30
-
-lbl_8005F010:
-	fmr      f30, f0
-
-lbl_8005F014:
-	lis      r4, lbl_8047889C@ha
-	addi     r3, r1, 8
-	addi     r7, r4, lbl_8047889C@l
-	lwz      r6, 0(r7)
-	mr       r4, r3
-	lwz      r5, 4(r7)
-	lwz      r0, 8(r7)
-	stw      r6, 8(r1)
-	stw      r5, 0xc(r1)
-	stw      r0, 0x10(r1)
-	lfs      f0, 0x24(r31)
-	fneg     f0, f0
-	stfs     f0, 0xc(r1)
-	lfs      f0, 0x14(r31)
-	stfs     f0, 0x10(r1)
-	bl       PSVECNormalize
-	stfs     f31, 0(r31)
-	lfs      f1, lbl_80516998@sda21(r2)
-	stfs     f1, 8(r31)
-	stfs     f1, 0x10(r31)
-	lfs      f0, 0xc(r1)
-	fmuls    f0, f0, f30
-	stfs     f0, 0x18(r31)
-	stfs     f1, 0x20(r31)
-	lfs      f0, 0x10(r1)
-	fmuls    f0, f0, f30
-	stfs     f0, 0x28(r31)
-	psq_l    f31, 56(r1), 0, qr0
-	lfd      f31, 0x30(r1)
-	psq_l    f30, 40(r1), 0, qr0
-	lfd      f30, 0x20(r1)
-	lwz      r0, 0x44(r1)
-	lwz      r31, 0x1c(r1)
-	mtlr     r0
-	addi     r1, r1, 0x40
-	blr
-	*/
 }
 
 /**
@@ -632,66 +471,110 @@ ASM void J3DMtxProjConcat(register Mtx mtx1, register Mtx mtx2, register Mtx dst
  * @note Address: 0x8005F750
  * @note Size: 0xDC
  */
-void J3DPSMtxArrayConcat(Mtx mtxA, Mtx mtxB, Mtx dst, u32 count)
-{
-	/*
-	.loc_0x0:
-	  stwu      r1, -0x40(r1)
-	  stfd      f14, 0x8(r1)
-	  lis       r7, 0x8051
-	  stfd      f15, 0x10(r1)
-	  addi      r7, r7, 0x46E0
-	  stfd      f31, 0x28(r1)
-	  subi      r4, r4, 0x8
-	  subi      r5, r5, 0x8
-	  mtctr     r6
 
-	.loc_0x24:
-	  psq_l     f0,0x0(r3),0,0
-	  psq_l     f6,0x8(r4),0,0
-	  psq_l     f7,0x10(r4),0,0
-	  psq_l     f8,0x18(r4),0,0
-	  ps_muls0  f12, f6, f0
-	  psq_l     f2,0x10(r3),0,0
-	  ps_muls0  f13, f7, f0
-	  psq_l     f31,0x0(r7),0,0
-	  ps_muls0  f14, f6, f2
-	  psq_l     f9,0x20(r4),0,0
-	  ps_muls0  f15, f7, f2
-	  psq_l     f1,0x8(r3),0,0
-	  ps_madds1 f12, f8, f0, f12
-	  psq_l     f3,0x18(r3),0,0
-	  ps_madds1 f14, f8, f2, f14
-	  psq_l     f10,0x28(r4),0,0
-	  ps_madds1 f13, f9, f0, f13
-	  psq_lu    f11,0x30(r4),0,0
-	  ps_madds1 f15, f9, f2, f15
-	  psq_l     f4,0x20(r3),0,0
-	  psq_l     f5,0x28(r3),0,0
-	  ps_madds0 f12, f10, f1, f12
-	  ps_madds0 f13, f11, f1, f13
-	  ps_madds0 f14, f10, f3, f14
-	  ps_madds0 f15, f11, f3, f15
-	  psq_st    f12,0x8(r5),0,0
-	  ps_muls0  f2, f6, f4
-	  ps_madds1 f13, f31, f1, f13
-	  ps_muls0  f0, f7, f4
-	  psq_st    f14,0x18(r5),0,0
-	  ps_madds1 f15, f31, f3, f15
-	  psq_st    f13,0x10(r5),0,0
-	  ps_madds1 f2, f8, f4, f2
-	  ps_madds1 f0, f9, f4, f0
-	  ps_madds0 f2, f10, f5, f2
-	  psq_st    f15,0x20(r5),0,0
-	  ps_madds0 f0, f11, f5, f0
-	  psq_st    f2,0x28(r5),0,0
-	  ps_madds1 f0, f31, f5, f0
-	  psq_stu   f0,0x30(r5),0,0
-	  bdnz+     .loc_0x24
-	  lfd       f14, 0x8(r1)
-	  lfd       f15, 0x10(r1)
-	  lfd       f31, 0x28(r1)
-	  addi      r1, r1, 0x40
-	  blr
-	*/
+#ifdef __MWERKS__ // clang-format off
+asm void J3DPSMtxArrayConcat(register Mtx mA, register Mtx mB, register Mtx mAB, register u32 count) {
+#define FP0 fp0
+#define FP1 fp1
+#define FP2 fp2
+#define FP3 fp3
+#define FP4 fp4
+#define FP5 fp5
+#define FP6 fp6
+#define FP7 fp7
+#define FP8 fp8
+#define FP9 fp9
+#define FP10 fp10
+#define FP11 fp11
+#define FP12 fp12
+#define FP13 fp13
+#define FP14 fp14
+#define FP15 fp15
+#define FP31 fp31
+#define UNIT_R r7
+    
+    // this is just PSMtxConcat???
+    nofralloc
+    
+	stwu      sp, -0x40(sp)
+	stfd    FP14,  0x08(sp)
+	addis UNIT_R, 0, Unit01@ha
+	stfd    FP15,  0x10(sp)
+	addi  UNIT_R, UNIT_R, Unit01@l
+	stfd    FP31,  0x28(sp)
+    subi  mB,  mB, 0x08
+    subi mAB, mAB, 0x08
+    mtctr count
+loop:
+	psq_l   FP0, 0x00(mA), 0, 0
+	psq_l   FP6, 0x08(mB), 0, 0
+	psq_l   FP7, 0x10(mB), 0, 0
+	psq_l   FP8, 0x18(mB), 0, 0
+	    ps_muls0 FP12, FP6, FP0
+	psq_l   FP2, 0x10(mA), 0, 0
+	    ps_muls0 FP13, FP7, FP0
+	psq_l  FP31, 0x00(UNIT_R), 0, 0
+	    ps_muls0 FP14, FP6, FP2
+	psq_l   FP9, 0x20(mB), 0, 0
+	    ps_muls0 FP15, FP7, FP2
+	psq_l   FP1, 0x08(mA), 0, 0
+		ps_madds1 FP12, FP8, FP0, FP12
+	psq_l   FP3, 0x18(mA), 0, 0
+		ps_madds1 FP14, FP8, FP2, FP14
+	psq_l  FP10, 0x28(mB), 0, 0
+		ps_madds1 FP13, FP9, FP0, FP13
+	psq_lu FP11, 0x30(mB), 0, 0
+		ps_madds1 FP15, FP9, FP2, FP15
+	psq_l   FP4, 0x20(mA), 0, 0
+	psq_l   FP5, 0x28(mA), 0, 0
+        ps_madds0 FP12, FP10, FP1, FP12
+        ps_madds0 FP13, FP11, FP1, FP13
+        ps_madds0 FP14, FP10, FP3, FP14
+        ps_madds0 FP15, FP11, FP3, FP15
+	psq_st FP12, 0x08(mAB), 0, 0
+
+	    ps_muls0 FP2, FP6, FP4
+        ps_madds1 FP13, FP31, FP1, FP13
+	    ps_muls0 FP0, FP7, FP4
+	psq_st FP14, 0x18(mAB), 0, 0
+        ps_madds1 FP15, FP31, FP3, FP15
+
+	psq_st FP13, 0x10(mAB), 0, 0
+
+		ps_madds1 FP2, FP8, FP4, FP2
+		ps_madds1 FP0, FP9, FP4, FP0
+        ps_madds0 FP2, FP10, FP5, FP2
+	psq_st FP15, 0x20(mAB), 0, 0
+        ps_madds0 FP0, FP11, FP5, FP0
+	psq_st  FP2, 0x28(mAB), 0, 0
+        ps_madds1 FP0, FP31, FP5, FP0
+	psq_stu FP0, 0x30(mAB), 0, 0
+
+    bdnz loop
+
+    lfd    FP14, 0x08(sp)
+    lfd    FP15, 0x10(sp)
+	lfd    FP31, 0x28(sp)
+	addi sp, sp, 0x40
+	blr
+
+#undef FP0
+#undef FP1
+#undef FP2
+#undef FP3
+#undef FP4
+#undef FP5
+#undef FP6
+#undef FP7
+#undef FP8
+#undef FP9
+#undef FP10
+#undef FP11
+#undef FP12
+#undef FP13
+#undef FP14
+#undef FP15
+#undef FP31
+#undef UNIT_R
 }
+#endif // clang-format on

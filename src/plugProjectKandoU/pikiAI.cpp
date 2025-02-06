@@ -32,7 +32,7 @@ u8 Piki::sGraspSituationOptimise = 1;
  */
 int Piki::graspSituation_Fast(Game::Creature** outTarget)
 {
-	if (moviePlayer && moviePlayer->mDemoState != 0) {
+	if (moviePlayer && moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		*outTarget = nullptr;
 		if (!isZikatu() || playData->isDemoFlag(DEMO_Reunite_Captains)) {
 			return PikiAI::ACT_NULL;
@@ -98,7 +98,7 @@ int Piki::graspSituation_Fast(Game::Creature** outTarget)
 		case OBJTYPE_Pellet: { // can we pick up the pellet?
 			Pellet* pellet   = static_cast<Pellet*>(creature);
 			bool isGrabbable = true;
-			if (pellet->getKind() == PELTYPE_UPGRADE && gameSystem->isStoryMode()) {
+			if (pellet->getKind() == PelletType::Upgrade && gameSystem->isStoryMode()) {
 				int configIdx = pellet->getConfigIndex();
 				if (!playData->isFindItemDemoFlag(configIdx)) {
 					isGrabbable = false;
@@ -282,7 +282,7 @@ int Piki::graspSituation_Fast(Game::Creature** outTarget)
  */
 int Piki::graspSituation(Game::Creature** outTarget)
 {
-	if (moviePlayer && moviePlayer->mDemoState != 0) {
+	if (moviePlayer && moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		*outTarget = nullptr;
 		return PikiAI::ACT_NULL;
 	}
@@ -348,7 +348,7 @@ int Piki::graspSituation(Game::Creature** outTarget)
 		Pellet* pellet = *pelIter;
 		if (pellet->isAlive() && !pellet->mCaptureMatrix && pellet->getFreeStickSlot() != -1 && !isZikatu()) {
 			bool isGrabbable = true;
-			if (pellet->getKind() == PELTYPE_UPGRADE && gameSystem->isStoryMode()) {
+			if (pellet->getKind() == PelletType::Upgrade && gameSystem->isStoryMode()) {
 				int configIdx = pellet->getConfigIndex();
 				if (!playData->isFindItemDemoFlag(configIdx)) {
 					isGrabbable = false;
@@ -643,7 +643,7 @@ bool Piki::invokeAI(Game::CollEvent* event, bool check)
 			if (!gameSystem->isVersusMode() || pellet->getBedamaColor() != getKind()) {
 				if (pellet->getTotalPikmins() < pellet->getPelletConfigMax() && !pellet->discoverDisabled()) {
 					bool upgradeReady = true;
-					if (pellet->getKind() == PELTYPE_UPGRADE && gameSystem->isStoryMode()) {
+					if (pellet->getKind() == PelletType::Upgrade && gameSystem->isStoryMode()) {
 						int configIdx = pellet->getConfigIndex();
 						if (!playData->isFindItemDemoFlag(configIdx)) {
 							upgradeReady = false;
@@ -794,7 +794,7 @@ bool Piki::invokeAI(Game::PlatEvent* event)
 		break;
 
 	case OBJTYPE_Bridge:
-		if (FABS(event->mPosition.y) < 0.2f) {
+		if (FABS(event->mNormal.y) < 0.2f) {
 			ItemBridge::Item* bridge = static_cast<ItemBridge::Item*>(item);
 			if (bridge->isAlive() && bridge->workable(mPosition)) {
 				PikiAI::ActBridgeArg bridgeArg;
@@ -933,9 +933,9 @@ bool Piki::invokeAI()
  */
 bool Piki::setActTransportArg(PikiAI::ActTransportArg& actTransportArg)
 {
-	actTransportArg.mGoal = nullptr;
-	actTransportArg._0C   = Vector3f(0.0f); // unused
-	actTransportArg._18   = -1;             // unused
+	actTransportArg.mGoal          = nullptr;
+	actTransportArg.mUnusedPos     = Vector3f(0.0f); // unused
+	actTransportArg.mUnusedSlotVal = -1;             // unused
 	return true;
 }
 

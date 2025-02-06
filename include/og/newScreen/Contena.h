@@ -82,18 +82,7 @@ struct ObjContena : public ::Screen::ObjBase {
 	int mScreenState;                        // _AC
 	f32 mMoveTime;                           // _B0
 	f32 mTimer0;                             // _B4
-	int mOnyonID;                            // _B8
-	int mInOnionCount;                       // _BC
-	int mCurrField;                          // _C0
-	int mInSquadCount;                       // _C4
-	int mMaxPikiOnField;                     // _C8
-	int mInParty2;                           // _CC
-	int mOnMapCount;                         // _D0
-	int mMaxPikiCount;                       // _D4
-	int _D8;                                 // _D8
-	bool _DC;                                // _DC
-	int _E0;                                 // _E0
-	u16 _E4;                                 // _E4
+	og::Screen::DataContena mDataContena;    // _B8
 	int mDispState;                          // _E8
 	og::Screen::CallBack_Furiko* mFuriko;    // _EC
 	f32 mMenuMoveAngle;                      // _F0
@@ -101,7 +90,7 @@ struct ObjContena : public ::Screen::ObjBase {
 	J2DPane* mPaneSpot;                      // _F8
 	f32 mSpotX;                              // _FC
 	f32 mSpotY;                              // _100
-	f32 _104;                                // _104
+	f32 mSpotScale;                          // _104
 	f32 mTimer;                              // _108
 	bool mDoDraw;                            // _10C
 	f32 mFadeLevel;                          // _110
@@ -147,7 +136,7 @@ struct ObjContena : public ::Screen::ObjBase {
 			_2C = -1.0f;
 			_30 = 1.0f;
 			_34 = 0.55f;
-			_38 = 0.068f;
+			_38 = 0.0668f;
 		}
 
 		f32 _00; // _00

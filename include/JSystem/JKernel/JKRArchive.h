@@ -36,10 +36,10 @@ struct JKRArchive : public JKRFileLoader {
 		CArcName() { }
 		CArcName(const char* name) { store(name); }
 
-		u16 mHash;         // _00
-		u16 mLength;       // _02
-		char mString[256]; // _04
-		u8 _104[4];        // _104, unknown
+		u16 mHash;              // _00
+		u16 mLength;            // _02
+		char mString[PATH_MAX]; // _04
+		u8 _104[4];             // _104, unknown
 	};
 
 	struct SDIFileEntry {
@@ -198,6 +198,8 @@ inline JKRArchive* JKRMountArchive(void* inBuf, JKRHeap* heap, JKRArchive::EMoun
 {
 	return JKRArchive::mount(inBuf, heap, mountDirection);
 }
+
+inline ResTIMG* JKRGetArchiveImageResource(JKRArchive* arc, char const* name) { return (ResTIMG*)(arc->getResource(name)); }
 
 enum JKRMemBreakFlag { MBF_0 = 0, MBF_1 = 1 };
 

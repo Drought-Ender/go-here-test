@@ -35,6 +35,8 @@ static inline void J3DFifoWriteXFCmd(u16 cmd, u16 len)
 struct J3DCurrentMtxInfo {
 	u32 mMtxIdxRegA; // _00
 	u32 mMtxIdxRegB; // _04
+	u32 getMtxIdxRegA() const { return mMtxIdxRegA; }
+	u32 getMtxIdxRegB() const { return mMtxIdxRegB; }
 };
 
 struct J3DCurrentMtx : public J3DCurrentMtxInfo {
@@ -44,15 +46,21 @@ struct J3DCurrentMtx : public J3DCurrentMtxInfo {
 		mMtxIdxRegB = 0x00F3CF3C;
 	}
 
+	void operator=(const J3DCurrentMtxInfo& info)
+	{
+		mMtxIdxRegA = info.mMtxIdxRegA;
+		mMtxIdxRegB = info.mMtxIdxRegB;
+	}
+
 	u32 getMtxIdxRegA() const { return mMtxIdxRegA; }
 	u32 getMtxIdxRegB() const { return mMtxIdxRegB; }
 
 	inline void load() const
 	{
-		J3DFifoWriteCPCmd(0x30, getMtxIdxRegA()); // CP_MATINDEX_A
-		J3DFifoWriteCPCmd(0x40, getMtxIdxRegB()); // CP_MATINDEX_B
+		J3DFifoWriteCPCmd(0x30, ((J3DCurrentMtxInfo*)this)->mMtxIdxRegA); // CP_MATINDEX_A
+		J3DFifoWriteCPCmd(0x40, ((J3DCurrentMtxInfo*)this)->mMtxIdxRegB); // CP_MATINDEX_B
 		J3DFifoWriteXFCmd(0x1018, 2);
-		GXWGFifo.u32 = getMtxIdxRegA();
+		GXWGFifo.s32 = getMtxIdxRegA();
 		GXWGFifo.u32 = getMtxIdxRegB();
 	}
 
@@ -69,7 +77,7 @@ struct J3DCurrentMtx : public J3DCurrentMtxInfo {
  * @size{0x4C}
  */
 struct J3DMaterial {
-	inline J3DMaterial() { initialize(); }
+	J3DMaterial() { initialize(); }
 
 	~J3DMaterial() { }
 
@@ -131,6 +139,7 @@ struct J3DMaterial {
 
 	// unused?
 	void makeDisplayList_private(J3DDisplayListObj* obj);
+	void copy(J3DMaterial* other);
 
 	// VTBL _00
 	J3DMaterial* mNext;              // _04
@@ -185,6 +194,8 @@ struct J3DLockedMaterial : public J3DMaterial {
  * @size{0x4C}
  */
 struct J3DPatchedMaterial : public J3DMaterial {
+	J3DPatchedMaterial() { initialize(); }
+
 	virtual void makeDisplayList();       // _10
 	virtual void makeSharedDisplayList(); // _14
 	virtual void load();                  // _18

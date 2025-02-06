@@ -32,6 +32,9 @@ static const u32 padding[] = { 0, 0, 0 };
 
 namespace PSM {
 
+int Scene_Ground::cEvenning_fadeOuTime = 150;
+int Scene_Ground::cEvenning_fadeInTime = 150;
+
 /**
  * @note Address: 0x80467630
  * @note Size: 0x84
@@ -129,7 +132,7 @@ PSSystem::StreamBgm* Scene_Global::getGlobalStream()
 {
 	PSSystem::SeqBase* seq = mSeqMgr.getSeq(1);
 	P2ASSERTLINE(114, seq);
-	P2ASSERTLINE(115, seq->getCastType() == 1);
+	P2ASSERTLINE(115, seq->getCastType() == PSSystem::SeqBase::TYPE_StreamBgm);
 	return static_cast<PSSystem::StreamBgm*>(seq);
 }
 
@@ -514,7 +517,9 @@ void Scene_Game::bossKilled(PSM::EnemyBoss* obj)
 	PSM::BossBgmFader::Mgr* mgr = PSSystem::SingletonBase<PSM::BossBgmFader::Mgr>::getInstance();
 	if (!mgr->checkBossActive() && seq) {
 		seq = PSMGetMiddleBossSeq();
-		if (seq && (seq->mJumpPort._70 == 2 || seq->mJumpPort._70 == 8)) {
+		if (seq
+		    && (seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackPrep
+		        || seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackLong)) {
 			obj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 		}
 	}
@@ -1149,10 +1154,10 @@ void Scene_Game::adaptEnvSe(PSSystem::EnvSeMgr* mgr)
  */
 void Scene_Game::bossAppear(PSM::EnemyBoss* obj, u16 time)
 {
-	if (PSMGetMiddleBossSeq() && (!mBossFaderMgr || mBossFaderMgr->mTypedProc.mCurrState == 0)) {
+	if (PSMGetMiddleBossSeq() && (!mBossFaderMgr || mBossFaderMgr->mTypedProc.mCurrProcState == BossBgmFader::TypedProc::PROC_None)) {
 		obj->jumpRequest(time);
 		if (mBossFaderMgr) {
-			mBossFaderMgr->mTypedProc.mNeedJump = 1;
+			mBossFaderMgr->mTypedProc.mNeedJump = true;
 		}
 	}
 }
@@ -1273,7 +1278,7 @@ bool Scene_Game::akubiOK()
 		result = true;
 	}
 
-	if (result && getMiddleBossBgm() && getMiddleBossBgm()->mJumpPort._70 != 0) {
+	if (result && getMiddleBossBgm() && getMiddleBossBgm()->mJumpPort.mCurrentTrackId != 0) {
 		result = false;
 	}
 	return result;
@@ -1319,17 +1324,17 @@ void Scene_Ground::fadeMainBgm(f32 p1, u32 p2, PSM::Scene_Ground::Time time)
 	case GroundTime_On:
 		if (p1 == 0.0f) {
 			if (*seq->getHandleP()) {
-				(*seq->getHandleP())->setVolume(p1, p2, 2);
+				(*seq->getHandleP())->setVolume(p1, p2, SOUNDPARAM_Demo);
 			}
 			if (mEnvSeMgr) {
-				mEnvSeMgr->setVolumeRequest(p1, p2, 2);
+				mEnvSeMgr->setVolumeRequest(p1, p2, SOUNDPARAM_Demo);
 			}
 		} else {
 			if (*seq->getHandleP()) {
-				(*seq->getHandleP())->setVolume(p1, p2 * 3, 2);
+				(*seq->getHandleP())->setVolume(p1, p2 * 3, SOUNDPARAM_Demo);
 			}
 			if (mEnvSeMgr) {
-				mEnvSeMgr->setVolumeRequest(p1, p2, 2);
+				mEnvSeMgr->setVolumeRequest(p1, p2, SOUNDPARAM_Demo);
 			}
 		}
 		break;
@@ -1347,7 +1352,7 @@ void Scene_Ground::jumpMainBgm(u8 time)
 {
 	MiddleBossSeq* seq = static_cast<MiddleBossSeq*>(mSeqMgr.getFirst()->getObject());
 	P2ASSERTLINE(846, seq);
-	P2ASSERTLINE(847, seq->getCastType() == CCT_EnemyBoss);
+	P2ASSERTLINE(847, seq->getCastType() == PSSystem::SeqBase::TYPE_JumpBgmSeq);
 	seq->requestJumpBgmOnBeat(time);
 
 	if (mEnvSeMgr) {
@@ -1554,7 +1559,7 @@ void Scene_Ground::changeEnvSE_Noon()
 Scene_Cave::Scene_Cave(u8 p1, PSGame::SceneInfo* info)
     : Scene_Game(p1, info)
     , mPollutUpTimer(-1)
-    , _5C(false)
+    , mHasStartedBossBgm(false)
 {
 	PSGame::CaveFloorInfo* floorInfo = static_cast<PSGame::CaveFloorInfo*>(info);
 	switch (floorInfo->mAlphaType) {
@@ -1807,12 +1812,12 @@ void Scene_Cave::startPollutUpSe()
 		JAISe* se1 = PSSystem::spSysIF->playSystemSe(PSSE_EV_POLUTIONMIX_DOWN01, 0);
 		JAISe* se2 = PSSystem::spSysIF->playSystemSe(PSSE_EV_POLUTIONMIX_DOWN02, 0);
 		if (se1) {
-			se1->setPan(1.0f, 80, 0);
-			se1->setDolby(1.0f, 80, 0);
+			se1->setPan(1.0f, 80, SOUNDPARAM_Unk0);
+			se1->setDolby(1.0f, 80, SOUNDPARAM_Unk0);
 		}
 		if (se2) {
-			se2->setPan(1.0f, 80, 0);
-			se2->setDolby(1.0f, 80, 0);
+			se2->setPan(1.0f, 80, SOUNDPARAM_Unk0);
+			se2->setDolby(1.0f, 80, SOUNDPARAM_Unk0);
 		}
 	}
 }
@@ -1860,7 +1865,7 @@ void Scene_Cave::init()
 void Scene_Cave::bossAppear(PSM::EnemyBoss* obj, u16 flag)
 {
 	if (isBossFloor()) {
-		if (_5C) {
+		if (mHasStartedBossBgm) {
 			return;
 		}
 		MiddleBossSeq* seq = PSMGetMiddleBossSeq();
@@ -1868,7 +1873,7 @@ void Scene_Cave::bossAppear(PSM::EnemyBoss* obj, u16 flag)
 			seq->startSeq(flag);
 			seq->setAvoidJumpTimer_Checked(180);
 		}
-		_5C = 1;
+		mHasStartedBossBgm = true;
 	} else {
 		Scene_Game::bossAppear(obj, flag);
 	}
@@ -1886,7 +1891,8 @@ void Scene_Cave::bossKilled(PSM::EnemyBoss* obj)
 		if (seq) {
 			if (!check) {
 				seq->stopSeq(40);
-			} else if (seq->mJumpPort._70 == 2 || seq->mJumpPort._70 == 8) {
+			} else if (seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackPrep
+			           || seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackLong) {
 				obj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 			}
 		}
@@ -1895,7 +1901,9 @@ void Scene_Cave::bossKilled(PSM::EnemyBoss* obj)
 		bool check         = PSSystem::SingletonBase<BossBgmFader::Mgr>::getInstance()->checkBossActive();
 		if (!check && seq) {
 			seq = PSMGetMiddleBossSeq();
-			if (seq && (seq->mJumpPort._70 == 2 || seq->mJumpPort._70 == 8)) {
+			if (seq
+			    && (seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackPrep
+			        || seq->mJumpPort.mCurrentTrackId == EnemyMidBoss::BossBgm_AttackLong)) {
 				obj->jumpRequest(PSM::EnemyMidBoss::BossBgm_MainLoop);
 			}
 		}
@@ -1944,7 +1952,7 @@ void Scene_Challenge::startMainSeq()
 		seq->startSeq();
 		JAISound* se = *seq->getHandleP();
 		if (se) {
-			se->setVolume(0.0f, 0, 2);
+			se->setVolume(0.0f, 0, SOUNDPARAM_Demo);
 		}
 	}
 }
@@ -2015,14 +2023,14 @@ void* PSChangeBgm_ChallengeGame()
 		P2ASSERTLINE(1181, seq);
 		JAISound* sound = *seq->getHandleP();
 		if (sound) {
-			sound->setVolume(0.0f, 0, 1);
+			sound->setVolume(0.0f, 0, SOUNDPARAM_Dopplar);
 		}
 
 		PSSystem::SeqBase* seq2 = seqmgr->getSeq(2);
 		P2ASSERTLINE(1190, seq2);
 		JAISound* sound2 = *seq2->getHandleP();
 		if (sound2) {
-			sound2->setVolume(1.0f, 30, 2);
+			sound2->setVolume(1.0f, 30, SOUNDPARAM_Demo);
 		}
 	}
 	/*
@@ -2165,9 +2173,7 @@ lbl_8046B754:
  */
 void PSStart2DStream(u32 id)
 {
-	PSSystem::StreamBgm* seq = static_cast<PSSystem::StreamBgm*>(PSMGetSceneMgrCheck()->mScenes->mSeqMgr.getSeq(1));
-	P2ASSERTLINE(114, seq);
-	P2ASSERTLINE(115, seq->getCastType() == 1);
+	PSSystem::StreamBgm* seq = static_cast<PSM::Scene_Global*>(PSMGetSceneMgrCheck()->mScenes)->getGlobalStream();
 	seq->setId(id);
 	seq->startSeq();
 }
@@ -2178,9 +2184,7 @@ void PSStart2DStream(u32 id)
  */
 u8 PSStop2DStream()
 {
-	PSSystem::StreamBgm* seq = static_cast<PSSystem::StreamBgm*>(PSMGetSceneMgrCheck()->mScenes->mSeqMgr.getSeq(1));
-	P2ASSERTLINE(114, seq);
-	P2ASSERTLINE(115, seq->getCastType() == 1);
+	PSSystem::StreamBgm* seq = static_cast<PSM::Scene_Global*>(PSMGetSceneMgrCheck()->mScenes)->getGlobalStream();
 	seq->stopSeq(30);
 }
 
@@ -2224,7 +2228,7 @@ void PSPauseOff() { static_cast<PSM::Scene_Game*>(PSMGetChildScene())->pauseOff_
  */
 void PSStartChallengeTimeUpStream()
 {
-	PSStart2DStream(0xc0011016);
+	PSStart2DStream(P2_STREAM_SOUND_ID(PSSTR_CHALLENGE_TIMEUP));
 
 	PSM::Scene_Game* scene = static_cast<PSM::Scene_Game*>(PSMGetChildScene());
 	PSSystem::checkGameScene(scene);
@@ -2240,7 +2244,7 @@ void PSMuteSE_on2D()
 {
 	PSSystem::SeqBase* seq = PSMGetSceneMgrCheck()->mScenes->mSeqMgr.getSeq(0);
 	JAISound* se           = *seq->getHandleP();
-	se->setVolume(0.0f, 0, 0);
+	se->setVolume(0.0f, 0, SOUNDPARAM_Unk0);
 }
 
 /**
@@ -2251,5 +2255,5 @@ void PSMuteOffSE_on2D()
 {
 	PSSystem::SeqBase* seq = PSMGetSceneMgrCheck()->mScenes->mSeqMgr.getSeq(0);
 	JAISound* se           = *seq->getHandleP();
-	se->setVolume(1.0f, 0, 0);
+	se->setVolume(1.0f, 0, SOUNDPARAM_Unk0);
 }

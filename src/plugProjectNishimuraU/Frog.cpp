@@ -138,7 +138,7 @@ void Obj::getShadowParam(ShadowParam& param)
 	param.mPosition.z = boundingSphere.mPosition.z;
 
 	if (isAlive()) {
-		if (mBounceTriangle) {
+		if (mFloorTriangle) {
 			if (isEvent(1, EB2_Earthquake)) {
 				param.mBoundingSphere.mRadius = 75.0f;
 			} else {
@@ -169,7 +169,7 @@ void Obj::collisionCallback(CollEvent& event)
 		if (!isEvent(0, EB_Bittered)) {
 
 			if (mIsFalling) {
-				if (creature->mBounceTriangle) {
+				if (creature->mFloorTriangle) {
 					if (creature->isNavi() || creature->isPiki()) {
 						InteractPress press(this, C_GENERALPARMS.mAttackDamage.mValue, nullptr);
 						event.mCollidingCreature->stimulate(press);
@@ -388,8 +388,8 @@ void Obj::pressOnGround()
 		createDropEffect(fxPos, getDownSmokeScale());
 	}
 
-	cameraMgr->startVibration(6, fxPos, 2);
-	rumbleMgr->startRumble(14, fxPos, 2);
+	cameraMgr->startVibration(VIBTYPE_LightFastShort, fxPos, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed14, fxPos, RUMBLEID_Both);
 
 	if (mWaterBox) {
 		getJAIObject()->startSound(PSSE_EN_FROG_WATERLAND, 0);
@@ -437,8 +437,8 @@ void Obj::createDownEffect(f32 scale)
 		createDropEffect(fxPos, scale);
 	}
 
-	cameraMgr->startVibration(0, mPosition, 2);
-	rumbleMgr->startRumble(11, mPosition, 2);
+	cameraMgr->startVibration(VIBTYPE_LightSlowShort, mPosition, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed11, mPosition, RUMBLEID_Both);
 }
 
 /**

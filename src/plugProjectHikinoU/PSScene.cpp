@@ -137,10 +137,12 @@ void Scene::stopAllSound(u32 time) { mSeqMgr.stopAllSound(time); }
 void Scene::scene1st(TaskChecker* task)
 {
 	WaveLoader* wave = mWaveLoader;
+
 	if (wave) {
-		(wave)->loadWave(task, WaveScene::AREA_0);
-		(wave)->loadWave(task, WaveScene::AREA_1);
+		wave->loadWave(task, WaveScene::AREA_0);
+		wave->loadWave(task, WaveScene::AREA_1);
 	}
+
 	mSeqMgr.scene1st(task);
 }
 
@@ -152,10 +154,10 @@ void Scene::scene1stLoadSync()
 {
 	volatile TaskChecker task;
 	OSInitMutex((OSMutex*)&task.mMutex);
-	task._18 = 0;
+	task.mTaskIndex = 0;
 	scene1st((TaskChecker*)&task);
 
-	while (task._18) { }
+	while (task.mTaskIndex) { }
 }
 
 /**

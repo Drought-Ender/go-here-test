@@ -81,13 +81,13 @@ struct Obj : public EnemyBase {
 	// _00 		= VTBL
 	// _00-_2BC	= EnemyBase
 	FSM* mFsm;                 // _2BC
-	u8 _2C0;                   // _2C0
+	u8 mCanSearchBridge;       // _2C0
 	bool mIsUnderground;       // _2C1
 	u16 mAppearCheck;          // _2C2
 	StateID mNextState;        // _2C4
 	ItemBridge::Item* mBridge; // _2C8
-	f32 _2CC;                  // _2CC
-	f32 _2D0;                  // _2D0
+	f32 mBridgeGoalRandOffsX;  // _2CC
+	f32 mBridgeTargetMaxWidth; // _2D0
 	                           // _2D4 = PelletView
 };
 
@@ -112,7 +112,7 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mBridgeDamage(this, 'fp01', "ã¥êHÇ¢ÉpÉèÅ[", 25.0f, 0.0f, 100.0f) // 'bridge eating power'
+		    , mBridgeDamage(this, 'fp01', "Ê©ãÈ£ü„ÅÑ„Éë„ÉØ„Éº", 25.0f, 0.0f, 100.0f) // 'bridge eating power'
 		{
 		}
 

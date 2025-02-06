@@ -29,8 +29,8 @@ struct DataNavi {
 	f32 mNaviLifeRatio; // _00
 	u32 mFollowPikis;   // _04
 	u32 mNextThrowPiki; // _08
-	u32 mDope1Count;    // _0C
-	u32 mDope0Count;    // _10
+	u32 mDope1Count;    // _0C, bitter sprays
+	u32 mDope0Count;    // _10, spicy sprays
 	u8 mActiveNaviID;   // _14
 };
 
@@ -80,6 +80,37 @@ struct DataMap {
 	u32 mCurrentPikminCounts[5]; // _18, indexed by MapPiki enum
 	u32 mFreePikmin;             // _2C
 	u32 mPokos;                  // _30
+};
+
+struct DataContena {
+	inline DataContena()
+	{
+		mInOnionCount   = 100;
+		mCurrField      = 1000;
+		mInSquadCount   = 0;
+		mMaxPikiOnField = 20;
+		mInParty2       = 50;
+		mOnMapCount     = 60;
+		mMaxPikiCount   = 200;
+		mOnyonID        = -1;
+		mInTransfer     = 0;
+		mExitSoundType  = 0;
+		mState          = 0;
+		mResult         = 0;
+	}
+
+	int mOnyonID;        // _00
+	u32 mInOnionCount;   // _04
+	u32 mCurrField;      // _08
+	u32 mInSquadCount;   // _0C
+	u32 mMaxPikiOnField; // _10
+	u32 mInParty2;       // _14
+	u32 mOnMapCount;     // _18
+	u32 mMaxPikiCount;   // _1C
+	u32 mInTransfer;     // _20
+	bool mExitSoundType; // _24
+	int mState;          // _28
+	s16 mResult;         // _2C
 };
 } // namespace Screen
 } // namespace og

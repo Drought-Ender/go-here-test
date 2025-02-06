@@ -80,7 +80,7 @@ struct BridgeParms : public CreatureParms {
 	struct Parms : public Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "Bridge::Parms")
-		    , mHealth(this, 'p000', "ƒ‰ƒCƒt", 100.0f, 0.0f, 40000.0f) // 'life'
+		    , mHealth(this, 'p000', "ãƒ©ã‚¤ãƒ•", 100.0f, 0.0f, 40000.0f) // 'life'
 		{
 		}
 
@@ -142,7 +142,7 @@ struct Item : public WorkItem<Item, FSM, State> {
 	// _00-_1EC = WorkItem
 	Mabiki mMabiki;                             // _1EC
 	f32 mFaceDir;                               // _1F4
-	u8 _1F8;                                    // _1F8
+	u8 mBreakDelay;                             // _1F8
 	WayPoint* mBridgeWP;                        // _1FC, follows bridge as it unfurls
 	WayPoint* mEndWP;                           // _200, waypoint on other side of bridge
 	PlatInstanceAttacher mPlatInstanceAttacher; // _204

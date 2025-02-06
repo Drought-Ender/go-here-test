@@ -81,13 +81,13 @@ Navi::Navi()
 	mFsm = new NaviFSM;
 	mFsm->init(this);
 
-	mCPlateMgr = new CPlate(100);
+	mCPlateMgr = new CPlate(MAX_PIKI_COUNT);
 	mMass      = 1.0f;
 
 	mFootmarks = new Footmarks;
 	mFootmarks->alloc(16);
 
-	mUpdateContext._09 = true;
+	mUpdateContext.mDoForceActive = true;
 
 	mCursorMatAnim = new Sys::MatRepeatAnimator;
 	mArrowMatAnim  = new Sys::MatLoopAnimator;
@@ -101,9 +101,8 @@ Navi::Navi()
  */
 void Navi::onInit(Game::CreatureInitArg* arg)
 {
-	mStickCount = 0;
-	_258        = 0;
-	u16 uVar2;
+	mStickCount      = 0;
+	mPlateScaleTimer = 0;
 
 	clearKaisanDisable();
 	clearThrowDisable();
@@ -111,8 +110,8 @@ void Navi::onInit(Game::CreatureInitArg* arg)
 	mInvincibleTimer = 0;
 	mCStickAngle     = 0.0f;
 
-	mSprayCounts[1] = 0;
-	mSprayCounts[0] = 0;
+	mSprayCounts[SPRAY_TYPE_BITTER] = 0;
+	mSprayCounts[SPRAY_TYPE_SPICY]  = 0;
 
 	initFakePiki();
 	naviMgr->setupNavi(this);
@@ -125,7 +124,7 @@ void Navi::onInit(Game::CreatureInitArg* arg)
 
 	initAnimator();
 
-	mIsAlive             = false;
+	mHideModel           = false;
 	mSceneAnimationTimer = 0.0f;
 
 	mWhistle = new NaviWhistle(this);
@@ -133,11 +132,11 @@ void Navi::onInit(Game::CreatureInitArg* arg)
 	_2DE           = 0;
 	mNextThrowPiki = nullptr;
 	mHoldPikiTimer = 0.0f;
-	_2AC           = 0;
+	mUnusedFlag2   = 0;
 
 	mCollTree->createFromFactory(mModel, naviMgr->mCollData, nullptr);
 	JUT_ASSERTLINE(838, ((int)mCollTree->mPart) >= 0x80000000,
-	               "ƒUƒ“[[iE„tEj[[ƒlƒ“\n"); // 'disappointttttt D: ?? ment' (lol)
+	               "ã‚¶ãƒ³?[?[ï¼ˆãƒ»Ð´ãƒ»ï¼‰âˆ’âˆ’ãƒãƒ³\n"); // 'disappointttttt D: ?? ment' (lol)
 	mCollTree->attachModel(mModel);
 
 	mFsm->start(this, NSID_Walk, nullptr);
@@ -158,15 +157,16 @@ void Navi::onInit(Game::CreatureInitArg* arg)
 	setLifeMax();
 
 	mPluckingCounter = 0;
-	_269             = 0;
-	Vector3f navi_scale; // navi model scale
-	navi_scale = Vector3f(OLIMAR_SCALE);
+	mUnusedFlag      = 0;
 
-	if (mNaviIndex == NAVIID_Louie) { // case for Louie/President scale
-		navi_scale = Vector3f(LOUIE_SCALE);
+	Vector3f modelScale;
+	modelScale = Vector3f(OLIMAR_SCALE);
+	if (mNaviIndex == NAVIID_Louie) {
+		modelScale = Vector3f(LOUIE_SCALE);
 	}
 
-	mScale = navi_scale;
+	mScale = modelScale;
+
 	int id = mNaviIndex;
 	mCursorMatAnim->start(&naviMgr->mCursorAnims[id]);
 	mArrowMatAnim->start(&naviMgr->mMarkerAnims[id]);
@@ -179,7 +179,7 @@ void Navi::onInit(Game::CreatureInitArg* arg)
 void Navi::onSetPosition(Vector3f& position)
 {
 	mPosition = position;
-	static_cast<FakePiki*>(this)->onSetPosition(); // dumb.
+	static_cast<FakePiki*>(this)->onSetPosition(); // Call base class version
 
 	if (mNaviIndex == NAVIID_Olimar) { // olimar
 		Radar::Mgr::entry(this, Radar::MAP_OLIMAR, 0);
@@ -233,9 +233,10 @@ void Navi::onKeyEvent(const SysShape::KeyEvent& event)
 Vector3f Navi::getPosition()
 {
 	if (moviePlayer && moviePlayer->isFlag(MVP_IsActive)) {
-		Matrixf* mat = mModel->mJoints->getWorldMatrix();
+		Matrixf* worldMtx = mModel->mJoints->getWorldMatrix();
+
 		Vector3f position;
-		mat->getTranslation(position);
+		worldMtx->getTranslation(position);
 		return position;
 
 	} else {
@@ -273,9 +274,9 @@ bool Navi::procActionButton()
 {
 	f32 minDist;
 	if (mPluckingCounter) {
-		minDist = naviMgr->mNaviParms->mNaviParms.mAutopluckDistance.mValue; // 'continuous extraction distance' - autoplucking range?
+		minDist = naviMgr->mNaviParms->mNaviParms.mAutopluckDistance.mValue;
 	} else {
-		minDist = naviMgr->mNaviParms->mNaviParms.mActionRadius.mValue; // 'action radius' - first pluck range
+		minDist = naviMgr->mNaviParms->mNaviParms.mActionRadius.mValue;
 	}
 
 	Iterator<ItemPikihead::Item> iter(ItemPikihead::mgr);
@@ -285,17 +286,18 @@ bool Navi::procActionButton()
 	// find (closest) pluckable sprout within range
 	CI_LOOP(iter)
 	{
-		ItemPikihead::Item* sprout = *iter;
+		BaseItem* item             = *iter;
+		ItemPikihead::Item* sprout = (ItemPikihead::Item*)item;
 		Vector3f sproutPos         = sprout->getPosition();
 		Vector3f naviPos           = getPosition();
-		f32 heightDiff             = FABS(sproutPos.y - naviPos.y);
-		f32 sqrXZ                  = sqrDistanceXZ(sproutPos, naviPos);
+		f32 heightDistance         = absF(sproutPos.y - naviPos.y);
+		f32 horizontalDistance     = sqrDistanceXZ(sproutPos, naviPos);
 
 		// sprout has to be pluckable, closer than current/within range, not at massive height difference
 		// AND either we're not in VS mode OR sprout color matches captain color
-		if (sprout->canPullout() && sqrXZ < minDist && heightDiff < 25.0f
+		if (sprout->canPullout() && horizontalDistance < minDist && heightDistance < 25.0f
 		    && (!gameSystem->isVersusMode() || sprout->mColor == (1 - mNaviIndex))) {
-			minDist      = sqrXZ;
+			minDist      = horizontalDistance;
 			targetSprout = sprout;
 		}
 	}
@@ -816,12 +818,16 @@ lbl_80140C64:
 void Navi::setupNukuAdjustArg(ItemPikihead::Item* item, NaviNukuAdjustStateArg& arg)
 {
 	Vector3f direction = item->getPosition() - getPosition();
-	arg._00            = angDist(roundAng(pikmin2_atan2f(direction.x, direction.z)), mFaceDir) / 10.0f;
+	arg.mAngleToItem   = angDist(roundAng(pikmin2_atan2f(direction.x, direction.z)), mFaceDir) / 10.0f;
 
-	f32 length    = pikmin2_sqrtf(direction.sqrMagnitude());
-	f32 norm      = 1.0f / length;
-	arg._04       = direction * (3.0003002f * (norm * (length - 15.0f)));
-	arg._10       = 2;
+	f32 distance = pikmin2_sqrtf(direction.sqrMagnitude());
+	f32 norm     = 1.0f / distance;
+
+	// These two lines are unused
+	// Minimum distance to item is 15.0f
+	arg.mUnusedVelocity = direction * (3.0003002f * (norm * (distance - 15.0f)));
+	arg.mUnusedState    = 2;
+
 	arg.mPikihead = item;
 }
 
@@ -832,10 +838,10 @@ void Navi::setupNukuAdjustArg(ItemPikihead::Item* item, NaviNukuAdjustStateArg& 
 bool Navi::hasDope(int sprayType)
 {
 	if (gameSystem->isVersusMode()) {
-		return (mSprayCounts[sprayType] > 0); // signed to generate andc
-	} else {
-		return playData->hasDope(sprayType);
+		return mSprayCounts[sprayType] > 0;
 	}
+
+	return playData->hasDope(sprayType);
 }
 
 /**
@@ -846,9 +852,9 @@ int Navi::getDopeCount(int sprayType)
 {
 	if (gameSystem->isVersusMode()) {
 		return (mSprayCounts[sprayType]);
-	} else {
-		return playData->getDopeCount(sprayType);
 	}
+
+	return playData->getDopeCount(sprayType);
 }
 
 /**
@@ -858,10 +864,10 @@ int Navi::getDopeCount(int sprayType)
 void Navi::useDope(int sprayType)
 {
 	if (gameSystem->isVersusMode()) {
-		(mSprayCounts[sprayType]--);
-	} else {
-		playData->useDope(sprayType);
+		mSprayCounts[sprayType]--;
 	}
+
+	playData->useDope(sprayType);
 }
 
 /**
@@ -1133,8 +1139,10 @@ void Navi::platCallback(PlatEvent& plat)
 			NaviFlickArg arg(obj, mag, naviMgr->mNaviParms->mNaviParms.mElectricGateDamage());
 			transit(NSID_Flick, &arg);
 		}
+
 		return;
 	}
+
 	if (plat.mInstance->mId.match('finl', '*')) {
 		mCPlateMgr->shrink();
 	}
@@ -1263,7 +1271,7 @@ SysShape::Model* Navi::viewGetShape() { return mModel; }
  * @note Address: 0x80141744
  * @note Size: 0x1C
  */
-f32 Navi::viewGetBaseScale() { return mNaviIndex == NAVIID_Olimar ? 1.3f : 1.5f; }
+f32 Navi::viewGetBaseScale() { return mNaviIndex == NAVIID_Olimar ? OLIMAR_SCALE : LOUIE_SCALE; }
 
 /**
  * @note Address: 0x80141760
@@ -1274,8 +1282,8 @@ f32 Navi::viewGetBaseScale() { return mNaviIndex == NAVIID_Olimar ? 1.3f : 1.5f;
 void Navi::doEntry()
 {
 	FakePiki::doEntry();
-	if (!isAlive() && mIsAlive) {
-		RESET_FLAG(mLod.mFlags, 0x34);
+	if (!isAlive() && mHideModel) {
+		mLod.resetFlag(AILOD_IsVisibleBoth);
 	}
 
 	if (mController1 == nullptr) {
@@ -1336,19 +1344,24 @@ void Navi::doAnimation()
 	if (isMovieMotion()) {
 		f32 time = sys->mDeltaTime;
 		updateCell();
+
 		AILODParm parm;
 		parm.mFar   = 0.02f;
 		parm.mClose = 0.015f;
 		updateLOD(parm);
+
 		mModel->clearAnimatorAll();
-		f32 calc = time * 30.0f;
-		mAnimator.mSelfAnimator.animate(calc);
-		mAnimator.mBoundAnimator.animate(calc);
+
+		f32 animTime = time * 30.0f;
+		mAnimator.mSelfAnimator.animate(animTime);
+		mAnimator.mBoundAnimator.animate(animTime);
+
 		updateTrMatrix();
-		SysShape::Model* model                                        = mModel;
-		model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = mAnimator.mBoundAnimator.getCalc();
+
+		mAnimator.mBoundAnimator.setModelCalc(mModel, 0);
 		PSMTXCopy(mBaseTrMatrix.mMatrix.mtxView, mModel->mJ3dModel->mPosMtx);
 		mModel->mJ3dModel->calc();
+
 		mCollTree->update();
 		updateCursor();
 	} else {
@@ -1774,9 +1787,9 @@ void Navi::updateCursor()
 void Navi::doSimulation(f32 timeStep)
 {
 	if (moviePlayer->isFlag(MVP_IsActive)) {
-		mSimVelocity  = Vector3f(0.0f);
-		mVelocity     = Vector3f(0.0f);
-		mAcceleration = Vector3f(0.0f);
+		mVelocity       = Vector3f(0.0f);
+		mTargetVelocity = Vector3f(0.0f);
+		mAcceleration   = Vector3f(0.0f);
 	}
 
 	FakePiki::doSimulation(timeStep);
@@ -1792,7 +1805,7 @@ void Navi::doSetView(int viewportNumber)
 	mMarkerModel->setCurrentViewNo(viewportNumber);
 	mCursorModel->setCurrentViewNo(viewportNumber);
 
-	if (mLod.mFlags & (16 << viewportNumber)) {
+	if (mLod.isVPVisible(viewportNumber)) {
 		mMarkerModel->showPackets();
 		mCursorModel->showPackets();
 	} else {
@@ -2003,7 +2016,7 @@ void Navi::on_movie_end(bool)
 void Navi::movieUserCommand(u32 command, MoviePlayer* player)
 {
 	switch (command) {
-	case 100: {
+	case CC_MovieCommand1: {
 		enterAllPikis();
 		if (player->isFlag(MVP_IsFinished)) {
 			pikiMgr->forceEnterPikmins(0);
@@ -2011,7 +2024,7 @@ void Navi::movieUserCommand(u32 command, MoviePlayer* player)
 		break;
 	}
 
-	case 102: {
+	case CC_MovieCommand3: {
 		Creature* hole = player->mTargetObject;
 		JUT_ASSERTLINE(2134, hole != nullptr, "no target!! HOLEIN\n");
 
@@ -2020,7 +2033,7 @@ void Navi::movieUserCommand(u32 command, MoviePlayer* player)
 		break;
 	}
 
-	case 103: {
+	case CC_MovieCommand4: {
 		Creature* fountain = player->mTargetObject;
 		JUT_ASSERTLINE(2148, fountain, "no target!! FOUNTAINON\n");
 
@@ -2029,17 +2042,17 @@ void Navi::movieUserCommand(u32 command, MoviePlayer* player)
 		break;
 	}
 
-	case 104: {
+	case CC_MovieCommand5: {
 		shadowMgr->delShadow(this);
 		break;
 	}
 
-	case 107: {
+	case CC_MovieCommand8: {
 		shadowMgr->addShadow(this);
 		break;
 	}
 
-	case 105: {
+	case CC_MovieCommand6: {
 		efx::TNaviEffect* fx = mEffectsObj;
 
 		if (!fx->isFlag(efx::NAVIFX_IsSaved)) {
@@ -2059,7 +2072,7 @@ void Navi::movieUserCommand(u32 command, MoviePlayer* player)
 		break;
 	}
 
-	case 106: {
+	case CC_MovieCommand7: {
 		// mEffectsObj->setMovieEffect(); using the inline fixes this part, but breaks everything else
 		efx::TNaviEffect* fx = mEffectsObj;
 		if (fx->isFlag(efx::NAVIFX_IsSaved)) {
@@ -2280,8 +2293,7 @@ void Navi::movieStartDemoAnimation(SysShape::AnimInfo* info)
 
 	mModel->clearAnimatorAll();
 
-	SysShape::Model* model                                        = mModel;
-	model->mJ3dModel->mModelData->mJointTree.mJoints[0]->mMtxCalc = (J3DMtxCalcAnmBase*)mAnimator.mBoundAnimator.getCalc();
+	mAnimator.mBoundAnimator.setModelCalc(mModel, 0);
 }
 
 /**
@@ -2290,10 +2302,10 @@ void Navi::movieStartDemoAnimation(SysShape::AnimInfo* info)
  */
 void Navi::movieSetTranslation(Vector3f& newpos, f32 dir)
 {
-	mSimVelocity         = 0.0f;
-	mVelocity            = 0.0f;
-	mAcceleration        = 0.0f;
-	mPositionBeforeMovie = mPosition;
+	mVelocity         = 0.0f;
+	mTargetVelocity   = 0.0f;
+	mAcceleration     = 0.0f;
+	mPreviousPosition = mPosition;
 	setPosition(newpos, false);
 	mFaceDir = dir;
 }
@@ -2309,12 +2321,12 @@ bool Navi::movieGotoPosition(Vector3f& pos)
 	sep.qNormalise();
 
 	if (xz < 400.0f) {
-		mVelocity    = 0.0f;
-		mSimVelocity = 0.0f;
+		mTargetVelocity = 0.0f;
+		mVelocity       = 0.0f;
 		return true;
 	}
 
-	mVelocity = (sep * naviMgr->mNaviParms->mNaviParms.mMoveSpeed()) * 0.5f;
+	mTargetVelocity = (sep * naviMgr->mNaviParms->mNaviParms.mMoveSpeed()) * 0.5f;
 	return false;
 
 	/*
@@ -2432,7 +2444,7 @@ void Navi::set_movie_draw(bool on)
  * @note Address: 0x80142CD4
  * @note Size: 0x50
  */
-bool Navi::isWalking() { return mVelocity.qLength() > 10.0f; }
+bool Navi::isWalking() { return mTargetVelocity.qLength() > 10.0f; }
 
 /**
  * @note Address: 0x80142D24
@@ -2458,9 +2470,9 @@ void Navi::setDeadLaydown()
 		offset = newpos;
 		setPosition(offset, false);
 		startMotion(IPikiAnims::DEAD, IPikiAnims::DEAD, nullptr, nullptr);
-		mIsAlive = false;
+		mHideModel = false;
 	} else {
-		mIsAlive = true;
+		mHideModel = true;
 	}
 	setAlive(false);
 	naviMgr->informOrimaDead(id);
@@ -2575,7 +2587,7 @@ ItemHole::Item* Navi::checkHole()
 	if (!ItemHole::mgr) {
 		return nullptr;
 	}
-	if (moviePlayer->mDemoState != 0) {
+	if (moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		return nullptr;
 	}
 	if (getStateID() != NSID_Walk) {
@@ -2606,7 +2618,7 @@ ItemCave::Item* Navi::checkCave()
 	if (!ItemCave::mgr) {
 		return nullptr;
 	}
-	if (moviePlayer->mDemoState != 0) {
+	if (moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		return nullptr;
 	}
 	if (getStateID() != NSID_Walk) {
@@ -2636,7 +2648,7 @@ ItemBigFountain::Item* Navi::checkBigFountain()
 	if (!ItemBigFountain::mgr) {
 		return nullptr;
 	}
-	if (moviePlayer->mDemoState != 0) {
+	if (moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		return nullptr;
 	}
 	if (getStateID() != NSID_Walk) {
@@ -2667,7 +2679,7 @@ Onyon* Navi::checkOnyon()
 	if (!gameSystem->isStoryMode()) {
 		return nullptr;
 	}
-	if (moviePlayer->mDemoState != 0) {
+	if (moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		return nullptr;
 	}
 	if (!ItemOnyon::mgr) {
@@ -2713,7 +2725,10 @@ f32 Navi::getMapCollisionRadius() { return 8.5f; }
  * @note Address: 0x80143AF4
  * @note Size: 0x4
  */
-void Navi::doDirectDraw(Graphics&) { }
+// void Navi::doDirectDraw(Graphics& gfx)
+// {
+//
+// }
 
 // /**
 //  * @note Address: N/A
@@ -2806,13 +2821,12 @@ void Navi::makeVelocity()
 {
 
 	if (mController1
-	    && ((mController1->getButtonDown() & Controller::PRESS_A) || (mController1->getButtonDown() & Controller::PRESS_B)
-	        || (mController1->getButtonDown() & Controller::PRESS_X) || (mController1->getButtonDown() & Controller::PRESS_Y)
-	        || (mController1->getButtonDown() & Controller::PRESS_Z) || (mController1->getButtonDown() & Controller::PRESS_L)
-	        || (mController1->getButtonDown() & Controller::PRESS_R) || (mController1->getButtonDown() & Controller::PRESS_DPAD_UP)
-	        || (mController1->getButtonDown() & Controller::PRESS_DPAD_DOWN)
-	        || (mController1->getButtonDown() & Controller::PRESS_DPAD_LEFT)
-	        || (mController1->getButtonDown() & Controller::PRESS_DPAD_RIGHT))) {
+	    && ((mController1->getButton() & Controller::PRESS_A) || (mController1->getButton() & Controller::PRESS_B)
+	        || (mController1->getButton() & Controller::PRESS_X) || (mController1->getButton() & Controller::PRESS_Y)
+	        || (mController1->getButton() & Controller::PRESS_Z) || (mController1->getButton() & Controller::PRESS_L)
+	        || (mController1->getButton() & Controller::PRESS_R) || (mController1->getButton() & Controller::PRESS_DPAD_UP)
+	        || (mController1->getButton() & Controller::PRESS_DPAD_DOWN) || (mController1->getButton() & Controller::PRESS_DPAD_LEFT)
+	        || (mController1->getButton() & Controller::PRESS_DPAD_RIGHT))) {
 		mSceneAnimationTimer = 0.0f;
 	} else {
 		mSceneAnimationTimer += sys->mDeltaTime;
@@ -2862,21 +2876,21 @@ void Navi::makeVelocity()
 		mSceneAnimationTimer = 0.0f;
 	}
 
-	f32 mod   = 1.0f;
-	mVelocity = result * speed * mod;
+	f32 mod         = 1.0f;
+	mTargetVelocity = result * speed * mod;
 
 	if (mController1) {
-		NaviParms* parms = naviMgr->mNaviParms;
-		bool check       = false;
+		NaviParms* parms  = naviMgr->mNaviParms;
+		bool turnToCursor = false;
 		if (mSceneAnimationTimer >= parms->mNaviParms.mCursorLookTime()) {
-			check = true;
+			turnToCursor = true;
 		}
-		if ((check || (!check && dist > parms->mNaviParms.mNeutralStickThreshold()))
+		if ((turnToCursor || (!turnToCursor && dist > parms->mNaviParms.mNeutralStickThreshold()))
 		    && (dist <= parms->mNaviParms.mCursorMovementStick())) {
-			mVelocity = 0.0f;
-			f32 rad   = pikmin2_atan2f(mWhistle->mNaviOffsetVec.x, mWhistle->mNaviOffsetVec.z);
-			rad       = roundAng(rad);
-			rad       = angDist(rad, mFaceDir);
+			mTargetVelocity = 0.0f;
+			f32 rad         = pikmin2_atan2f(mWhistle->mNaviOffsetVec.x, mWhistle->mNaviOffsetVec.z);
+			rad             = roundAng(rad);
+			rad             = angDist(rad, mFaceDir);
 			mFaceDir += rad * 0.2f;
 			mFaceDir = roundAng(mFaceDir);
 			setMoveRotation(false);
@@ -3231,7 +3245,7 @@ void Navi::callPikis()
 
 		last = piki;
 		if (piki && piki != this) {
-			InteractFue act(this, false, true);
+			InteractFue act(this, false, true); // don't combine parties, is new to party
 			piki->stimulate(act);
 		}
 	}
@@ -3377,7 +3391,7 @@ void Navi::callPikis()
  */
 bool Navi::invincible()
 {
-	if (moviePlayer && moviePlayer->mDemoState != 0) {
+	if (moviePlayer && moviePlayer->mDemoState != DEMOSTATE_Inactive) {
 		return true;
 	}
 	if (mInvincibleTimer) {
@@ -3386,10 +3400,10 @@ bool Navi::invincible()
 	if (!gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
 		return true;
 	}
-	if (!mCurrentState) {
-		return true;
+	if (mCurrentState) {
+		return mCurrentState->invincible();
 	}
-	return mCurrentState->invincible();
+	return true;
 }
 
 /**
@@ -3416,8 +3430,8 @@ void Navi::startDamage(f32 damage)
 		mFsm->transit(this, NSID_Damaged, &arg);
 		mHealth -= damage;
 		mSoundObj->startSound(PSSE_PL_ORIMA_DAMAGE, 0);
-		cameraMgr->startVibration(29, mNaviIndex);
-		rumbleMgr->startRumble(1, mNaviIndex);
+		cameraMgr->startVibration(VIBTYPE_NaviDamage, mNaviIndex);
+		rumbleMgr->startRumble(RUMBLETYPE_NaviDamage, mNaviIndex);
 		mEffectsObj->createOrimadamage_(mEffectsObj->mHeadMtx->mMatrix.mtxView);
 		PSM::DamageDirector* director = PSMGetDamageD();
 		if (director) {
@@ -3581,183 +3595,38 @@ void Navi::startDamage(f32 damage)
  * @note Address: 0x80144610
  * @note Size: 0x214
  */
-void Navi::addDamage(f32 damage, bool flag)
+void Navi::addDamage(f32 damage, bool playSound)
 {
-	if ((moviePlayer && moviePlayer->mDemoState != 0) || !gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
-		return;
-	}
+	if ((!moviePlayer || moviePlayer->mDemoState == DEMOSTATE_Inactive) && gameSystem->isFlag(GAMESYS_IsGameWorldActive)) {
+		if (playData->mOlimarData->hasItem(OlimarData::ODII_JusticeAlloy)) {
+			damage *= naviMgr->mNaviParms->mNaviParms.mShieldDamageReductionRate();
+		}
 
-	if (playData->mOlimarData->hasItem(OlimarData::ODII_JusticeAlloy)) {
-		damage *= naviMgr->mNaviParms->mNaviParms.mShieldDamageReductionRate();
-	}
+		if (!isAlive() || mCurrentState->invincible()) {
+			return;
+		} else if (invincible()) {
+			return;
+		}
 
-	if (isAlive() && !mCurrentState->invincible() && !invincible()) {
 		mHealth -= damage;
-		if (flag) {
+
+		if (playSound) {
 			mSoundObj->startSound(PSSE_PL_ORIMA_DAMAGE, 0);
-			cameraMgr->startVibration(29, mNaviIndex);
-			rumbleMgr->startRumble(1, mNaviIndex);
+			cameraMgr->startVibration(VIBTYPE_NaviDamage, mNaviIndex);
+			rumbleMgr->startRumble(RUMBLETYPE_NaviDamage, mNaviIndex);
 			mEffectsObj->createOrimadamage_(mEffectsObj->mHeadMtx->mMatrix.mtxView);
 			PSM::DamageDirector* director = PSMGetDamageD();
 			if (director) {
 				director->directOn();
 			}
-			if (mHealth < 1.0f) {
-				if (getStateID() != NSID_Dead) {
-					mFsm->transit(this, NSID_Dead, nullptr);
-				}
+		}
+
+		if (mHealth < 1.0f) {
+			if (getStateID() != NSID_Dead) {
+				mFsm->transit(this, NSID_Dead, nullptr);
 			}
 		}
 	}
-
-	/*
-	.loc_0x0:
-	  stwu      r1, -0x20(r1)
-	  mflr      r0
-	  stw       r0, 0x24(r1)
-	  stfd      f31, 0x10(r1)
-	  psq_st    f31,0x18(r1),0,0
-	  stw       r31, 0xC(r1)
-	  stw       r30, 0x8(r1)
-	  lwz       r5, -0x64AC(r13)
-	  fmr       f31, f1
-	  mr        r30, r3
-	  mr        r31, r4
-	  cmplwi    r5, 0
-	  beq-      .loc_0x40
-	  lwz       r0, 0x18(r5)
-	  cmpwi     r0, 0
-	  bne-      .loc_0x1F4
-	.loc_0x40:
-	  lwz       r3, -0x6C18(r13)
-	  lbz       r0, 0x3C(r3)
-	  rlwinm.   r0,r0,0,26,26
-	  beq-      .loc_0x1F4
-	  lwz       r3, -0x6B70(r13)
-	  li        r4, 0x5
-	  addi      r3, r3, 0x48
-	  bl        0xA1964
-	  rlwinm.   r0,r3,0,24,31
-	  beq-      .loc_0x78
-	  lwz       r3, -0x6D20(r13)
-	  lwz       r3, 0xC8(r3)
-	  lfs       f0, 0xC00(r3)
-	  fmuls     f31, f31, f0
-	.loc_0x78:
-	  mr        r3, r30
-	  lwz       r12, 0x0(r30)
-	  lwz       r12, 0xA8(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  beq-      .loc_0x1F4
-	  lwz       r3, 0x274(r30)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x20(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  beq-      .loc_0xB4
-	  b         .loc_0x1F4
-	.loc_0xB4:
-	  lwz       r3, -0x64AC(r13)
-	  cmplwi    r3, 0
-	  beq-      .loc_0xD4
-	  lwz       r0, 0x18(r3)
-	  cmpwi     r0, 0
-	  beq-      .loc_0xD4
-	  li        r3, 0x1
-	  b         .loc_0x124
-	.loc_0xD4:
-	  lbz       r0, 0x2A4(r30)
-	  cmplwi    r0, 0
-	  beq-      .loc_0xE8
-	  li        r3, 0x1
-	  b         .loc_0x124
-	.loc_0xE8:
-	  lwz       r3, -0x6C18(r13)
-	  lbz       r0, 0x3C(r3)
-	  rlwinm.   r0,r0,0,26,26
-	  bne-      .loc_0x100
-	  li        r3, 0x1
-	  b         .loc_0x124
-	.loc_0x100:
-	  lwz       r3, 0x274(r30)
-	  cmplwi    r3, 0
-	  beq-      .loc_0x120
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x20(r12)
-	  mtctr     r12
-	  bctrl
-	  b         .loc_0x124
-	.loc_0x120:
-	  li        r3, 0x1
-	.loc_0x124:
-	  rlwinm.   r0,r3,0,24,31
-	  bne-      .loc_0x1F4
-	  lfs       f0, 0x2A0(r30)
-	  rlwinm.   r0,r31,0,24,31
-	  fsubs     f0, f0, f31
-	  stfs      f0, 0x2A0(r30)
-	  beq-      .loc_0x1A4
-	  lwz       r3, 0x26C(r30)
-	  li        r4, 0x80F
-	  li        r5, 0
-	  lwz       r12, 0x28(r3)
-	  lwz       r12, 0x7C(r12)
-	  mtctr     r12
-	  bctrl
-	  lwz       r3, -0x6960(r13)
-	  li        r4, 0x1D
-	  lhz       r5, 0x2DC(r30)
-	  bl        0x10DC18
-	  lwz       r3, -0x6958(r13)
-	  li        r4, 0x1
-	  lhz       r5, 0x2DC(r30)
-	  bl        0x10F19C
-	  lwz       r3, 0x2D0(r30)
-	  lwz       r4, 0x14(r3)
-	  bl        0x273EA4
-	  bl        0x3146E8
-	  cmplwi    r3, 0
-	  beq-      .loc_0x1A4
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x10(r12)
-	  mtctr     r12
-	  bctrl
-	.loc_0x1A4:
-	  lfs       f1, 0x2A0(r30)
-	  lfs       f0, -0x6008(r2)
-	  fcmpo     cr0, f1, f0
-	  bge-      .loc_0x1F4
-	  lwz       r3, 0x274(r30)
-	  cmplwi    r3, 0
-	  beq-      .loc_0x1C8
-	  lwz       r0, 0x4(r3)
-	  b         .loc_0x1CC
-	.loc_0x1C8:
-	  li        r0, -0x1
-	.loc_0x1CC:
-	  cmpwi     r0, 0x13
-	  beq-      .loc_0x1F4
-	  lwz       r3, 0x270(r30)
-	  mr        r4, r30
-	  li        r5, 0x13
-	  li        r6, 0
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x14(r12)
-	  mtctr     r12
-	  bctrl
-	.loc_0x1F4:
-	  psq_l     f31,0x18(r1),0,0
-	  lwz       r0, 0x24(r1)
-	  lfd       f31, 0x10(r1)
-	  lwz       r31, 0xC(r1)
-	  lwz       r30, 0x8(r1)
-	  mtlr      r0
-	  addi      r1, r1, 0x20
-	  blr
-	*/
 }
 
 /**
@@ -3768,7 +3637,7 @@ void Navi::enterAllPikis()
 {
 	Iterator<Piki> iterator(pikiMgr);
 	int pikis = 0;
-	Piki* buffer[100];
+	Piki* buffer[MAX_PIKI_COUNT];
 	Piki** list = buffer;
 	CI_LOOP(iterator)
 	{
@@ -4001,7 +3870,7 @@ bool Navi::formationable() { return mDisbandTimer == 0; }
  */
 void Navi::updateKaisanDisable()
 {
-	if (mDisbandTimer > 0 && mVelocity.qLength() > 20.0f) {
+	if (mDisbandTimer > 0 && mTargetVelocity.qLength() > 20.0f) {
 		mDisbandTimer--;
 	}
 }
@@ -4034,7 +3903,7 @@ void Navi::updateThrowDisable()
 		return;
 	}
 
-	if (mController1 && mController1->getButton() & PAD_BUTTON_A) {
+	if (mController1 && mController1->getButton() & Controller::PRESS_A) {
 		mThrowTimer = NAVI_THROWTIMER_LENGTH;
 	}
 
@@ -4054,7 +3923,7 @@ void Navi::clearThrowDisable() { mThrowTimer = 0; }
 void Navi::holeinAllPikis(Vector3f& pos)
 {
 	naviMgr->getAliveOrima(ALIVEORIMA_Active);
-	Piki* buffer[100];
+	Piki* buffer[MAX_PIKI_COUNT];
 	int pikis = 0;
 
 	Iterator<Creature> iterator(mCPlateMgr);
@@ -4086,7 +3955,7 @@ void Navi::holeinAllPikis(Vector3f& pos)
  */
 void Navi::fountainonAllPikis(Vector3f& pos)
 {
-	Piki* buffer[100];
+	Piki* buffer[MAX_PIKI_COUNT];
 	int pikis = 0;
 
 	Iterator<Creature> iterator(mCPlateMgr);
@@ -4118,7 +3987,7 @@ void Navi::fountainonAllPikis(Vector3f& pos)
  */
 void Navi::demowaitAllPikis()
 {
-	Piki* buffer[100];
+	Piki* buffer[MAX_PIKI_COUNT];
 	int pikis = 0;
 
 	Iterator<Creature> iterator(mCPlateMgr);
@@ -4163,7 +4032,7 @@ bool Navi::releasePikis()
 	loozy->stimulate(act);
 
 	s32 pikis = 0;
-	Piki* buffer[100];
+	Piki* buffer[MAX_PIKI_COUNT];
 	Iterator<Creature> iterator(mCPlateMgr);
 	CI_LOOP(iterator)
 	{
@@ -4256,7 +4125,7 @@ bool Navi::releasePikis()
 		Piki* piki = buffer[i];
 		PikiAI::ActFreeArg arg(distList[piki->getKind()], position[piki->getKind()], true);
 		buffer[i]->mSoundObj->startFreePikiSound(PSSE_PK_VC_BREAKUP, 0x5a, 0);
-		buffer[i]->mBrain->start(1, &arg);
+		buffer[i]->mBrain->start(PikiAI::ACT_Free, &arg);
 	}
 	mDisbandTimer = 60;
 	return true;
@@ -4913,95 +4782,113 @@ void Navi::makeCStick(bool disable)
 	stickPos.x = 0.0f;
 	stickPos.z = stickPos.x;
 
-	if (mController1 && moviePlayer->mDemoState == 0) {
+	if (mController1 && moviePlayer->mDemoState == DEMOSTATE_Inactive) {
 		stickPos.x = -mController1->getSubStickX();
 		stickPos.z = mController1->getSubStickY();
 	}
 
-	Vector3f side = mCamera->getSideVector();
-	Vector3f up   = mCamera->getUpVector();
-	Vector3f view = mCamera->getViewVector();
-	side.y        = 0.0f;
-	side.qNormalise();
+	Vector3f cameraSide        = mCamera->getSideVector();
+	Vector3f transformedMotion = mCamera->getUpVector();
+	Vector3f cameraView        = mCamera->getViewVector();
+	cameraSide.y               = 0.0f;
+	cameraSide.qNormalise();
 
-	if (up.y > view.y) {
-		view.x = view.x;
-		view.z = view.z;
+	if (transformedMotion.y > cameraView.y) {
+		cameraView.x = cameraView.x;
+		cameraView.z = cameraView.z;
 	} else {
-		view.x = up.x;
-		view.z = up.z;
+		cameraView.x = transformedMotion.x;
+		cameraView.z = transformedMotion.z;
 	}
 
-	Vector3f obummer(view.x, 0.0f, view.z);
-	obummer.qNormalise();
+	// Transform the C-Stick according to the direction of the camera
+	Vector3f normalisedView(cameraView.x, 0.0f, cameraView.z);
+	normalisedView.qNormalise();
 
-	up = (side * stickPos.x) + (obummer * stickPos.z);
+	transformedMotion = (cameraSide * stickPos.x) + (normalisedView * stickPos.z);
 	if (disable) {
-		up = 0.0f;
+		transformedMotion = 0.0f;
 	}
 
-	mCStickPosition = 0.0f;
-	f32 dist        = up.sqrMagnitude();
-	mCommandOn2     = false;
-	if (pikmin2_sqrtf(dist) > 0.05f) {
+	mCStickPosition  = 0.0f;
+	f32 moveStrength = transformedMotion.sqrMagnitude();
+	mCommandOn2      = false;
+
+	// If the C-Stick is being used
+	if (pikmin2_sqrtf(moveStrength) > 0.05f) {
 		mCommandOn2          = true;
 		mSceneAnimationTimer = 0.0f;
-		mCStickPosition      = up;
-		f32 scale            = pikmin2_atan2f(up.x, up.z);
-		f32 ang2             = mCPlateMgr->mAngle;
-		f32 cosA             = pikmin2_cosf(scale);
-		f32 sinA             = pikmin2_sinf(scale);
-		f32 cosB             = pikmin2_cosf(ang2);
-		f32 sinB             = pikmin2_sinf(ang2);
-		f32 cosC             = pikmin2_cosf(2.0943952f);
+		mCStickPosition      = transformedMotion;
 
-		f32 zero = 0.0f;
-		if ((sinA * sinB + zero) + (cosA * cosB) > cosC) {
-			zero = angDist(scale, ang2) * 0.4f + ang2;
-		} else {
-			zero = scale;
-		}
-		scale        = roundAng(zero);
-		mCStickAngle = scale;
-		f32 calc     = (pikmin2_sqrtf(dist) - 0.05f) / 0.95f;
-		if (calc >= 0.9f) {
-			calc = 1.0f;
-		} else {
-			calc = (calc / 0.9f) * 0.6f;
-		}
-		mCPlateMgr->refresh(mCPlateMgr->mSlotCount, calc);
-		if (_258 < 40) {
-			_258++;
-		}
-		Vector3f pos = getPosition();
+		// transformedMotion is the direction of the C-Stick,
+		// So calling atan2f gets the directional angle of the C-Stick
+		f32 stickAngle = pikmin2_atan2f(transformedMotion.x, transformedMotion.z);
+		f32 plateAngle = mCPlateMgr->mAngle;
 
-		f32 angle;
-		if (_258 >= 40) {
-			angle = 3.0f;
+		f32 stickAngleCos  = pikmin2_cosf(stickAngle);
+		f32 stickAngleSine = pikmin2_sinf(stickAngle);
+
+		f32 plateAngleCos  = pikmin2_cosf(plateAngle);
+		f32 plateSineAngle = pikmin2_sinf(plateAngle);
+
+		f32 angleLimit = pikmin2_cosf(120.0f * DEG2RAD);
+
+		f32 newAngle = 0.0f;
+
+		// If the angle of the C-Stick is greater than the angle limit
+		if ((stickAngleSine * plateSineAngle + newAngle) + (stickAngleCos * plateAngleCos) > angleLimit) {
+			// Interpolate from the Plate angle to the C-Stick angle
+			newAngle = angDist(stickAngle, plateAngle) * 0.4f + plateAngle;
 		} else {
-			angle = 1.0f;
+			newAngle = stickAngle;
 		}
 
-		mCPlateMgr->setPos(pos, scale, mSimVelocity, angle);
+		stickAngle   = roundAng(newAngle);
+		mCStickAngle = stickAngle;
+
+		// Normalise the moveStrength value
+		f32 normalizedMoveStrength = (pikmin2_sqrtf(moveStrength) - 0.05f) / 0.95f;
+		if (normalizedMoveStrength >= 0.9f) {
+			normalizedMoveStrength = 1.0f;
+		} else {
+			normalizedMoveStrength = (normalizedMoveStrength / 0.9f) * 0.6f;
+		}
+
+		mCPlateMgr->refresh(mCPlateMgr->mSlotCount, normalizedMoveStrength);
+		if (mPlateScaleTimer < 40) {
+			mPlateScaleTimer++;
+		}
+
+		Vector3f position = getPosition();
+		f32 scale;
+		if (mPlateScaleTimer >= 40) {
+			scale = 3.0f;
+		} else {
+			scale = 1.0f;
+		}
+
+		mCPlateMgr->setPos(position, stickAngle, mVelocity, scale);
 		_2FC        = 0;
 		mCommandOn1 = false;
 
 	} else {
+		mPlateScaleTimer = 0;
 
-		_258 = 0;
 		if (!_2FC) {
 			mCommandOn1 = true;
 		}
+
 		f32 dir = mFaceDir + PI;
-		if ((!_2FC && mVelocity.qLength() < 50.0f) && getStateID() != NSID_ThrowWait) {
+		if ((!_2FC && mTargetVelocity.qLength() < 50.0f) && getStateID() != NSID_ThrowWait) {
 			f32 angle    = mCStickAngle;
 			Vector3f pos = getPosition();
 
 			// this angle + dir thing is really stupid I don't know how to make dir compile in here
-			mCPlateMgr->setPos(pos, angle, mSimVelocity, 1.0f);
+			mCPlateMgr->setPos(pos, angle, mVelocity, 1.0f);
 		} else {
 			_2FC = true;
 		}
+
 		mCPlateMgr->refresh(mCPlateMgr->mSlotCount, 0.0f);
 
 		f32 minDist = 12800.0f;
@@ -5016,6 +4903,7 @@ void Navi::makeCStick(bool disable)
 				minDist = dist;
 			}
 		}
+
 		if (minDist < naviMgr->mNaviParms->mNaviParms.mPikiWaitRange()) {
 			if (mCStickState == 0) {
 				mCStickIncrement++;
@@ -5044,24 +4932,24 @@ void Navi::makeCStick(bool disable)
 		} else if (mCStickState == 1) {
 			_2FD          = 1;
 			Vector3f pos  = getPosition();
-			Vector3f diff = mCPlateMgr->_A4 - pos;
+			Vector3f diff = mCPlateMgr->mMaxPositionOffset - pos;
 			diff.qNormalise();
 			dir           = pikmin2_atan2f(diff.x, diff.z);
 			Vector3f pos2 = getPosition();
-			mCPlateMgr->setPosGray(pos2, dir, mSimVelocity, 1.0f);
+			mCPlateMgr->setPosGray(pos2, dir, mVelocity, 1.0f);
 		} else if (mCStickState == 2) {
 			mCommandOn1 = false;
 			if (_2FD) {
 				Vector3f pos = getPosition();
-				mCPlateMgr->rearrangeSlot(pos, dir, mSimVelocity);
+				mCPlateMgr->rearrangeSlot(pos, dir, mVelocity);
 				_2FD = 0;
 			}
 			Vector3f pos = getPosition();
-			mCPlateMgr->setPos(pos, dir, mSimVelocity, 1.0f);
+			mCPlateMgr->setPos(pos, dir, mVelocity, 1.0f);
 		}
 	}
 
-	mCStickTargetVector = up;
+	mCStickTargetVector = transformedMotion;
 
 	/*
 	.loc_0x0:
@@ -5926,7 +5814,7 @@ u32 Navi::ogGetNextThrowPiki()
 
 inline f32 pikmin2_normalise(Vector3f& vec)
 {
-	f32 length = pikmin2_sqrtf(vec.magnitude());
+	f32 length = pikmin2_sqrtf(vec.sqrMagnitude());
 	if (length > 0) {
 		f32 norm = 1.0f / length;
 		vec *= norm;
@@ -6003,13 +5891,13 @@ void Navi::throwPiki(Piki* piki, Vector3f& cursorPos)
 	f32 xSpeed = dist2D / (2.0f * newTimeToPeak);
 
 	// Velocity to use in movement calcs needs to be in 3D, not 2D, so adjust XZ components.
-	piki->mSimVelocity = Vector3f(xSpeed * pikmin2_sinf(angDist), ySpeed, xSpeed * pikmin2_cosf(angDist));
+	piki->mVelocity = Vector3f(xSpeed * pikmin2_sinf(angDist), ySpeed, xSpeed * pikmin2_cosf(angDist));
 
 	// Add navi 'momentum' to piki (XZ) velocity - ignore y.
 	Vector3f momentum;
 	// Momentum is navi simulation velocity components, scaled by 1.0f.
 	//  -- I suspect devs toyed around with this value in development.
-	getScaledXZVec(momentum, mSimVelocity.x, mSimVelocity.z, 1.0f);
+	momentum.set2D(mVelocity * 1.0f);
 	momentum.y = 0.0f;
 
 	// Normalise vector into just a 'direction' and grab the 'length' - this is just navi ground speed.
@@ -6021,8 +5909,8 @@ void Navi::throwPiki(Piki* piki, Vector3f& cursorPos)
 	}
 
 	// Adjust piki sim and real velocities.
-	piki->mSimVelocity += momentum * magnitude;
-	piki->mVelocity = piki->mSimVelocity;
+	piki->mVelocity += momentum * magnitude;
+	piki->mTargetVelocity = piki->mVelocity;
 	/*
 	.loc_0x0:
 	  stwu      r1, -0x80(r1)

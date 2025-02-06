@@ -16,6 +16,9 @@
 #include "efx/TNaviEffect.h"
 #include "efx/TPk.h"
 
+#define CH_SCORE_POKO_MULTIPLIER   10
+#define CH_SCORE_PIKMIN_MULTIPLIER 10
+
 struct JUTTexture;
 struct LightObj;
 
@@ -45,9 +48,9 @@ enum VsCaveInfoType {
 };
 
 enum LoseReasonFlags {
-	VSLOSE_Unk1       = 0x1,
+	VSLOSE_NaviDown   = 0x1,
 	VSLOSE_Extinction = 0x2,
-	VSLOSE_Unk3       = 0x4,
+	VSLOSE_Finished   = 0x4,
 	VSLOSE_Marble     = 0x80,
 };
 
@@ -63,7 +66,7 @@ struct TekiNode : public CNode {
 	// _00 		= VTBL
 	// _00-_18	= CNode
 	EnemyTypeID::EEnemyTypeID mId; // _18
-	int _1C;                       // _1C
+	int mTekiNum;                  // _1C
 	int mNodeID;                   // _20
 };
 
@@ -103,13 +106,43 @@ struct CardSelector {
 	int getTotalWeight();
 	int selectCard();
 
-	int mValues[CARD_ID_COUNT];
-	f32 mCumulative[CARD_ID_COUNT];
+	int mValues[CARD_ID_COUNT];     // _00
+	f32 mCumulative[CARD_ID_COUNT]; // _30
+};
+
+// this is just a guess, it's for cardData in vsCardMgr.cpp that doesn't get used... at all
+struct CardData {
+	const char* mName; // _00
+	int mCount;        // _04
 };
 
 struct CardMgr {
 	struct SlotMachine {
-		SlotMachine();
+		enum EAppearStates { APPEAR_LEAVE = 0, APPEAR_AWAIT = 1, APPEAR_ENTER = 2, APPEAR_RESET = 3 };
+
+		enum ESpinStates {
+			SPIN_UNSTARTED      = 0,
+			SPIN_WAIT_START     = 1,
+			SPIN_START          = 2,
+			SPIN_WAIT_MAX_SPEED = 3,
+			SPIN_DECELERATE     = 4,
+			SPIN_DECELERATE_END = 5,
+			SPIN_DOWN_TO_CARD   = 6,
+			SPIN_WAIT_CARD_STOP = 7,
+			SPIN_UP_TO_CARD     = 8,
+			SPIN_WAIT_CARD_ROLL = 9,
+			SPIN_END            = 10
+		};
+
+		SlotMachine()
+		{
+			mCardMgr = nullptr;
+			clear();
+			mCherryStock  = 0;
+			mPrevSelected = UNRESOLVED;
+			_68           = 0.0f;
+			_6C           = 0.0f;
+		}
 
 		void clear();
 		void start();
@@ -124,8 +157,8 @@ struct CardMgr {
 		bool equalTo(int);
 		bool goodPlace();
 
-		int getNextCard(int);
-		int getPrevCard(int);
+		inline int getNextCard(int card) { return (CARD_ID_COUNT + card + 1) % CARD_ID_COUNT; }
+		inline int getPrevCard(int card) { return (CARD_ID_COUNT + card - 1) % CARD_ID_COUNT; }
 
 		f32 mSpinAngle;     // _00
 		int mCurrCardIndex; // _04
@@ -142,8 +175,8 @@ struct CardMgr {
 		u32 mAppearState;   // _30, unknown
 		f32 mAppearValue;   // _34
 		int _38;            // _38
-		f32 _3C;            // _3C, timer?
-		f32 _40;            // _40
+		f32 mTimer;         // _3C
+		f32 mRotationZ;     // _40
 		f32 _44;            // _44
 		f32 _48;            // _48
 		int _4C;            // _4C, maybe currentSlotIndex?
@@ -156,22 +189,6 @@ struct CardMgr {
 		int mPrevSelected;  // _64
 		f32 _68;            // _68
 		f32 _6C;            // _6C
-
-		enum ESpinStates {
-			SPIN_UNSTARTED      = 0,
-			SPIN_WAIT_START     = 1,
-			SPIN_START          = 2,
-			SPIN_WAIT_MAX_SPEED = 3,
-			SPIN_DECELERATE     = 4,
-			SPIN_DECELERATE_END = 5,
-			SPIN_DOWN_TO_CARD   = 6,
-			SPIN_WAIT_CARD_STOP = 7,
-			SPIN_UP_TO_CARD     = 8,
-			SPIN_WAIT_CARD_ROLL = 9,
-			SPIN_END            = 10
-		};
-
-		enum EAppearStates { APPEAR_LEAVE = 0, APPEAR_AWAIT = 1, APPEAR_ENTER = 2, APPEAR_RESET = 3 };
 	};
 
 	CardMgr(VsGameSection*, TekiMgr*);
@@ -188,7 +205,7 @@ struct CardMgr {
 
 	Vector3f getSlotOrigin(int);
 	Vector2f getLampPos(int, int);
-	Vector2f getPlayerCard(int);
+	Vector3f getPlayerCard(int);
 	void clearPlayerCard();
 
 	JUTTexture* getTexture(eCardType);
@@ -202,10 +219,10 @@ struct CardMgr {
 	JUTTexture* mLampOffTexture;   // _10
 	JUTTexture* mHighlightTexture; // _14
 	SlotMachine mSlotMachines[2];  // _18
-	int _F8;                       // _F8
-	Vector3f* _FC;                 // _FC, array of 0x100 vectors?
-	Vector3f* _100;                // _100, array of 0x100 vectors?
-	f32 _104;                      // _104
+	int mPointCount;               // _F8
+	Vector3f* mVertices;           // _FC, array of 0x100 vectors?
+	Vector3f* mNormals;            // _100, array of 0x100 vectors?
+	f32 mRollSoundMinSpeed;        // _104
 	LightObj* mLightObj;           // _108
 	VsGameSection* mSection;       // _10C
 	TekiMgr* mTekiMgr;             // _110
@@ -242,28 +259,28 @@ struct StageList : public CNode {
 
 	// _00 		= VTBL
 	// _00-_18	= CNode
-	StageData mStageData;
+	StageData mStageData; // _18
 };
 
 /////////////////////////////////////////////////////////////////
 // STATE MACHINE DEFINITIONS
 enum GameStateFlags {
-	VSGS_Unk1  = 0x1,
-	VSGS_Unk2  = 0x2,
-	VSGS_Unk3  = 0x4,
-	VSGS_Unk4  = 0x8,
-	VSGS_Unk5  = 0x10,
-	VSGS_Unk6  = 0x20,
-	VSGS_Unk7  = 0x40,
-	VSGS_Unk8  = 0x80,
-	VSGS_Unk9  = 0x100,
-	VSGS_Unk10 = 0x200,
-	VSGS_Unk11 = 0x400,
-	VSGS_Unk12 = 0x800,
-	VSGS_Unk13 = 0x1000,
-	VSGS_Unk14 = 0x2000,
-	VSGS_Unk15 = 0x4000,
-	VSGS_Unk16 = 0x8000,
+	VSGS_EnteringCave      = 0x1,
+	VSGS_PikminExtinct     = 0x2,
+	VSGS_IntroDone         = 0x4,
+	VSGS_TimeUp            = 0x8,
+	VSGS_Unk5              = 0x10,
+	VSGS_Unk6              = 0x20,
+	VSGS_Unk7              = 0x40,
+	VSGS_ReadyGoOpen       = 0x80,
+	VSGS_WinLoseReasonOpen = 0x100,
+	VSGS_WinLoseOpen       = 0x200,
+	VSGS_Unk11             = 0x400,
+	VSGS_Unk12             = 0x800,
+	VSGS_Unk13             = 0x1000,
+	VSGS_Unk14             = 0x2000,
+	VSGS_Unk15             = 0x4000,
+	VSGS_IsSectionFadeout  = 0x8000,
 };
 
 struct FSM : public StateMachine<VsGameSection> {
@@ -279,17 +296,17 @@ struct State : public FSMState<VsGameSection> {
 	{
 	}
 
-	virtual void draw(VsGameSection*, Graphics&) { }                      // _20 (weak)
-	virtual void pre2dDraw(Graphics&, VsGameSection*) { }                 // _24 (weak)
-	virtual void onOrimaDown(VsGameSection*, int) { }                     // _28 (weak)
-	virtual void onMovieStart(VsGameSection*, MovieConfig*, u32, u32) { } // _2C (weak)
-	virtual void onMovieDone(VsGameSection*, MovieConfig*, u32, u32) { }  // _30 (weak)
-	virtual void onNextFloor(VsGameSection*, ItemHole::Item*) { }         // _34 (weak)
-	virtual void on_section_fadeout(VsGameSection*) { }                   // _38 (weak)
-	virtual bool goingToCave(VsGameSection*) { return false; }            // _3C (weak)
-	virtual void onBattleFinished(VsGameSection*, int, bool) { }          // _40 (weak)
-	virtual void onRedOrBlueSuckStart(VsGameSection*, int, bool) { }      // _44 (weak)
-	virtual bool isCardUsable(VsGameSection*) { return false; }           // _48 (weak)
+	virtual void draw(VsGameSection*, Graphics&) { }                                               // _20 (weak)
+	virtual void pre2dDraw(Graphics&, VsGameSection*) { }                                          // _24 (weak)
+	virtual void onOrimaDown(VsGameSection*, int) { }                                              // _28 (weak)
+	virtual void onMovieStart(VsGameSection* game, MovieConfig* movie, u32 unused, u32 naviID) { } // _2C (weak)
+	virtual void onMovieDone(VsGameSection*, MovieConfig*, u32, u32) { }                           // _30 (weak)
+	virtual void onNextFloor(VsGameSection*, ItemHole::Item*) { }                                  // _34 (weak)
+	virtual void on_section_fadeout(VsGameSection*) { }                                            // _38 (weak)
+	virtual bool goingToCave(VsGameSection*) { return false; }                                     // _3C (weak)
+	virtual void onBattleFinished(VsGameSection*, int, bool) { }                                   // _40 (weak)
+	virtual void onRedOrBlueSuckStart(VsGameSection*, int, bool) { }                               // _44 (weak)
+	virtual bool isCardUsable(VsGameSection*) { return false; }                                    // _48 (weak)
 
 	// _00     = VTBL
 	// _00-_0C = FSMState
@@ -298,18 +315,18 @@ struct State : public FSMState<VsGameSection> {
 struct GameState : public State {
 	GameState();
 
-	virtual void init(VsGameSection*, StateArg*);                      // _08
-	virtual void exec(VsGameSection*);                                 // _0C
-	virtual void cleanup(VsGameSection*);                              // _10
-	virtual void draw(VsGameSection*, Graphics&);                      // _20
-	virtual void pre2dDraw(Graphics&, VsGameSection*);                 // _24
-	virtual void onOrimaDown(VsGameSection*, int);                     // _28
-	virtual void onMovieStart(VsGameSection*, MovieConfig*, u32, u32); // _2C
-	virtual void onMovieDone(VsGameSection*, MovieConfig*, u32, u32);  // _30
-	virtual void onNextFloor(VsGameSection*, ItemHole::Item*);         // _34
-	virtual void on_section_fadeout(VsGameSection*)                    // _38 (weak)
+	virtual void init(VsGameSection*, StateArg*);                                               // _08
+	virtual void exec(VsGameSection*);                                                          // _0C
+	virtual void cleanup(VsGameSection*);                                                       // _10
+	virtual void draw(VsGameSection*, Graphics&);                                               // _20
+	virtual void pre2dDraw(Graphics&, VsGameSection*);                                          // _24
+	virtual void onOrimaDown(VsGameSection*, int);                                              // _28
+	virtual void onMovieStart(VsGameSection* game, MovieConfig* movie, u32 unused, u32 naviID); // _2C
+	virtual void onMovieDone(VsGameSection*, MovieConfig*, u32, u32);                           // _30
+	virtual void onNextFloor(VsGameSection*, ItemHole::Item*);                                  // _34
+	virtual void on_section_fadeout(VsGameSection*)                                             // _38 (weak)
 	{
-		setFlag(VSGS_Unk16);
+		setFlag(VSGS_IsSectionFadeout);
 	}
 	virtual bool goingToCave(VsGameSection*);                     // _3C
 	virtual void onBattleFinished(VsGameSection*, int, bool);     // _40
@@ -396,7 +413,7 @@ struct GameState : public State {
 	u32 _0C;                    // _0C
 	Controller* mController;    // _10
 	BitFlag<u16> mFlags;        // _14
-	u8 _16;                     // _16
+	u8 mSubState;               // _16
 	f32 mTimer;                 // _18
 	f32 mFloorExtendTimer;      // _1C
 	f32 mDisplayTime;           // _20
@@ -416,21 +433,21 @@ struct VSState : public GameState {
 struct LoadArg : public StateArg {
 	inline LoadArg()
 	    : _00(0)
-	    , _04(0)
-	    , _08(false)
+	    , mGameLoadType(0)
+	    , mNeedClearHeap(false)
 	{
 	}
 
 	inline LoadArg(u32 a, int b, bool c)
 	    : _00(a)
-	    , _04(b)
-	    , _08(c)
+	    , mGameLoadType(b)
+	    , mNeedClearHeap(c)
 	{
 	}
 
-	u32 _00;  // _00, unknown
-	int _04;  // _04, unknown
-	bool _08; // _08
+	u32 _00;             // _00, unused
+	int mGameLoadType;   // _04
+	bool mNeedClearHeap; // _08
 };
 
 struct LoadState : public State {
@@ -449,14 +466,14 @@ struct LoadState : public State {
 	f32 _14;                                      // _10
 	Controller* mController;                      // _14
 	VsGameSection* mSection;                      // _18
-	bool _1C;                                     // _1C
-	u32 _20;                                      // _20
-	int _24;                                      // _24
-	bool _28;                                     // _28
+	bool mIsLoadStarted;                          // _1C
+	u32 mUnusedVal;                               // _20
+	int mGameStartType;                           // _24
+	bool mNeedClearHeap;                          // _28
 	Delegate<Game::VsGame::LoadState>* mDelegate; // _2C
 	DvdThreadCommand mDvdThreadCommand;           // _30
-	bool _9C;                                     // _9c
-	f32 _A0;                                      // _A0
+	bool mIsGameStarting;                         // _9c
+	f32 mAutoStartTime;                           // _A0
 };
 
 struct ResultArg : public StateArg {
@@ -499,7 +516,7 @@ struct ResultState : public State {
 };
 
 struct TitleArg : public StateArg {
-	u8 _00; // _00, unknown
+	bool mDoNeedClearHeap; // _00
 };
 
 struct TitleState : public State {
@@ -519,8 +536,6 @@ struct TitleState : public State {
 	void dvdload();
 	void execChallenge(VsGameSection*);
 	void execVs(VsGameSection*);
-
-	inline int getChallengeStageNum() { return 30; }
 
 	inline int getVsStageNum() { return mSection->mVsStageList->mStageData.getChildCount(); }
 

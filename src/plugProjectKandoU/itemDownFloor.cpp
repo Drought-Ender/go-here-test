@@ -381,7 +381,7 @@ void Item::doAI()
 {
 	if (mDownFloorType == DFTYPE_PaperBag) {
 		switch (mSoundEvent.update()) {
-		case 2:
+		case TSE_ApplyTransition:
 			P2ASSERTLINE(607, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 			static_cast<PSM::WorkItem*>(mSoundObj)->eventStop();
 			break;
@@ -422,11 +422,11 @@ void Item::platCallback(PlatEvent& event)
 
 		if (mDownFloorType == DFTYPE_PaperBag && mWeightBuffer > 0) {
 			switch (mSoundEvent.event()) {
-			case 1:
+			case TSE_Active:
 				P2ASSERTLINE(731, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 				static_cast<PSM::WorkItem*>(mSoundObj)->eventStart();
 				break;
-			case 3:
+			case TSE_Apply:
 				P2ASSERTLINE(738, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 				static_cast<PSM::WorkItem*>(mSoundObj)->eventRestart();
 				break;
@@ -450,15 +450,15 @@ void Item::platCallback(PlatEvent& event)
  */
 void Item::getCarryInfoParam(CarryInfoParam& param)
 {
-	param.mUseType  = 0;
+	param.mUseType  = CINFOTYPE_Table;
 	param.mPosition = mPosition;
 	param.mPosition.y += 50.0f;
-	param.mYOffsetMax = 50.0f;
-	param._14         = 1;
-	param.mValue1     = mCurrentWeight;
-	param.mValue2     = mBagMaxWeight;
-	param.mColor      = 6;
-	param.mIsTopFirst = FALSE;
+	param.mYOffsetMax    = 50.0f;
+	param.mUnused        = 1;
+	param.mCurrentWeight = mCurrentWeight;
+	param.mMaxWeight     = mBagMaxWeight;
+	param.mColor         = CINFOCOLOR_DownFloor;
+	param.mIsTopFirst    = FALSE;
 }
 
 /**
@@ -474,9 +474,9 @@ Mgr::Mgr()
 
 	JKRArchive* textArc = openTextArc("texts.szs");
 	loadArchive("arc.szs");
-	loadBmd("down_floor_1.bmd", 0, 0x20000);
-	loadBmd("down_floor_2.bmd", 1, 0x20000);
-	loadBmd("down_floor_3.bmd", 2, 0x20020000);
+	loadBmd("down_floor_1.bmd", 0, J3DMODEL_CreateNewDL);
+	loadBmd("down_floor_2.bmd", 1, J3DMODEL_CreateNewDL);
+	loadBmd("down_floor_3.bmd", 2, J3DMODEL_Unk30 | J3DMODEL_CreateNewDL);
 
 	loadAnimMgr(textArc, "animmgr.txt");
 	mPlatforms = new Platform*[3];
@@ -486,7 +486,7 @@ Mgr::Mgr()
 	mPlatforms[2] = loadPlatform(textArc, "platform_3.bin");
 
 	MapCode::Code mapCode;
-	mapCode.setCode(MapCode::Code::Attribute1 | MapCode::Code::Attribute2, MapCode::Code::SlipCode0, true);
+	mapCode.setCode(MapCode::Code::Attribute1 | MapCode::Code::Attribute2, MapCode::Code::SlipCode_NoSlip, true);
 
 	mPlatforms[0]->setMapCodeAll(mapCode);
 	mPlatforms[1]->setMapCodeAll(mapCode);
@@ -509,7 +509,7 @@ Mgr::Mgr()
 void Mgr::setupDownFloor(Item* item)
 {
 	sys->heapStatusStart("new Model", nullptr);
-	item->mModel = new SysShape::Model(mModelData[item->mModelType], 0x20000, 2);
+	item->mModel = new SysShape::Model(mModelData[item->mModelType], J3DMODEL_CreateNewDL, 2);
 	item->mModel->mJ3dModel->calc();
 	item->mModel->mJ3dModel->calcMaterial();
 	item->mModel->mJ3dModel->makeDL();
@@ -588,12 +588,15 @@ char* Mgr::getCaveName(int type)
 int Mgr::getCaveID(char* name)
 {
 	int id;
+
 	if (strncmp("DownFloor", name, strlen("DownFloor")) == 0) {
 		return DFMODEL_SmallBlock;
 	}
+
 	if (strncmp("DownFloor2", name, strlen("DownFloor2")) == 0) {
 		return DFMODEL_LargeBlock;
 	}
+
 	if (strncmp("DownFloor3", name, strlen("DownFloor3")) != 0) {
 		return -1;
 	}
@@ -833,7 +836,7 @@ void Mgr::generatorWrite(Stream& input, GenItemParm* genParm)
 	P2ASSERTLINE(1246, downParm);
 	input.textWriteTab(input.mTabCount);
 	input.writeShort(downParm->mBagWeight);
-	input.textWriteText("\t#’¾‚Ýl”\r\n"); // '#number of people sinking'
+	input.textWriteText("\t#æ²ˆã¿äººæ•°\r\n"); // '#number of people sinking'
 
 	input.textWriteTab(input.mTabCount);
 	input.writeShort(downParm->mModelType);

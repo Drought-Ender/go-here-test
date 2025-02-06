@@ -34,8 +34,8 @@ struct ShadowParam {
 struct ShadowParms : public Parameters {
 	ShadowParms()
 	    : Parameters(nullptr, "ShadowParms")
-	    , mLodNear(this, 'lodn', "LOD NearÅF", 0.1f, 0.0f, 0.2f)
-	    , mLodFar(this, 'lodf', "LOD FarÅF", 0.02f, 0.0f, 0.2f)
+	    , mLodNear(this, 'lodn', "LOD NearÔºö", 0.1f, 0.0f, 0.2f)
+	    , mLodFar(this, 'lodf', "LOD FarÔºö", 0.02f, 0.0f, 0.2f)
 	{
 	}
 
@@ -96,25 +96,7 @@ struct CylinderBase {
 	void fillRectAlphaZero();
 	void drawCylinderList(int);
 
-	inline f32 getRadius(int i)
-	{
-		f32 size = 1.0f;
-		switch (i) {
-		case 1:
-			size = 1.05f;
-			break;
-		case 0:
-		case 2:
-			size = 1.35f;
-			break;
-		default:
-			break;
-		}
-
-		return size;
-	}
-
-	// VTBL _00
+	// _00 = VTBL
 	CylinderList** mDisplayListObj; // _04
 	Color4* mColor;                 // _08
 	ShadowParms* mParms;            // _0C
@@ -285,7 +267,7 @@ struct ShadowMgr : public CNode {
 	u8 mEnabled;                                // _3C
 	u8 mDoCheckCylinderType;                    // _3D
 	int mCylinderID;                            // _40
-	int _44;                                    // _44, seems to be entirely unused
+	int mUnused0;                               // _44, seems to be entirely unused
 	Color4 mColor;                              // _48
 	ShadowParms* mParms;                        // _4C
 };

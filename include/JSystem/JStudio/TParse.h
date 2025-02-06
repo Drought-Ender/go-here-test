@@ -3,7 +3,7 @@
 
 #include "JSystem/JStudio/stb.h"
 #include "JSystem/JStudio/TControl.h"
-#include "JSystem/JStudio/fvb/fvb.h"
+#include "JSystem/JStudio/fvb.h"
 
 namespace JStudio {
 struct TParse : public stb::TParse {
@@ -12,7 +12,7 @@ struct TParse : public stb::TParse {
 	virtual bool parseHeader(const stb::data::TParse_THeader&, u32);     // _14
 	virtual bool parseBlock_block(const stb::data::TParse_TBlock&, u32); // _18
 
-	void parseBlock_block_fvb_(const JStudio::stb::data::TParse_TBlock&, u32);
+	bool parseBlock_block_fvb_(const JStudio::stb::data::TParse_TBlock&, u32);
 
 	fvb::TParse mFvbParse; // _08
 };

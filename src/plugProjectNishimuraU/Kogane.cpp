@@ -136,7 +136,7 @@ bool Kogane::Obj::pressCallBack(Creature* obj, f32 dmg, CollPart*)
  */
 void Kogane::Obj::wallCallback(const MoveInfo& info)
 {
-	Vector3f pos = info.mReflectPosition;
+	Vector3f pos = info.mWallNormal;
 	setTargetPosition(&pos);
 }
 
@@ -367,7 +367,7 @@ bool Kogane::Obj::createTreasureItem()
 	if (mHitCount == 0) {
 		PelletInitArg arg;
 		if (pelletMgr->makePelletInitArg(arg, mPelletDropCode)) {
-			arg.mState = 2;
+			arg.mState = PelBirthType_ScaleAppear;
 			if (Pellet::sFromTekiEnable)
 				arg.mFromEnemy = true;
 
@@ -623,7 +623,7 @@ void Kogane::Obj::createDoping(u8 type, int num)
 	Vector3f pos = mtx->getColumn(3);
 
 	for (int i = 0; i < num; i++) {
-		ItemHoney::InitArg arg(type, 0);
+		ItemHoney::InitArg arg(type, false);
 		BaseItem* honey = ItemHoney::mgr->birth();
 		if (honey) {
 			honey->init(&arg);

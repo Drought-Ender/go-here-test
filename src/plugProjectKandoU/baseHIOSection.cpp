@@ -28,7 +28,7 @@ BaseHIOSection::BaseHIOSection(JKRHeap* heap)
 	u32 totalFreeSize = JKRHeap::sCurrentHeap->getTotalFreeSize();
 
 	JUT_ASSERTLINE(314, freeSize == totalFreeSize, "fragmentation occurred : after sound\n");
-	mPlayer4Controller = new Controller(Controller::PORT_3);
+	mDebugController = new Controller(Controller::PORT_3);
 }
 
 /**
@@ -44,8 +44,8 @@ BaseHIOSection::~BaseHIOSection()
 
 	mRootNode = nullptr;
 
-	delete mPlayer4Controller;
-	mPlayer4Controller = nullptr;
+	delete mDebugController;
+	mDebugController = nullptr;
 }
 
 /**
@@ -60,7 +60,7 @@ void BaseHIOSection::setDisplay(JFWDisplay* display, int secondsPer60Frames)
 	// Assign the new display and create a new JUTFader object for it
 	mDisplay = display;
 	mFader   = new JUTFader(0, 0, JUTVideo::sManager->mRenderModeObj->fbWidth, JUTVideo::sManager->mRenderModeObj->efbHeight,
-                          JUtility::TColor(0, 0, 0, 0));
+	                        JUtility::TColor(0, 0, 0, 0));
 
 	// Assign the new fader to the display's mFader member
 	mDisplay->mFader = mFader;

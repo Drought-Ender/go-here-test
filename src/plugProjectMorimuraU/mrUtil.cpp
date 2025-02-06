@@ -11,7 +11,7 @@ namespace Morimura {
 void TCallbackScissor::draw(Graphics& gfx, J2DGrafContext& graf)
 {
 	gfx.mPerspGraph.setPort();
-	GXSetScissor(mBounds.i.x, mBounds.i.y, mBounds.f.x - mBounds.i.x, mBounds.f.y - mBounds.i.y);
+	GXSetScissor(mBounds.i.x, mBounds.i.y, mBounds.getWidth(), mBounds.getHeight());
 }
 
 /**
@@ -25,7 +25,7 @@ TOffsetMsgSet::TOffsetMsgSet(u64* taglist, u64 newtag, int size)
 	mSize    = size;
 
 	mTagList = new u64[size];
-	_04      = new int[size];
+	mIdList  = new int[size];
 	for (int i = 0; i < mSize; i++) {
 		u64 temp     = taglist[i];
 		u64* currTag = &mTagList[i];
@@ -44,7 +44,7 @@ TOffsetMsgSet::TOffsetMsgSet(u64* taglist, u64 newtag, int size, u64* taglist2, 
 	mMsgID   = newtag;
 	mSize    = size;
 	mTagList = taglist2;
-	_04      = alloc;
+	mIdList  = alloc;
 
 	for (int i = 0; i < mSize; i++) {
 		u64 temp     = taglist[i];
@@ -61,7 +61,7 @@ TOffsetMsgSet::TOffsetMsgSet(u64* taglist, u64 newtag, int size, u64* taglist2, 
 u64 TOffsetMsgSet::getMsgID(int index)
 {
 	for (int i = 0; i < mSize; i++) {
-		_04[i] = 0;
+		mIdList[i] = 0;
 	}
 
 	int counter = 1;
@@ -76,11 +76,11 @@ u64 TOffsetMsgSet::getMsgID(int index)
 		calcOffset(offset, i - 1);
 	}
 
-	_04[0]     = offset;
+	mIdList[0] = offset;
 	u64 retTag = mMsgID;
 
 	for (int i = 0; i < mSize; i++) {
-		int curr = _04[i];
+		int curr = mIdList[i];
 		if (curr) {
 			u64* currTag = &mTagList[i];
 
@@ -164,20 +164,20 @@ void TScreenBase::draw(Graphics& gfx, J2DPerspGraph* graf)
 TIndPane::TIndPane(char const* name, f32 x, f32 y)
     : CNode("indpane")
 {
-	mTexture1 = nullptr;
-	mTexture2 = nullptr;
-	mTexture3 = nullptr;
-	_34       = 0.0f;
-	_38       = 0.0f;
-	_3C       = 0;
-	_40       = 0.0f;
-	_44       = true;
-	mTexture1 = new JUTTexture(name);
+	mTexture1    = nullptr;
+	mTexture2    = nullptr;
+	mTexture3    = nullptr;
+	mMtxXOffset  = 0.0f;
+	mMtxYOffset  = 0.0f;
+	mTexMtxScale = 0;
+	mRotation    = 0.0f;
+	mMtxUseType  = true;
+	mTexture1    = new JUTTexture(name);
 
-	_38     = 0.02f;
-	_34     = 0.02f;
-	mMinPos = Vector2f(0.0f, 0.0f);
-	mMaxPos = Vector2f(x, y);
+	mMtxYOffset = 0.02f;
+	mMtxXOffset = 0.02f;
+	mMinPos     = Vector2f(0.0f, 0.0f);
+	mMaxPos     = Vector2f(x, y);
 }
 
 /**
@@ -218,16 +218,16 @@ void TIndPane::draw()
 	GXSetIndTexCoordScale(GX_IND_TEX_STAGE_0, GX_ITS_1, GX_ITS_1);
 	Mtx23 mtx;
 
-	if (_44) {
-		mtx[0][0] = _34;
+	if (mMtxUseType) {
+		mtx[0][0] = mMtxXOffset;
 		mtx[0][1] = 0.0f;
 		mtx[0][2] = 0.0f;
 		mtx[1][0] = 0.0f;
-		mtx[1][1] = _38;
+		mtx[1][1] = mMtxYOffset;
 		mtx[1][2] = 0.0f;
 	} else {
 		Matrixf temp;
-		PSMTXRotRad(temp.mMatrix.mtxView, 'z', MTXDegToRad(_40));
+		PSMTXRotRad(temp.mMatrix.mtxView, 'z', MTXDegToRad(mRotation));
 		mtx[0][0] = temp.mMatrix.structView.xx * 0.5f;
 		mtx[0][1] = temp.mMatrix.structView.yx * 0.5f;
 		mtx[0][2] = 0.0f;
@@ -236,7 +236,7 @@ void TIndPane::draw()
 		mtx[1][2] = 0.0f;
 	}
 
-	GXSetIndTexMtx(GX_ITM_0, mtx, _3C);
+	GXSetIndTexMtx(GX_ITM_0, mtx, mTexMtxScale);
 	GXSetTevIndWarp(GX_TEVSTAGE0, GX_IND_TEX_STAGE_0, 1, 0, GX_ITM_0);
 	GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
 	GXSetTevOp(GX_TEVSTAGE0, GX_REPLACE);
@@ -325,8 +325,8 @@ void TScaleUpCounter::forceScaleUp(bool flag)
 void TScaleUpCounter::setScale(f32 scale, f32 scalesub)
 {
 	mPane12DistX = _AC * scale;
-	for (int i = 0; i < mCurrentCounters; i++) {
-		og::Screen::CounterKeta* keta = mCounters[i];
+	for (int i = 0; i < mCurrentDigitNum; i++) {
+		og::Screen::CounterKeta* keta = mCounterDigits[i];
 		keta->mSize.x                 = scale;
 		keta->mSize.y                 = scalesub;
 	}
@@ -351,8 +351,8 @@ TScaleUpCounter* setScaleUpCounter(P2DScreen::Mgr* screen, u64 inTag, u32* data,
 			break;
 		}
 
-		tagSub3          = tag;
-		pane->mIsVisible = false;
+		tagSub3 = tag;
+		pane->hide();
 	}
 
 	TScaleUpCounter* counter = new TScaleUpCounter(const_cast<char**>(og::Screen::SujiTex32), flag, offs, arc);
@@ -368,10 +368,8 @@ TScaleUpCounter* setScaleUpCounter(P2DScreen::Mgr* screen, u64 inTag, u32* data,
  */
 TScaleUpCounter* setScaleUpCounter2(P2DScreen::Mgr* screen, u64 inTag, u64 searchTag, u32* data, u16 flag, JKRArchive* arc)
 {
-	J2DPane* pane    = screen->search(inTag);
-	pane->mIsVisible = false;
-	pane             = screen->search(searchTag);
-	pane->mIsVisible = false;
+	screen->search(inTag)->hide();
+	screen->search(searchTag)->hide();
 
 	TScaleUpCounter* counter = new TScaleUpCounter(const_cast<char**>(og::Screen::SujiTex32), flag, 2, arc);
 	counter->init(screen, inTag, searchTag, searchTag, data, true);
@@ -390,6 +388,6 @@ void TScissorPane::drawSelf(f32, f32, Mtx*)
 	PSMTXIdentity(mtx.mMatrix.mtxView);
 	GXLoadPosMtxImm(mtx.mMatrix.mtxView, 0);
 
-	GXSetScissor(mBounds.i.x, mBounds.i.y, mBounds.f.x - mBounds.i.x, mBounds.f.y - mBounds.i.y);
+	GXSetScissor(mBounds.i.x, mBounds.i.y, mBounds.getWidth(), mBounds.getHeight());
 }
 } // namespace Morimura

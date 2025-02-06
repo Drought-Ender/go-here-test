@@ -6,17 +6,20 @@
 #include "PSSystem/PSGame.h"
 #include "SoundID.h"
 #include "JSystem/JFramework/JFWDisplay.h"
-#include "JSystem/J2D/J2DPane.h"
+#include "JSystem/J2D/J2DPicture.h"
 #include "JSystem/JUtility/JUTProcBar.h"
-#include "JSystem/JUtility/JUTTexture.h"
+#include "PSM/Scene.h"
 
 static void _Print(char* format, ...) { OSReport(format, __FILE__); }
 
 namespace Demo {
 namespace {
 
-static u8 sMovieIndexTable[8] = { 5, 6, 7, 0, 8, 9, 10, 0 };
-static s8 sMovieIndex         = -1;
+static u8 sMovieIndexTable[8] = {
+	Game::THPPlayer::PLAY_1, Game::THPPlayer::PLAY_2, Game::THPPlayer::PLAY_3, Game::THPPlayer::OPENING_GameStart,
+	Game::THPPlayer::PLAY_4, Game::THPPlayer::PLAY_5, Game::THPPlayer::PLAY_6, Game::THPPlayer::OPENING_GameStart,
+};
+static s8 sMovieIndex = -1;
 
 struct LogoLocation {
 	u16 x;
@@ -24,8 +27,7 @@ struct LogoLocation {
 };
 
 static LogoLocation sLogoLocate[] = {
-	{ 0x0172, 0x000F }, { 0x0172, 0x000F }, { 0x0172, 0x000F }, { 0x0172, 0x0028 },
-	{ 0x0172, 0x000F }, { 0x0172, 0x000F }, { 0x0172, 0x000F }, { 0x0172, 0x0028 },
+	{ 370, 15 }, { 370, 15 }, { 370, 15 }, { 370, 40 }, { 370, 15 }, { 370, 15 }, { 370, 15 }, { 370, 40 },
 };
 } // namespace
 
@@ -71,11 +73,10 @@ void Section::init()
 	addGenNode(&mMoviePlayer);
 	mTimeStep = 0.5f;
 
-	// this struct appears messed up
 	JUTProcBar::sManager->setVisible(false);
 	JUTProcBar::sManager->setVisibleHeapBar(false);
 	if (sMovieIndex == -1) {
-		sMovieIndex = randInt(8);
+		sMovieIndex = randInt(sizeof(sMovieIndexTable));
 	}
 }
 
@@ -90,7 +91,7 @@ void Section::doDraw(Graphics& gfx)
 
 	J2DPicture pic(mLogoTexture);
 	LogoLocation& location = sLogoLocate[sMovieIndex];
-	pic.draw(location.x, location.y, pic.mBounds.f.x - pic.mBounds.i.x, pic.mBounds.f.y - pic.mBounds.i.y, false, false, false);
+	pic.draw(location.x, location.y, pic.getWidth(), pic.getHeight(), false, false, false);
 }
 
 /**
@@ -123,11 +124,10 @@ bool Section::doUpdate()
  */
 void Section::doExit()
 {
-	PSSystem::SceneMgr* mgr = PSSystem::getSceneMgr();
-	PSSystem::checkSceneMgr(mgr);
-	mgr->deleteCurrentScene();
+	PSMGetSceneMgrCheck()->deleteCurrentScene();
 
-	if ((s8)(++sMovieIndex) >= (u32)8) {
+	u32 max = sizeof(sMovieIndexTable);
+	if (++sMovieIndex >= max) {
 		sMovieIndex = 0;
 	}
 

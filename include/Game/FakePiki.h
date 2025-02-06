@@ -27,7 +27,7 @@ struct IPikiAnims {
 		DEAD       = 5,
 		DEAD2      = 6,
 		DEAD3      = 7,
-		ESA        = 8, // feed
+		ESA        = 8, // eaten
 		FALL       = 9,
 		FUE        = 10, // whistle
 		FURIMUKU   = 11, // look over shoulder
@@ -82,7 +82,7 @@ struct IPikiAnims {
 		KOROBU2    = 60, // falldown2
 		GASDEAD    = 61,
 		GDEAD      = 62,
-		SUWARERU   = 63,
+		SUWARERU   = 63, // stabbed
 		PUNCH      = 64,
 		PUNCH2     = 65,
 		PUNCH3     = 66,
@@ -90,14 +90,15 @@ struct IPikiAnims {
 };
 
 enum FakePikiDynamics {
-	FPFLAGS_MoveRotationDisabled   = 0x1,
-	FPFLAGS_UpdateTrMatrixDisabled = 0x2,
-	FPFLAGS_MoveVelocityDisabled   = 0x4,
-	FPFLAGS_MapCollisionDisabled   = 0x8,
-	FPFLAGS_Unk5                   = 0x10,
-	FPFLAGS_Zikatu                 = 0x20,
-	FPFLAGS_WasZikatu              = 0x80,
-	FPFLAGS_Unk8                   = 0x100,
+	FPFLAGS_MoveRotationDisabled   = 0x1,  // do not rotate
+	FPFLAGS_UpdateTrMatrixDisabled = 0x2,  // do not update mBaseTrMatrix
+	FPFLAGS_MoveVelocityDisabled   = 0x4,  // do not move
+	FPFLAGS_MapCollisionDisabled   = 0x8,  // do not care about map collision
+	FPFLAGS_PikiBeingPlucked       = 0x10, // piki currently being plucked
+	FPFLAGS_Zikatu                 = 0x20, // wild piki
+	FPFLAGS_PikiEnteringCave       = 0x40, // piki flagged as entering a cave (in party, right color if SC, etc)
+	FPFLAGS_WasZikatu     = 0x80,  // was previously wild - used so louie can't whistle olimar's pikis til the bag's down on day 1 lol
+	FPFLAGS_IsWildBulbmin = 0x100, // bulbmin that haven't been whistled yet
 };
 
 struct FakePiki : public Creature, public SysShape::MotionListener {
@@ -164,7 +165,7 @@ struct FakePiki : public Creature, public SysShape::MotionListener {
 	virtual bool isZikatu()
 	{
 		return isFPFlag(FPFLAGS_Zikatu);
-	}                                       // _1F4 (weak), is this a Wild Piki? (before type discovery, useless Pikmin)
+	} // _1F4 (weak), is this a Wild Piki? (before type discovery, useless Pikmin)
 	virtual void setZikatu(bool makeZikatu) // _1F8 (weak)
 	{
 		if (makeZikatu) {
@@ -192,13 +193,13 @@ struct FakePiki : public Creature, public SysShape::MotionListener {
 		mPosition = dest;
 		onSetPosition();
 	}
-	virtual f32 getFaceDir() { return mFaceDir; }                                    // _64 (weak)
-	virtual Vector3f getVelocity() { return mSimVelocity; }                          // _6C (weak)
-	virtual void setVelocity(Vector3f& vel) { mSimVelocity = vel; }                  // _68 (weak)
-	virtual void getVelocityAt(Vector3f& vec, Vector3f& vel) { vel = mSimVelocity; } // _184 (weak)
-	virtual Vector3f* getSound_PosPtr() { return &mPosition; }                       // _100 (weak)
-	virtual void onSetPosition() { }                                                 // _218 (weak)
-	virtual bool isWalking() { return false; }                                       // _21C (weak)
+	virtual f32 getFaceDir() { return mFaceDir; }                                 // _64 (weak)
+	virtual Vector3f getVelocity() { return mVelocity; }                          // _6C (weak)
+	virtual void setVelocity(Vector3f& vel) { mVelocity = vel; }                  // _68 (weak)
+	virtual void getVelocityAt(Vector3f& vec, Vector3f& vel) { vel = mVelocity; } // _184 (weak)
+	virtual Vector3f* getSound_PosPtr() { return &mPosition; }                    // _100 (weak)
+	virtual void onSetPosition() { }                                              // _218 (weak)
+	virtual bool isWalking() { return false; }                                    // _21C (weak)
 
 	bool assertMotion(int);
 
@@ -231,14 +232,14 @@ struct FakePiki : public Creature, public SysShape::MotionListener {
 
 	bool debugShapeDL(char*);
 
-	inline void setCurrVelocity(Vector3f& vel) { mVelocity = vel; }
+	inline void setCurrVelocity(Vector3f& vel) { mTargetVelocity = vel; }
 
 	// _000      = VTBL
 	// _000-_178 = Creature
 	// _178-_17C = MotionListener
 	BitFlag<u32> mFakePikiFlags;            // _17C
-	f32 _180;                               // _180
-	u32 _184;                               // _184
+	f32 mTraceMoveRadius;                   // _180, 0.0f for everything except carrot pikmin, which is 0.3f
+	u32 mDontUseWallCallback;               // _184
 	IDelegate* mDoAnimCallback;             // _188
 	s16 mRoomIndex;                         // _18C
 	WaterBox* mWaterBox;                    // _190
@@ -249,17 +250,17 @@ struct FakePiki : public Creature, public SysShape::MotionListener {
 	u8 mLookAtTimer;                        // _1A4
 	Creature* mLookAtTargetCreature;        // _1A8
 	PikiAnimator mAnimator;                 // _1AC
-	Vector3f mVelocity;                     // _1E4
+	Vector3f mTargetVelocity;               // _1E4
 	Vector3f mSimPosition;                  // _1F0, unused
 	f32 mFaceDir;                           // _1FC
-	Vector3f mSimVelocity;                  // _200
+	Vector3f mVelocity;                     // _200
 	Vector3f mPosition;                     // _20C
 	Sys::Sphere mBoundingSphere;            // _218, was mShadowParam.mBoundingSphere
 	int mBoundAnimIdx;                      // _228, current animIdx for held/bound object
 	int _22C;                               // _22C, anim id of some description?
 	int _230;                               // _230, anim id of some description?
 	f32 mAnimSpeed;                         // _234
-	Vector3f mPositionBeforeMovie;          // _238
+	Vector3f mPreviousPosition;             // _238, used to check what movements was made each frame
 	f32 mFaceDirOffset;                     // _244
 	Sys::Triangle* mFakePikiBounceTriangle; // _248
 	Sys::TriIndexList* mTriList;            // _24C
@@ -272,18 +273,18 @@ struct FakePikiParms : public CreatureParms {
 	struct Parms : public Parameters {
 		Parms()
 		    : Parameters(nullptr, "FakePiki::Parms")
-		    , mStepStartSpeed(this, 'fp01', "ASIBUMI äJénÉXÉsÅ[Éh", 5.0f, 0.0f, 500.0f)                 // 'ASIBUMI start speed' (stepping?)
-		    , mWalkStartSpeed(this, 'fp02', "WALK äJénÉXÉsÅ[Éh", 8.0f, 0.0f, 500.0f)                    // 'WALK start speed'
-		    , mRunStartSpeed(this, 'fp03', "RUN äJénÉXÉsÅ[Éh", 20.0f, 0.0f, 500.0f)                     // 'RUN start speed'
-		    , mEscapeStartSpeed(this, 'fp04', "ESCAPE äJénÉXÉsÅ[Éh", 95.0f, 0.0f, 500.0f)               // 'ESCAPE start speed'
-		    , mWalkPlaybackFrameCountMin(this, 'fp04', "WALK çƒê∂ÉtÉåÅ[ÉÄêî(min)", 60.0f, 0.0f, 300.0f) // 'WALK playback frame count (min)'
-		    , mWalkPlaybackFrameCountMax(this, 'fp05', "WALK çƒê∂ÉtÉåÅ[ÉÄêî(max)", 90.0f, 0.0f,
+		    , mStepStartSpeed(this, 'fp01', "ASIBUMI ÈñãÂßã„Çπ„Éî„Éº„Éâ", 5.0f, 0.0f, 500.0f)                 // 'ASIBUMI start speed' (stepping?)
+		    , mWalkStartSpeed(this, 'fp02', "WALK ÈñãÂßã„Çπ„Éî„Éº„Éâ", 8.0f, 0.0f, 500.0f)                    // 'WALK start speed'
+		    , mRunStartSpeed(this, 'fp03', "RUN ÈñãÂßã„Çπ„Éî„Éº„Éâ", 20.0f, 0.0f, 500.0f)                     // 'RUN start speed'
+		    , mEscapeStartSpeed(this, 'fp04', "ESCAPE ÈñãÂßã„Çπ„Éî„Éº„Éâ", 95.0f, 0.0f, 500.0f)               // 'ESCAPE start speed'
+		    , mWalkPlaybackFrameCountMin(this, 'fp04', "WALK ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(min)", 60.0f, 0.0f, 300.0f) // 'WALK playback frame count (min)'
+		    , mWalkPlaybackFrameCountMax(this, 'fp05', "WALK ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(max)", 90.0f, 0.0f,
 		                                 300.0f)                                                      // 'WALK  playback frame count (max)'
-		    , mRunPlaybackFrameCountMin(this, 'fp06', "RUN çƒê∂ÉtÉåÅ[ÉÄêî(min)", 40.0f, 0.0f, 300.0f) // 'RUN playback frame count (min)'
-		    , mRunPlaybackFrameCountMax(this, 'fp07', "RUN çƒê∂ÉtÉåÅ[ÉÄêî(max)", 60.0f, 0.0f, 300.0f) // 'RUN playback frame count (max)'
-		    , mEscapePlaybackFrameCountMin(this, 'fp08', "ESCAPE çƒê∂ÉtÉåÅ[ÉÄêî(min)", 60.0f, 0.0f,
+		    , mRunPlaybackFrameCountMin(this, 'fp06', "RUN ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(min)", 40.0f, 0.0f, 300.0f) // 'RUN playback frame count (min)'
+		    , mRunPlaybackFrameCountMax(this, 'fp07', "RUN ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(max)", 60.0f, 0.0f, 300.0f) // 'RUN playback frame count (max)'
+		    , mEscapePlaybackFrameCountMin(this, 'fp08', "ESCAPE ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(min)", 60.0f, 0.0f,
 		                                   300.0f) // 'ESCAPE playback frame count (min)'
-		    , mEscapePlaybackFrameCountMax(this, 'fp09', "ESCAPE çƒê∂ÉtÉåÅ[ÉÄêî(max)", 90.0f, 0.0f,
+		    , mEscapePlaybackFrameCountMax(this, 'fp09', "ESCAPE ÂÜçÁîü„Éï„É¨„Éº„É†Êï∞(max)", 90.0f, 0.0f,
 		                                   300.0f) // 'ESCAPE playback frame count (max)'
 		{
 		}

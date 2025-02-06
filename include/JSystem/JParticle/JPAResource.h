@@ -25,8 +25,8 @@ struct JPAResource {
 	void init(JKRHeap*);
 	bool calc(JPAEmitterWorkData*, struct JPABaseEmitter*);
 	void draw(JPAEmitterWorkData*, JPABaseEmitter*);
-	void drawP(JPAEmitterWorkData*);
-	void drawC(JPAEmitterWorkData*);
+	void drawP(JPAEmitterWorkData*); // Draw parent
+	void drawC(JPAEmitterWorkData*); // Draw child
 	void setPTev();
 	void setCTev(JPAEmitterWorkData*);
 	void calc_p(JPAEmitterWorkData*, JPABaseParticle*);
@@ -42,7 +42,7 @@ struct JPAResource {
 	JPAExTexShape* getEts() const { return mExTexShape; }
 	JPADynamicsBlock* getDyn() const { return mDynamicsBlock; }
 
-	u16 getTexIdx(u8 idx) const { return mTextureIDList[idx]; }
+	u16 getTexIdx(u32 idx) const { return mTextureIDList[idx]; }
 	u16 getUsrIdx() const { return mUsrIdx; }
 
 	JPAFunctionA** mCalcEmitterFuncList;       // _00

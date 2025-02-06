@@ -121,7 +121,7 @@ void StateWait::cleanup(EnemyBase* enemy)
 void StateMove::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	Obj* tank             = OBJ(enemy);
-	tank->_2F0            = 0.0f;
+	tank->mWalkTimer      = 0.0f;
 	tank->mTargetCreature = nullptr;
 	tank->startMotion(TANKANIM_Move, nullptr);
 	tank->setAnimSpeed(60.0f);
@@ -137,9 +137,9 @@ void StateMove::exec(EnemyBase* enemy)
 	f32 viewAngle = tank->getViewAngle();
 
 	Vector3f pos       = tank->getPosition();
-	Vector3f targetPos = Vector3f(tank->_2F8);
+	Vector3f targetPos = Vector3f(tank->mGoalPosition);
 
-	if (sqrDistanceXZ(pos, targetPos) > 2500.0f && tank->_2F0 < 3.0f) {
+	if (sqrDistanceXZ(pos, targetPos) > 2500.0f && tank->mWalkTimer < 3.0f) {
 		EnemyFunc::walkToTarget(tank, targetPos, CG_GENERALPARMS(tank).mMoveSpeed(), CG_GENERALPARMS(tank).mTurnSpeed(),
 		                        CG_GENERALPARMS(tank).mMaxTurnAngle());
 	} else {
@@ -166,7 +166,7 @@ void StateMove::exec(EnemyBase* enemy)
 		}
 	}
 
-	tank->_2F0 += sys->mDeltaTime;
+	tank->mWalkTimer += sys->mDeltaTime;
 
 	if (tank->mCurAnim->mIsPlaying && tank->mCurAnim->mType == KEYEVENT_END) {
 		if (tank->mHealth <= 0.0f) {
@@ -188,9 +188,9 @@ void StateMove::exec(EnemyBase* enemy)
 		if (target) {
 			// f32 angleDist = tank->getAngDist(target); // f26
 
-			if (tank->isTargetOutOfRange(target, tank->getAngDist(target), CG_GENERALPARMS(tank).mPrivateRadius(),
-			                             CG_GENERALPARMS(tank).mSightRadius(), CG_GENERALPARMS(tank).mFov(),
-			                             viewAngle)) { // slightly different inline?
+			if (tank->isTargetWithinRange(target, tank->getAngDist(target), CG_GENERALPARMS(tank).mPrivateRadius(),
+			                              CG_GENERALPARMS(tank).mSightRadius(), CG_GENERALPARMS(tank).mFov(),
+			                              viewAngle)) { // slightly different inline?
 				transit(tank, TANK_Wait, nullptr);
 				return;
 			}
@@ -601,10 +601,10 @@ void StateMove::cleanup(EnemyBase* enemy)
 void StateMoveTurn::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	Obj* tank = OBJ(enemy);
-	tank->_2F4 += PI / 3;
+	tank->mTurnGoalDir += PI / 3;
 	Vector3f homePos(tank->mHomePosition);
-	tank->_2F8            = Vector3f(CG_GENERALPARMS(tank).mTerritoryRadius() * sinf(tank->_2F4) + homePos.x, homePos.y,
-                          CG_GENERALPARMS(tank).mTerritoryRadius() * cosf(tank->_2F4) + homePos.z);
+	tank->mGoalPosition   = Vector3f(CG_GENERALPARMS(tank).mTerritoryRadius() * sinf(tank->mTurnGoalDir) + homePos.x, homePos.y,
+	                                 CG_GENERALPARMS(tank).mTerritoryRadius() * cosf(tank->mTurnGoalDir) + homePos.z);
 	tank->mTargetCreature = nullptr;
 	tank->mTargetVelocity = Vector3f(0.0f);
 	tank->startMotion(TANKANIM_Turn, nullptr);
@@ -691,7 +691,7 @@ void StateMoveTurn::exec(EnemyBase* enemy)
 {
 	Obj* tank          = OBJ(enemy);
 	f32 view           = tank->getViewAngle();
-	Vector3f targetPos = tank->_2F8;
+	Vector3f targetPos = tank->mGoalPosition;
 	f32 deltaDir       = tank->turnToTarget2(targetPos, CG_GENERALPARMS(tank).mTurnSpeed(), CG_GENERALPARMS(tank).mMaxTurnAngle());
 	if (tank->mHealth <= 0.0f) {
 		transit(enemy, TANK_Dead, nullptr);
@@ -778,14 +778,14 @@ void StateChaseTurn::exec(EnemyBase* enemy)
 		tank->mCautionTimer = 0.0f;
 		f32 angleDist       = tank->changeFaceDir2(target);
 		if (target->isAlive()) {
-			if (tank->isTargetOutOfRange(target, angleDist, CG_GENERALPARMS(tank).mPrivateRadius(), CG_GENERALPARMS(tank).mSightRadius(),
-			                             CG_GENERALPARMS(tank).mFov(), viewAngle)) {
+			if (tank->isTargetWithinRange(target, angleDist, CG_GENERALPARMS(tank).mPrivateRadius(), CG_GENERALPARMS(tank).mSightRadius(),
+			                              CG_GENERALPARMS(tank).mFov(), viewAngle)) {
 				tank->mTargetCreature = nullptr;
 				tank->finishMotion();
 			}
 		}
 	} else {
-		Vector3f targetPos = tank->_2F8;
+		Vector3f targetPos = tank->mGoalPosition;
 		f32 angleDist      = tank->changeFaceDir(targetPos);
 		if (absF(angleDist) <= 10.0f * PI / 180) {
 			tank->finishMotion();
@@ -1261,7 +1261,7 @@ void StateAttack::init(EnemyBase* enemy, StateArg* stateArg)
 {
 	Obj* tank           = OBJ(enemy);
 	tank->mIsBlowing    = false;
-	tank->_2E4          = 0.0f;
+	tank->mAttackTimer  = 0.0f;
 	tank->mCautionTimer = 0.0f;
 	tank->disableEvent(0, EB_Cullable);
 	tank->mTargetCreature = nullptr;

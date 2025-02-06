@@ -5,7 +5,6 @@
 #include "Dolphin/os.h"
 #include "JSystem/JAudio/JAI/JAIBasic.h"
 #include "JSystem/JAudio/JAI/JAIStream.h"
-#include "PSSystem/FxMgr.h"
 #include "JSystem/JKernel/JKRDisposer.h"
 #include "JSystem/JKernel/JKRFileLoader.h"
 #include "P2Macros.h"
@@ -65,7 +64,7 @@ struct StreamBgm : public BgmSeq {
 	virtual void init();                                   // _0C
 	virtual void scene1st(TaskChecker*) { }                // _10 (weak)
 	virtual void startSeq();                               // _14
-	virtual u8 getCastType() { return 1; }                 // _24 (weak)
+	virtual u8 getCastType() { return TYPE_StreamBgm; }    // _24 (weak)
 	virtual u32 getSeqType() { return 0; }                 // _28 (weak)
 	virtual bool isPlaying();                              // _34
 	virtual JAISound** getHandleP() { return &mJaiSound; } // _3C (weak)
@@ -132,11 +131,15 @@ struct SysChecker {
 	inline SysChecker()
 	{
 		OSInitMutex(&mMutex);
-		_18 = 0;
+		mIsEnabled = 0;
 	}
 
 	OSMutex mMutex; // _00
-	int _18;        // _18
+	int mIsEnabled; // _18
+};
+
+struct FxMgr {
+	FxMgr();
 };
 
 // Size: 0x4C
@@ -222,9 +225,10 @@ inline PSSystem::SysIF* PSGetSystemIFA()
 
 inline u32 isValidSeType(u32 soundID)
 {
+	u32 ass = (soundID >> 12) & 0xF;
 	// problem here
 	if ((soundID >> 30) == 0) {
-		return (soundID >> 12) & 0xF;
+		return ass;
 	}
 
 	if ((soundID >> 30) == 2) {

@@ -24,13 +24,13 @@ struct DataMgrBase : public JKRDisposer {
 	virtual ~DataMgrBase(); // _08
 	virtual void init()
 	{
-		JKRHeap::free(_18, nullptr);
-		_18 = nullptr;
+		JKRHeap::free(mExternalFlags, nullptr);
+		mExternalFlags = nullptr;
 	} // _0C (weak)
 
 	// _00      = VTABLE
 	// _04-_18  = JKRDisposer
-	void* _18; // _18
+	void* mExternalFlags; // _18
 };
 
 /**
@@ -45,7 +45,7 @@ struct DataLoadMgrNode : virtual public DataMgrBase {
 	virtual bool isTempBuffaMode() { return false; } // _0C (weak)
 	virtual void init()
 	{
-		_08 = 0;
+		mFlagState = 0;
 		DataMgrBase::init();
 	} // _10 (weak)
 
@@ -79,11 +79,11 @@ struct DataLoadMgrNode : virtual public DataMgrBase {
 
 	// _00 = DataMgrBase*
 	// _04 = VTABLE
-	int _08;               // _08
-	char mPath[0x100];     // _0C
-	char mLoadPath[0x100]; // _10C, best guess as to name
-	u32 _20C;              // _20C
-	u32 _210;              // _210
+	int mFlagState;           // _08
+	char mPath[PATH_MAX];     // _0C
+	char mLoadPath[PATH_MAX]; // _10C, best guess as to name
+	u32 _20C;                 // _20C
+	u32 _210;                 // _210
 
 	// _214 - _234 = DataMgrBase (virtual)
 };
@@ -120,8 +120,8 @@ struct PrmDataMgrNode : public DataMgrNode {
 	}
 
 	virtual ~PrmDataMgrNode<A, B>() { } // _08 (weak)
-	virtual JKRHeap* getObjHeap();      // _14 (weak)
-	virtual JKRHeap* getDataHeap();     // _18 (weak)
+	virtual JKRHeap* getObjHeap()  = 0; // _14 (weak)
+	virtual JKRHeap* getDataHeap() = 0; // _18 (weak)
 	virtual bool initInstance(void* buffer, s32 bufferLength)
 	{
 		if (initInstance()) {
@@ -131,15 +131,23 @@ struct PrmDataMgrNode : public DataMgrNode {
 			return true;
 		}
 		return false;
-	}                               // _1C (weak)
-	virtual bool initInstance() { } // _20 (weak)
+	} // _1C (weak)
+	virtual bool initInstance() // _20 (weak)
+	{
+		if (!mPrmSetRc) {
+			mPrmSetRc = new (getObjHeap(), 0) A(_254, 0);
+			return true;
+		}
+
+		return false;
+	}
 
 	// _00      = DataMgrBase*
 	// _04      = VTBL
 	// _08-_250 = DataMgrNode
-	JADUtility::PrmSetRc<PSAutoBgm::Track>* mPrmSetRc; // _250
-	B* _254;                                           // _254, unknown
-	                                                   // _258-_278 = DataMgrBase (virtual)
+	A* mPrmSetRc; // _250
+	B* _254;      // _254, unknown
+	              // _258-_278 = DataMgrBase (virtual)
 };
 
 struct DataLoadMgrVirNode {

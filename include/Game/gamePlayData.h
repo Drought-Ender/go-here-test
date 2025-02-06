@@ -10,6 +10,9 @@
 #include "id32.h"
 #include "kh/khDayEndResult.h"
 
+// HOW MUCH IS THE DEBT
+#define DEBT_AMOUNT (10000)
+
 namespace Game {
 struct CourseInfo;
 struct Pellet;
@@ -252,7 +255,7 @@ struct PlayData : public CNode {
 	enum CourseFlags {
 		PDCF_Unset    = 0x0,
 		PDCF_Open     = 0x1,
-		PDCF_Unknown2 = 0x2,
+		PDCF_JustOpen = 0x2,
 		PDCF_Visited  = 0x4,
 	};
 	/**
@@ -262,7 +265,7 @@ struct PlayData : public CNode {
 		CaveOtakara()
 		    : mCaveCount(0)
 		    , mOtakaraCountsOld(nullptr)
-		    , _08(nullptr)
+		    , mVisitStatus(nullptr)
 		{
 		}
 
@@ -275,11 +278,11 @@ struct PlayData : public CNode {
 			if (caves > 0) {
 				mCaveCount        = caves;
 				mOtakaraCountsOld = new u8[caves];
-				_08               = new int[caves];
+				mVisitStatus      = new int[caves];
 				if (mCaveCount > 0) {
 					for (int j = 0; j < mCaveCount; j++) {
 						mOtakaraCountsOld[j] = 0;
-						_08[j]               = 0;
+						mVisitStatus[j]      = 0;
 					}
 				}
 			}
@@ -290,7 +293,7 @@ struct PlayData : public CNode {
 			if (mCaveCount > 0) {
 				for (int j = 0; j < mCaveCount; j++) {
 					mOtakaraCountsOld[j] = 0;
-					_08[j]               = 0;
+					mVisitStatus[j]      = 0;
 				}
 			}
 		}
@@ -302,8 +305,8 @@ struct PlayData : public CNode {
 		// so I guess it's both for some reason.
 		u8* mOtakaraCountsOld; // _04
 
-		// Pointer to array indexed by cave index.
-		int* _08; // _08
+		// Pointer to array indexed by cave index. 0 = not visited, 1 or 2 = visited?
+		int* mVisitStatus; // _08
 	};
 
 	struct LimitGen {
@@ -412,7 +415,11 @@ struct PlayData : public CNode {
 	bool isCaveFirstReturn(int, ID32&);
 	bool closeCourse(int);
 
+	inline void setStoryFlag(StoryFlags flag) { mStoryFlags |= flag; }
 	inline bool isStoryFlag(StoryFlags flag) { return mStoryFlags & flag; }
+
+	inline bool hasGotWhites() { return !isDemoFlag(DEMO_White_Candypop); }
+	inline bool hasGotPurples() { return !isDemoFlag(DEMO_Purple_Candypop); }
 
 	inline PelletFirstMemory* getZukanStat() { return mZukanStat; }
 
@@ -431,7 +438,7 @@ struct PlayData : public CNode {
 		for (int i = 0; i < 2; i++) {
 			output.textWriteTab(output.mTabCount);
 			output.writeInt(mBerryCount[i]);
-			sprintf(textBuffer, "\t# dope-ŽÀ[%d]\r\n", i); // 'dope-berry'
+			sprintf(textBuffer, "\t# dope-å®Ÿ[%d]\r\n", i); // 'dope-berry'
 			output.textWriteText(textBuffer);
 		}
 	}
@@ -466,9 +473,13 @@ struct PlayData : public CNode {
 
 	inline void addPokos(int pokos) { mPokoCount += pokos; }
 
+	inline u8& getDebtProgressFlags(int flagID) { return ((u8*)(&mDebtProgressFlags))[flagID]; }
+
+	inline PelletCropMemory* getCaveCropMemory() const { return mCaveCropMemory; }
+
 	// _00     = VTBL
 	// _00-_18 = CNode
-	bool _18;                               // _18
+	bool mDoAllowDebugPikiSpawn;            // _18
 	u8 mLoadType;                           // _19, see SaveFlags enum
 	void* mBeforeSaveDelegate;              // _1C
 	u8 mDeadNaviID;                         // _20
@@ -502,11 +513,12 @@ struct PlayData : public CNode {
 	LimitGen* mLimitGen; // _E4
 
 	// Current Poko count.
-	u32 mPokoCount; // _E8
+	int mPokoCount; // _E8
 
 	int mCavePokoCount; // _EC
 
-	u8 mDebtProgressFlags[2]; // _F0, represent which %of debt messages have been seen
+	BitFlag<u8> mDebtProgressFlags;       // _F0, represent which %of debt messages have been seen
+	BitFlag<u8> mBackupDebtProgressFlags; // _F1
 
 	// ptr to array of previous day's collected overworld treasure counts, per
 	// course.

@@ -191,7 +191,7 @@ void Item::initDependency()
 	}
 
 	if (!complete()) {
-		efx::Arg arg(Vector3f::zero);
+		efx::Arg arg;
 		arg.mPosition = mPosition;
 		mEfxWarpZone->create(&arg);
 	}
@@ -207,7 +207,7 @@ bool Item::sound_culling()
 	Navi* navi = naviMgr->getActiveNavi();
 	if (navi) {
 		Vector3f pos = navi->getPosition();
-		if (sqrDistanceXZ(pos, mPosition) >= 490000.0f) {
+		if (sqrDistanceXZ(pos, mPosition) >= SQUARE(700.0f)) {
 			return true;
 		}
 	}
@@ -353,12 +353,12 @@ void Item::do_setLODParm(AILODParm& parm)
  */
 void Item::doAI()
 {
-	mEfxWarpZone->setRateLOD(mLod.mFlags & 3, false);
+	mEfxWarpZone->setRateLOD(mLod.isFlag(AILOD_IsMid | AILOD_IsFar), false);
 	mFsm->exec(this);
 	if (mBarrel && !mBarrel->isAlive()) {
 		mBarrel = nullptr;
 		if (!complete()) {
-			efx::Arg arg(Vector3f::zero);
+			efx::Arg arg;
 			arg.mPosition = mPosition;
 			mEfxWarpZone->create(&arg);
 		}
@@ -754,14 +754,14 @@ Mgr::Mgr()
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("dungeon_hole.bmd", 0, 0x20000);
+	loadBmd("dungeon_hole.bmd", 0, J3DMODEL_CreateNewDL);
 	JKRArchive* arc = openTextArc("texts.szs");
 	mPlatformA      = loadPlatform(arc, "cap_platform.bin");
 	mPlatformB      = loadPlatform(arc, "side_platform.bin");
 	MapCode::Code code;
-	code.setCode(1, 2, true);
+	code.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode_Steep, true);
 	mPlatformA->setMapCodeAll(code);
-	code.setCode(1, 0, true);
+	code.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode_NoSlip, true);
 	mPlatformB->setMapCodeAll(code);
 	closeTextArc(arc);
 }
@@ -770,7 +770,7 @@ void Mgr::onLoadResources()
  * @note Address: 0x801EB3C8
  * @note Size: 0x74
  */
-void Mgr::setup(BaseItem* item) { item->mModel = new SysShape::Model(getModelData(0), 0x20000, 2); }
+void Mgr::setup(BaseItem* item) { item->mModel = new SysShape::Model(getModelData(0), J3DMODEL_CreateNewDL, 2); }
 
 /**
  * @note Address: 0x801EB43C

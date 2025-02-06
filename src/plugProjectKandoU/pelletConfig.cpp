@@ -3,6 +3,8 @@
 #include "string.h"
 #include "TagParm.h"
 
+const char* className = "pelletConfig";
+
 namespace Game {
 
 /**
@@ -21,31 +23,29 @@ PelletConfigList::PelletConfigList()
  */
 PelletConfig::PelletConfig()
 {
-	mParams.mIndex                                     = -1;
-	mParams.mUnique.mData                              = "no";
-	mParams.mIndirect.mData                            = "no";
-	mParams.mTxtArchive.mData                          = nullptr;
-	mParams.mDepth.mData                               = 0.0f;
-	mParams.mDepthA.mData                              = 10.0f;
-	mParams.mDepthB.mData                              = 20.0f;
-	mParams.mDepthC.mData                              = 30.0f;
-	mParams.mDepthD.mData                              = 40.0f;
-	mParams.mNumPMotions.mData                         = 0;
-	reinterpret_cast<int*>(&mParams.mMessage.mData)[1] = 0;
-	reinterpret_cast<int*>(&mParams.mMessage.mData)[0] = 0;
-	mParams.mOffset.mData.x                            = 0.0f;
-	mParams.mOffset.mData.y                            = 0.0f;
-	mParams.mOffset.mData.z                            = 0.0f;
-	mParams.mCode.mData                                = 0;
-	mParams.mDictionary.mData                          = 0;
-	mParams.mIndirectState                             = Indirect_No;
+	mParams.mIndex             = -1;
+	mParams.mUnique.mData      = "no";
+	mParams.mIndirect.mData    = "no";
+	mParams.mTxtArchive.mData  = nullptr;
+	mParams.mDepth.mData       = 0.0f;
+	mParams.mDepthA.mData      = 10.0f;
+	mParams.mDepthB.mData      = 20.0f;
+	mParams.mDepthC.mData      = 30.0f;
+	mParams.mDepthD.mData      = 40.0f;
+	mParams.mNumPMotions.mData = 0;
+	mParams.mMessage.mData     = 0;
+	mParams.mOffset.mData.x    = 0.0f;
+	mParams.mOffset.mData.y    = 0.0f;
+	mParams.mOffset.mData.z    = 0.0f;
+	mParams.mCode.mData        = 0;
+	mParams.mDictionary.mData  = 0;
+	mParams.mIndirectState     = Indirect_No;
 }
 
 /**
  * @note Address: 0x801B4050
  * @note Size: 0x374
  */
-const char* UNUSED_pelletConfig = "pelletConfig";
 PelletConfig::TParms::TParms()
     : TagParameters("PelletConfig")
     , mName(this, "name")
@@ -94,7 +94,7 @@ PelletConfig* PelletConfigList::getPelletConfig(char* str)
 		PelletConfig* pConfig = &mConfigs[i];
 		u32 len               = strlen(str);
 
-		if (!strncmp(pConfig->mParams.mName.mData, str, len)) {
+		if (IS_SAME_STRING_N(pConfig->mParams.mName.mData, str, len)) {
 			return pConfig;
 		}
 	}

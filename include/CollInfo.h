@@ -87,6 +87,8 @@ struct CollPart : public CNode {
 	void setScale(f32);
 	void update();
 
+	inline f32 getSqrRadius() { return mRadius * mRadius; }
+
 	f32 mBaseRadius;             // _18, base radius used to calculate real radius (in setScale, it's scaled)
 	f32 mRadius;                 // _1C
 	Vector3f mOffset;            // _20
@@ -97,7 +99,7 @@ struct CollPart : public CNode {
 	Vector3f mPosition;          // _4C
 	u8 mPartType;                // _58, using define list - 0=Sphere, 1=Tube, 2=TubeTree
 	SysShape::MtxObject* mModel; // _5C
-	u32 _60;                     // _60
+	u32 mUnusedVal;              // _60
 };
 
 struct CollPartMgr : public MonoObjectMgr<CollPart> {
@@ -109,7 +111,9 @@ struct CollPartMgr : public MonoObjectMgr<CollPart> {
 
 struct FindCollPartArg {
 	Condition<CollPart>* mCondition; // _00
-	Sys::Sphere mPosition;           // _04
+	Sys::Sphere mHitSphere;          // _04
+
+	inline Vector3f& getHitPosition() { return mHitSphere.mPosition; }
 };
 
 struct MouthCollPart : public CollPart {
@@ -129,7 +133,7 @@ struct MouthCollPart : public CollPart {
 
 	Game::Creature* mStuckCreature; // _64
 	SysShape::Joint* mMouthJoint;   // _68
-	u8 _6C;                         // _6C
+	u8 mIsOniKurage;                // _6C, greater jellyfloat uses special calcs for stuff inside it
 };
 
 struct MouthSlots {

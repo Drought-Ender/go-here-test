@@ -46,8 +46,8 @@ struct J2DAnmBase {
 	 */
 	J2DAnmBase()
 	{
-		mCurrentFrame = 0.0f;
-		mFrameLength  = 0;
+		mCurrentFrame    = 0.0f;
+		mTotalFrameCount = 0;
 	}
 
 	/**
@@ -65,7 +65,7 @@ struct J2DAnmBase {
 	 * @brief Gets the maximum frame of the animation.
 	 * @return The maximum frame of the animation.
 	 */
-	inline s16 getFrameMax() const { return mFrameLength; }
+	inline s16 getFrameMax() const { return mTotalFrameCount; }
 
 	/**
 	 * @brief Sets the current frame of the animation.
@@ -86,11 +86,11 @@ struct J2DAnmBase {
 	inline J2DAnmKind getKind() const { return mKind; }
 
 	// _00 = VTBL
-	u8 mAttribute;     // _04
-	u8 _05;            // _05
-	s16 mFrameLength;  // _06
-	f32 mCurrentFrame; // _08
-	J2DAnmKind mKind;  // _0C
+	u8 mAttribute;        // _04
+	u8 _05;               // _05
+	s16 mTotalFrameCount; // _06
+	f32 mCurrentFrame;    // _08
+	J2DAnmKind mKind;     // _0C
 };
 
 /**
@@ -437,7 +437,7 @@ struct J2DAnmTexPattern : public J2DAnmBase {
 struct J2DAnmTextureSRTKey : public J2DAnmBase {
 	J2DAnmTextureSRTKey()
 	{ // taken from TP - may need tweaking for P2 given different sized struct?
-		_10                = 0;
+		mRotationScale     = 0;
 		_20                = 0;
 		_1E                = 0;
 		_1C                = 0;
@@ -469,10 +469,11 @@ struct J2DAnmTextureSRTKey : public J2DAnmBase {
 	inline u16 getUpdateMaterialNum() const { return mUpdateMaterialNum / 3; }
 	inline u16 getUpdateMaterialID(u16 i) const { return mUpdateMaterialID[i]; }
 	inline u8 getUpdateTexMtxID(u16 i) const { return mUpdateTexMtxID[i]; }
+	inline void getTransform(u16 i, J3DTextureSRTInfo* info) const { calcTransform(mCurrentFrame, i, info); }
 
 	// _00     = VTBL
 	// _00-_10 = J2DAnmBase
-	u32 _10;                             // _10
+	u32 mRotationScale;                  // _10
 	u16 mUpdateMaterialNum;              // _14
 	J3DAnmTransformKeyTable* mInfoTable; // _18
 	u16 _1C;                             // _1C
@@ -544,8 +545,8 @@ struct J2DAnmTransformKey : public J2DAnmTransform {
 	J2DAnmTransformKey()
 	    : J2DAnmTransform(nullptr, nullptr, nullptr)
 	{
-		_24        = 0;
-		mInfoTable = nullptr;
+		mRotationScale = 0;
+		mInfoTable     = nullptr;
 	}
 
 	virtual ~J2DAnmTransformKey() { }                               // _08 (weak)
@@ -559,7 +560,7 @@ struct J2DAnmTransformKey : public J2DAnmTransform {
 	// _00-_1C = J2DAnmTransform
 	u8 _1C[6];                           // _1C, unknown
 	u16 _22;                             // _22
-	int _24;                             // _24
+	int mRotationScale;                  // _24
 	J3DAnmTransformKeyTable* mInfoTable; // _28
 };
 
@@ -567,11 +568,11 @@ struct J2DAnmTransformKey : public J2DAnmTransform {
 struct J2DAnmVisibilityFull : public J2DAnmBase {
 	J2DAnmVisibilityFull()
 	{
-		_10     = 0;
-		mTable  = nullptr;
-		_12     = 0;
-		mValues = nullptr;
-		mKind   = J2DANM_VisibilityFull;
+		mAnimTableNum1 = 0;
+		mTable         = nullptr;
+		mAnimTableNum2 = 0;
+		mValues        = nullptr;
+		mKind          = J2DANM_VisibilityFull;
 	}
 
 	virtual ~J2DAnmVisibilityFull() { } // _08 (weak)
@@ -580,8 +581,8 @@ struct J2DAnmVisibilityFull : public J2DAnmBase {
 
 	// _00     = VTBL
 	// _00-_10 = J2DAnmBase
-	u16 _10;                           // _10
-	u16 _12;                           // _12
+	u16 mAnimTableNum1;                // _10
+	u16 mAnimTableNum2;                // _12
 	J3DAnmVisibilityFullTable* mTable; // _14
 	u8* mValues;                       // _18
 };
@@ -600,6 +601,10 @@ struct J2DAnmVtxColor : public J2DAnmBase {
 
 	virtual ~J2DAnmVtxColor() { }                      // _08 (weak)
 	virtual void getColor(u8, u16, GXColor*) const { } // _10 (weak)
+
+	u16 getAnmTableNum(u8 idx) const { return mAnmTableNum[idx]; }
+	J3DAnmVtxColorIndexData* getAnmVtxColorIndexData(u8 idx, u16 p1) const { return &mVtxColorIndexData[idx][p1]; }
+	u16* getVtxColorIndexPointer(u8 idx) const { return mVtxColorIndexPtr[idx]; }
 
 	// _00     = VTBL
 	// _00-_10 = J2DAnmBase

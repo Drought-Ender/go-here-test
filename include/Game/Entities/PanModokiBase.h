@@ -160,20 +160,20 @@ struct Obj : public EnemyBase {
 	s16 mWpIndex3;                                      // _2EA
 	u32 mPathID;                                        // _2EC
 	bool mIsPathfinding;                                // _2F0
-	u8 _2F1;                                            // _2F1
+	u8 mCanReactToPress;                                // _2F1
 	WalkSmokeEffect::Mgr mWalkSmokeMgr;                 // _2F4
 	efx::TPanHide* mEfxHide;                            // _2FC
 	efx::TPanSmoke* mEfxSmoke;                          // _300
-	int _304;                                           // _304
+	int mFindNextRouteCounter;                          // _304
 	Vector3f mPrevCheckPosition;                        // _308
 	int mMoveToWpTimer;                                 // _314
 	int mMoveSpeedTimer;                                // _318
-	u8 _31C;                                            // _31C
+	u8 mIsCarryStuck;                                   // _31C
 	Vector3f mPelletCarryVelocity;                      // _320
 	f32 mCarrySizeDiff;                                 // _32C
 	f32 mShadowSize;                                    // _330
 	f32 mCarryingYPosition;                             // _334
-	f32 _338;                                           // _338
+	f32 mUnusedVal;                                     // _338
 	f32 mBounceEffectSize;                              // _33C
 	f32 mAppearEffectSize;                              // _340
 	StateID mNextState;                                 // _344
@@ -191,16 +191,16 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mNestScale(this, 'fp00', "‘ƒƒXƒP[ƒ‹", 1.0f, 0.0f, 5.0f)                 // 'nest scale'
-		    , mWalkAnimSpeed(this, 'fp16', "•à‚«ƒ‚[ƒVƒ‡ƒ“ƒXƒs[ƒh", 1.0f, 0.0f, 5.0f) // 'walking motion speed'
-		    , mFastTurnSpeed(this, 'fp02', "‹}‰ñ“]‘¬“x—¦", 0.1f, 0.0f, 1.0f)           // 'rapid rotation speed rate'
-		    , mMaxFastTurnAngle(this, 'fp05', "‹}‰ñ“]‘¬“xÅ‘å", 1.0f, 0.0f, 180.0f)    // 'rapid rotation speed max'
-		    , mCarrySpeed(this, 'fp03', "–ß‚è‘¬“x", 10.0f, 0.0f, 100.0f)               // 'return speed'
-		    , mSuckDamage(this, 'fp04', "ƒRƒ“ƒeƒiƒ_ƒ[ƒW", 10.0f, 0.0f, 1000.0f)      // 'container [onyon/ship] damage'
-		    , mPressDamage(this, 'fp06', "ƒvƒŒƒXƒ_ƒ[ƒW", 10.0f, 0.0f, 1000.0f)       // 'press damage'
-		    , mWaitTime(this, 'fp14', "‘Ò‹@ŠÔ", 20.0f, 0.0f, 500.0f)                 // 'wait time'
-		    , mHideTime(this, 'fp15', "ö•šŠÔ", 50.0f, 0.0f, 300.0f)                 // 'incubation time'
-		    , mMaxCarryWeight(this, 'ip01', "ƒ^[ƒQƒbƒgƒXƒƒbƒg”‹«ŠE", 5, 1, 20)      // 'target slot limit'
+		    , mNestScale(this, 'fp00', "å·£ã‚¹ã‚±ãƒ¼ãƒ«", 1.0f, 0.0f, 5.0f)                 // 'nest scale'
+		    , mWalkAnimSpeed(this, 'fp16', "æ­©ããƒ¢ãƒ¼ã‚·ãƒ§ãƒ³ã‚¹ãƒ”ãƒ¼ãƒ‰", 1.0f, 0.0f, 5.0f) // 'walking motion speed'
+		    , mFastTurnSpeed(this, 'fp02', "æ€¥å›è»¢é€Ÿåº¦ç‡", 0.1f, 0.0f, 1.0f)           // 'rapid rotation speed rate'
+		    , mMaxFastTurnAngle(this, 'fp05', "æ€¥å›è»¢é€Ÿåº¦æœ€å¤§", 1.0f, 0.0f, 180.0f)    // 'rapid rotation speed max'
+		    , mCarrySpeed(this, 'fp03', "æˆ»ã‚Šé€Ÿåº¦", 10.0f, 0.0f, 100.0f)               // 'return speed'
+		    , mSuckDamage(this, 'fp04', "ã‚³ãƒ³ãƒ†ãƒŠãƒ€ãƒ¡ãƒ¼ã‚¸", 10.0f, 0.0f, 1000.0f)      // 'container [onyon/ship] damage'
+		    , mPressDamage(this, 'fp06', "ãƒ—ãƒ¬ã‚¹ãƒ€ãƒ¡ãƒ¼ã‚¸", 10.0f, 0.0f, 1000.0f)       // 'press damage'
+		    , mWaitTime(this, 'fp14', "å¾…æ©Ÿæ™‚é–“", 20.0f, 0.0f, 500.0f)                 // 'wait time'
+		    , mHideTime(this, 'fp15', "æ½œä¼æ™‚é–“", 50.0f, 0.0f, 300.0f)                 // 'incubation time'
+		    , mMaxCarryWeight(this, 'ip01', "ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã‚¹ãƒ­ãƒƒãƒˆæ•°å¢ƒç•Œ", 5, 1, 20)      // 'target slot limit'
 		{
 		}
 
@@ -304,7 +304,7 @@ struct StateCarryEnd : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	Vector3f _10; // _10, position maybe?
+	Vector3f mStartPosition; // _10
 };
 
 struct StateDamage : public State {
@@ -357,7 +357,7 @@ struct StateStick : public State {
 
 	// _00		= VTBL
 	// _00-_10 	= EnemyFSMState
-	int _10; // _10, unknown
+	int mMoveToTargetTimer; // _10
 };
 
 struct StateSucked : public State {

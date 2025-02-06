@@ -14,18 +14,25 @@ struct JAIStream;
 struct JKRHeap;
 
 struct JAIBasic {
+	struct Flags {
+		bool _00 : 1;
+		bool _01 : 1;
+		bool _02 : 1;
+		bool _03 : 1;
+		bool _04 : 1;
+	};
+
 	JAIBasic();
 
 	virtual JAISequence* makeSequence();       // _08
 	virtual JAISe* makeSe();                   // _0C
 	virtual JAIStream* makeStream();           // _10
-	virtual BOOL getMapInfoFxline(u32);        // _14
+	virtual u16 getMapInfoFxline(u32);         // _14
 	virtual BOOL getMapInfoGround(u32);        // _18
 	virtual f32 getMapInfoFxParameter(u32);    // _1C
 	virtual void setSeExtParameter(JAISound*); // _20
 	virtual void setRegisterTrackCallback();   // _24
 
-	// void prepareSoundVecT<JAISound>(u32, JAISound**, Vec*, u32, u32, u8);
 	// void startSoundVecT<JAISound>(u32, JAISound**, Vec*, u32, u32, u8);
 	// void startSoundActorT<JAISound>(u32, JAISound**, JAInter::Actor*, u32, u8);
 	void initDriver(JKRSolidHeap*, u32, u8);
@@ -40,10 +47,10 @@ struct JAIBasic {
 	void setInitFileLoadSwitch(u8);
 	BOOL initReadFile();
 	void processFrameWork();
-	void startSoundBasic(u32, JAISound**, JAInter::Actor*, u32, u8, JAInter::SoundInfo*);
-	void startSoundBasic(u32, JAISequence**, JAInter::Actor*, u32, u8, JAInter::SoundInfo*);
-	void startSoundBasic(u32, JAISe**, JAInter::Actor*, u32, u8, JAInter::SoundInfo*);
-	void startSoundBasic(u32, JAIStream**, JAInter::Actor*, u32, u8, JAInter::SoundInfo*);
+	void startSoundBasic(u32 id, JAISound** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId, JAInter::SoundInfo* info);
+	void startSoundBasic(u32 id, JAISequence** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId, JAInter::SoundInfo* info);
+	void startSoundBasic(u32 id, JAISe** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId, JAInter::SoundInfo* info);
+	void startSoundBasic(u32 id, JAIStream** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId, JAInter::SoundInfo* info);
 	void stopSoundHandle(JAISound*, u32);
 	void stopAllSe(u8);
 	u16 getSoundOffsetNumberFromID(u32);
@@ -57,16 +64,19 @@ struct JAIBasic {
 	static JKRHeap* getCurrentJAIHeap() { return msCurrentHeap; }
 
 	template <typename T>
-	void startSoundActorT(u32 id, T** handlePtr, JAInter::Actor* actor, u32 p4, u8 p5);
+	void startSoundActorT(u32 id, T** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId);
 
 	template <typename T>
-	void startSoundVecReturnHandleT(T** handlePtr, u32 p2, Vec* p3, u32 p4, u32 p5, u8 p6);
+	void startSoundVecReturnHandleT(T** handlePtr, u32 soundID, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId);
 
 	template <typename T>
-	void startSoundVecT(u32 id, T** handlePtr, Vec* p3, u32 p4, u32 p5, u8 p6);
+	void startSoundVecT(u32 id, T** handlePtr, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId);
 
 	template <typename T>
-	void startSoundActorReturnHandleT(T**, u32, JAInter::Actor*, u32, u8);
+	void startSoundActorReturnHandleT(T** handlePtr, u32 soundID, JAInter::Actor* actor, u32 fadeTime, u8 camId);
+
+	template <typename T>
+	void prepareSoundVecT(u32 soundID, T** handlePtr, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId);
 
 	// unused/inlined:
 	void bootDSP();
@@ -97,19 +107,13 @@ struct JAIBasic {
 	// VT _00
 	JAInter::Camera* mCameras; // _04
 	JKRHeap* mHeap;            // _08
-	u8 _0C;                    // _0C
-	u8 mParamSoundOutputMode;  // _0D
-	struct Flags {
-		bool _0 : 1;
-		bool _1 : 1;
-		bool _2 : 1;
-		bool _3 : 1;
-		bool _4 : 1;
-	} _0E;    // _0E
-	u32 _10;  // _10
-	u32 _14;  // _14
-	u32 _18;  // _18
-	u8** _1C; // _1C
+	u8 mFileLoadType;          // _0C
+	u8 mParamSoundOutputMode;  // _0D, see JASOutputMode enum
+	Flags mFlags;              // _0E
+	u32 mCurrentTick;          // _10
+	u32 _14;                   // _14
+	u8* mRawDataPtr;           // _18
+	u8** _1C;                  // _1C
 
 	static JAIBasic* msBasic;
 	static JKRHeap* msCurrentHeap;
@@ -124,30 +128,30 @@ struct JAIBasic {
 };
 
 template <typename T>
-void JAIBasic::startSoundVecT(u32 id, T** handlePtr, Vec* p3, u32 p4, u32 p5, u8 p6)
+void JAIBasic::startSoundVecT(u32 id, T** handlePtr, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId)
 {
-	JAInter::Actor actor(p3, p3, p3, p5);
-	startSoundActorT(id, handlePtr, &actor, p4, p6);
+	JAInter::Actor actor(position, infoIndex);
+	startSoundActorT(id, handlePtr, &actor, fadeTime, camId);
 }
 
 template <typename T>
-void JAIBasic::startSoundActorT(u32 id, T** handlePtr, JAInter::Actor* actor, u32 p4, u8 p5)
+void JAIBasic::startSoundActorT(u32 id, T** handlePtr, JAInter::Actor* actor, u32 fadeTime, u8 camId)
 {
 	JAInter::SoundInfo* info = JAInter::SoundTable::getInfoPointer(id);
 	if (info) {
-		startSoundBasic(id, handlePtr, actor, p4, p5, info);
+		startSoundBasic(id, handlePtr, actor, fadeTime, camId, info);
 	}
 }
 
 template <typename T>
-void JAIBasic::startSoundVecReturnHandleT(T** handlePtr, u32 p2, Vec* p3, u32 p4, u32 p5, u8 p6)
+void JAIBasic::startSoundVecReturnHandleT(T** handlePtr, u32 soundID, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId)
 {
 	T* tempHandle[1];
 	*tempHandle = nullptr;
-	if ((p2 & JAISoundID_TypeMask) == JAISoundID_Type_Se) {
+	if ((soundID & JAISoundID_TypeMask) == JAISoundID_Type_Se) {
 		*tempHandle = (T*)(1);
 	}
-	JAIBasic::startSoundVecT(p2, tempHandle, p3, p4, p5, p6);
+	JAIBasic::startSoundVecT(soundID, tempHandle, position, fadeTime, infoIndex, camId);
 	*handlePtr = *tempHandle;
 	if (*tempHandle) {
 		(*tempHandle)->release();
@@ -155,17 +159,26 @@ void JAIBasic::startSoundVecReturnHandleT(T** handlePtr, u32 p2, Vec* p3, u32 p4
 }
 
 template <typename T>
-void JAIBasic::startSoundActorReturnHandleT(T** handlePtr, u32 p2, JAInter::Actor* p3, u32 p4, u8 p6)
+void JAIBasic::startSoundActorReturnHandleT(T** handlePtr, u32 soundID, JAInter::Actor* actor, u32 fadeTime, u8 camId)
 {
 	T* tempHandle[1];
 	*tempHandle = nullptr;
-	if ((p2 & JAISoundID_TypeMask) == JAISoundID_Type_Se) {
+	if ((soundID & JAISoundID_TypeMask) == JAISoundID_Type_Se) {
 		*tempHandle = (T*)(1);
 	}
-	JAIBasic::startSoundActorT(p2, tempHandle, p3, p4, p6);
+	JAIBasic::startSoundActorT(soundID, tempHandle, actor, fadeTime, camId);
 	*handlePtr = *tempHandle;
 	if (*tempHandle) {
 		(*tempHandle)->release();
+	}
+}
+
+template <typename T>
+void JAIBasic::prepareSoundVecT(u32 soundID, T** handlePtr, Vec* position, u32 fadeTime, u32 infoIndex, u8 camId)
+{
+	JAIBasic::startSoundVecT(soundID, handlePtr, position, fadeTime, infoIndex, camId);
+	if (*handlePtr) {
+		(*handlePtr)->setPrepareFlag(1);
 	}
 }
 

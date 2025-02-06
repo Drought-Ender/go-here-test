@@ -23,8 +23,8 @@ MapUnits::MapUnits(JUTTexture* texture)
 	mSizeX   = -1;
 	mSizeY   = -1;
 	if (mTexture) {
-		mSizeX = ((u32)mTexture->mTexInfo->mSizeX) >> 3;
-		mSizeY = ((u32)mTexture->mTexInfo->mSizeY) >> 3;
+		mSizeX = ((u32)mTexture->mTexInfo->mSizeX) / 8;
+		mSizeY = ((u32)mTexture->mTexInfo->mSizeY) / 8;
 	}
 
 	mDoorNode   = new DoorNode();
@@ -79,73 +79,49 @@ void MapUnits::setBaseGenPtr(BaseGen* baseGen) { mBaseGen = baseGen; }
  * @note Address: N/A
  * @note Size: 0x8
  */
-// void Cave::MapUnits::setUnitTexture(JUTTexture*)
-// {
-// // UNUSED FUNCTION
-// }
+void MapUnits::setUnitTexture(JUTTexture* texture) { mTexture = texture; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// char* Cave::MapUnits::getUnitName()
-// {
-// // UNUSED FUNCTION
-// }
+char* MapUnits::getUnitName() { return mName; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// int Cave::MapUnits::getUnitIndex()
-// {
-// // UNUSED FUNCTION
-// }
+int MapUnits::getUnitIndex() { return mIndex; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// int Cave::MapUnits::getUnitKind()
-// {
-// // UNUSED FUNCTION
-// }
+int MapUnits::getUnitKind() { return mKind; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// int Cave::MapUnits::getUnitSizeX()
-// {
-// // UNUSED FUNCTION
-// }
+int MapUnits::getUnitSizeX() { return mSizeX; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// int Cave::MapUnits::getUnitSizeY()
-// {
-// // UNUSED FUNCTION
-// }
+int MapUnits::getUnitSizeY() { return mSizeY; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// BaseGen* Cave::MapUnits::getBaseGen()
-// {
-// // UNUSED FUNCTION
-// }
+BaseGen* MapUnits::getBaseGen() { return mBaseGen; }
 
 /**
  * @note Address: N/A
  * @note Size: 0x8
  */
-// JUTTexture* Cave::MapUnits::getUnitTexture()
-// {
-// // UNUSED FUNCTION
-// }
+JUTTexture* MapUnits::getUnitTexture() { return mTexture; }
 
 /**
  * @note Address: 0x80242938
@@ -187,8 +163,8 @@ void UnitInfo::create()
 	// sets up unit sizes + directions based on details in mMapUnits + current rotation
 
 	// load all door nodes from mMapUnits into mDoorNode
-	DoorNode* mapDoorNode = (DoorNode*)mMapUnits->mDoorNode->mChild;
-	for (mapDoorNode; mapDoorNode; mapDoorNode = (DoorNode*)mapDoorNode->mNext) {
+	DoorNode* mapDoorNode = static_cast<DoorNode*>(mMapUnits->mDoorNode->mChild);
+	for (mapDoorNode; mapDoorNode; mapDoorNode = static_cast<DoorNode*>(mapDoorNode->mNext)) {
 		DoorNode* newDoorNode         = new DoorNode();
 		newDoorNode->mDoor.mDirection = mapDoorNode->mDoor.mDirection;
 		newDoorNode->mDoor.mOffset    = mapDoorNode->mDoor.mOffset;
@@ -200,20 +176,20 @@ void UnitInfo::create()
 
 	// if unit is facing up or down, use X and Y as normal
 	if ((mUnitRotation == CD_Up) || (mUnitRotation == CD_Down)) {
-		mUnitSizeX = mMapUnits->mSizeX;
-		mUnitSizeY = mMapUnits->mSizeY;
+		mUnitSizeX = mMapUnits->getUnitSizeX();
+		mUnitSizeY = mMapUnits->getUnitSizeY();
 	} else { // if unit is facing left or right, swap X and Y
-		mUnitSizeX = mMapUnits->mSizeY;
-		mUnitSizeY = mMapUnits->mSizeX;
+		mUnitSizeX = mMapUnits->getUnitSizeY();
+		mUnitSizeY = mMapUnits->getUnitSizeX();
 	}
 
 	// set defaults for door offsets
-	int X = mMapUnits->mSizeX - 1;
-	int Y = mMapUnits->mSizeY - 1;
+	int X = mMapUnits->getUnitSizeX() - 1;
+	int Y = mMapUnits->getUnitSizeY() - 1;
 
 	// set all door offsets based on their directions
-	DoorNode* unitDoorNode = (DoorNode*)mDoorNode->mChild;
-	for (unitDoorNode; unitDoorNode; unitDoorNode = (DoorNode*)unitDoorNode->mNext) {
+	DoorNode* unitDoorNode = static_cast<DoorNode*>(mDoorNode->mChild);
+	for (unitDoorNode; unitDoorNode; unitDoorNode = static_cast<DoorNode*>(unitDoorNode->mNext)) {
 
 		int doorDir      = unitDoorNode->mDoor.mDirection; // default direction
 		int newDirection = (doorDir + mUnitRotation) % 4;  // rotate with unit
@@ -250,10 +226,11 @@ char* UnitInfo::getUnitName() { return mMapUnits->mName; }
  * @note Address: N/A
  * @note Size: 0xC
  */
-// int Cave::UnitInfo::getUnitIndex()
-// {
-// // UNUSED FUNCTION
-// }
+int UnitInfo::getUnitIndex()
+{
+	// UNUSED FUNCTION
+	return mMapUnits->mIndex;
+}
 
 /**
  * @note Address: 0x80242B78
@@ -283,7 +260,7 @@ int UnitInfo::getUnitRotation() { return mUnitRotation; }
  * @note Address: 0x80242B9C
  * @note Size: 0x24
  */
-DoorNode* UnitInfo::getDoorNode(int doorNum) { return (DoorNode*)mDoorNode->getChildAt(doorNum); }
+DoorNode* UnitInfo::getDoorNode(int doorNum) { return static_cast<DoorNode*>(mDoorNode->getChildAt(doorNum)); }
 
 /**
  * @note Address: 0x80242BC0

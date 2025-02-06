@@ -55,12 +55,12 @@ void ActTransport::init(ActionArg* settings)
 
 	mPellet = arg->mPellet;
 	mGoal   = arg->mGoal;
-	_1C     = arg->_0C;
-	_28     = arg->_18;
+	_1C     = arg->mUnusedPos;
+	_28     = arg->mUnusedSlotVal;
 
 	mParent->startMotion(Game::IPikiAnims::WAIT, Game::IPikiAnims::WAIT, nullptr, nullptr);
-	mParent->mVelocity = Vector3f(0.0f);
-	mState             = TRANSPORT_Slot;
+	mParent->mTargetVelocity = Vector3f(0.0f);
+	mState                   = TRANSPORT_Slot;
 
 	GotoSlotArg gotoSlotArg(mPellet, SLOTSEARCH_Nearest);
 	mGotoSlot->init(&gotoSlotArg);
@@ -227,7 +227,7 @@ void ActTransport::onKeyEvent(SysShape::KeyEvent const& keyEvent)
 		}
 		break;
 
-	case KEYEVENT_1: {
+	case KEYEVENT_LOOP_END: {
 		Game::Pellet* pellet = mPellet;
 		if (pellet->isPicked()) {
 			mParent->startSound(pellet, PSSE_PK_VC_LIFT_MOVE, PSGame::SeMgr::SETSE_PikiCarry);

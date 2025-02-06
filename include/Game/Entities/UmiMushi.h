@@ -73,20 +73,20 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mDamageRate(this, 'fp01', "ƒ_ƒ[ƒWƒŒ[ƒg", 1.0f, 0.0f, 1.0f)           // 'damage rate'
-		    , mTurnStartAngle(this, 'fp02', "ù‰ñŠJnŠp“x", 60.0f, 0.0f, 180.0f)      // 'turn start angle'
-		    , mTurnEndAngle(this, 'fp03', "ù‰ñI—¹Šp“x", 10.0f, 0.0f, 180.0f)        // 'turn end angle'
-		    , mMoveSpeed(this, 'fp04', "ƒT[ƒ`ˆÚ“®‘¬“x", 10.0f, 0.0f, 100.0f)         // 'search movement speed'
-		    , mRotateSpeed(this, 'fp06', "ƒT[ƒ`‰ñ“]‘¬“x—¦", 0.1f, 0.0f, 1.0f)        // 'search rotation speed rate'
-		    , mRotateSpeedMax(this, 'fp07', "ƒT[ƒ`‰ñ“]Å‘å‘¬“x", 5.0f, 0.0f, 360.0f) // 'search rotation max speed'
-		    , mPurpleDamageRate(this, 'fp09', "•ƒsƒNƒ~ƒ“ƒ_ƒ[ƒWƒŒ[ƒg", 0.0f, 0.0f,
+		    , mDamageRate(this, 'fp01', "ãƒ€ãƒ¡ãƒ¼ã‚¸ãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)           // 'damage rate'
+		    , mTurnStartAngle(this, 'fp02', "æ—‹å›é–‹å§‹è§’åº¦", 60.0f, 0.0f, 180.0f)      // 'turn start angle'
+		    , mTurnEndAngle(this, 'fp03', "æ—‹å›çµ‚äº†è§’åº¦", 10.0f, 0.0f, 180.0f)        // 'turn end angle'
+		    , mMoveSpeed(this, 'fp04', "ã‚µãƒ¼ãƒç§»å‹•é€Ÿåº¦", 10.0f, 0.0f, 100.0f)         // 'search movement speed'
+		    , mRotateSpeed(this, 'fp06', "ã‚µãƒ¼ãƒå›è»¢é€Ÿåº¦ç‡", 0.1f, 0.0f, 1.0f)        // 'search rotation speed rate'
+		    , mRotateSpeedMax(this, 'fp07', "ã‚µãƒ¼ãƒå›è»¢æœ€å¤§é€Ÿåº¦", 5.0f, 0.0f, 360.0f) // 'search rotation max speed'
+		    , mPurpleDamageRate(this, 'fp09', "é»’ãƒ”ã‚¯ãƒŸãƒ³ãƒ€ãƒ¡ãƒ¼ã‚¸ãƒ¬ãƒ¼ãƒˆ", 0.0f, 0.0f,
 		                        1.0f)                                              // 'black pikmin damage rate'
-		    , mCaveTerritory(this, 'fp10', "’n‰ºƒeƒŠƒgƒŠ[", 200.0f, 0.0f, 500.0f) // 'underground territory'
-		    , mWhiteDamage(this, 'fp11', "”’ƒsƒNƒ~ƒ“", 300.0f, 0.0f, 1000.0f)      // 'white pikmin'
-		    , mBlindHealth(this, 'fp12', "‚ß‚­‚çƒ‰ƒCƒt", 1000.0f, 0.0f, 2000.0f)   // 'blind life'
-		    , mBlindWaitTime(this, 'fp13', "‚ß‚­‚ç‘Ò‹@ŠÔŠu", 200.0f, 0.0f, 500.0f) // 'blind wait interval'
-		    , mBlindMoveTime(this, 'fp14', "‚ß‚­‚çˆÚ“®ŠÔŠu", 200.0f, 0.0f, 500.0f) // 'blind movement interval'
-		    , mWaitTimeAfterAttack(this, 'ip01', "UŒ‚Œã‘Ò‹@ŠúŠÔ", 100, 0, 300)    // 'waiting period after attack'
+		    , mCaveTerritory(this, 'fp10', "åœ°ä¸‹ãƒ†ãƒªãƒˆãƒªãƒ¼", 200.0f, 0.0f, 500.0f) // 'underground territory'
+		    , mWhiteDamage(this, 'fp11', "ç™½ãƒ”ã‚¯ãƒŸãƒ³", 300.0f, 0.0f, 1000.0f)      // 'white pikmin'
+		    , mBlindHealth(this, 'fp12', "ã‚ãã‚‰ãƒ©ã‚¤ãƒ•", 1000.0f, 0.0f, 2000.0f)   // 'blind life'
+		    , mBlindWaitTime(this, 'fp13', "ã‚ãã‚‰å¾…æ©Ÿé–“éš”", 200.0f, 0.0f, 500.0f) // 'blind wait interval'
+		    , mBlindMoveTime(this, 'fp14', "ã‚ãã‚‰ç§»å‹•é–“éš”", 200.0f, 0.0f, 500.0f) // 'blind movement interval'
+		    , mWaitTimeAfterAttack(this, 'ip01', "æ”»æ’ƒå¾Œå¾…æ©ŸæœŸé–“", 100, 0, 300)    // 'waiting period after attack'
 		{
 		}
 
@@ -107,21 +107,21 @@ struct Parms : public EnemyParmsBase {
 
 	Parms()
 	{
-		_A10 = 1;
-		_A11 = 1;
-		_A12 = 1;
-		_A13 = 1;
-		_A14 = 1;
-		_A15 = 0;
-		_A16 = 1;
-		_A18 = -1;
-		_A1C = 10.0f;
-		_A20 = 0.05f;
-		_A24 = 1.0f;
-		_A28 = 10.0f;
-		_A2C = 0.3f;
-		_A30 = 1.0f;
-		_A34 = 1.4f;
+		mCanRotate              = 1;
+		mIsAIAlwaysActiveOnWait = 1;
+		mDoUseFindState         = 1;
+		mCanEatNavis            = 1;
+		mUnused1                = 1;
+		mDoUseParamEyeCalc      = 0;
+		mUnused2                = 1;
+		mUnused3                = -1;
+		mWalkAngleSpeed         = 10.0f;
+		mRotateAngleDelta       = 0.05f;
+		mUnused4                = 1.0f;
+		mEyeYOffset             = 10.0f;
+		mBlindTurnRateReduction = 0.3f;
+		mDefaultEyeScale        = 1.0f;
+		mTailScale              = 1.4f;
 	}
 
 	virtual void read(Stream& stream) // _08 (weak)
@@ -132,22 +132,22 @@ struct Parms : public EnemyParmsBase {
 	}
 
 	// _00-_7F8	= EnemyParmsBase
-	ProperParms mProperParms; // _7F8
-	u8 _A10;                  // _A10, unknown
-	u8 _A11;                  // _A11, unknown
-	u8 _A12;                  // _A12, unknown
-	u8 _A13;                  // _A13, unknown
-	u8 _A14;                  // _A14, unknown
-	u8 _A15;                  // _A15, unknown
-	u8 _A16;                  // _A16, unknown
-	s16 _A18;                 // _A18, unknown
-	f32 _A1C;                 // _A1C
-	f32 _A20;                 // _A20
-	f32 _A24;                 // _A24
-	f32 _A28;                 // _A28
-	f32 _A2C;                 // _A2C
-	f32 _A30;                 // _A30
-	f32 _A34;                 // _A34
+	ProperParms mProperParms;    // _7F8
+	u8 mCanRotate;               // _A10
+	u8 mIsAIAlwaysActiveOnWait;  // _A11
+	u8 mDoUseFindState;          // _A12
+	u8 mCanEatNavis;             // _A13
+	u8 mUnused1;                 // _A14
+	u8 mDoUseParamEyeCalc;       // _A15
+	u8 mUnused2;                 // _A16
+	s16 mUnused3;                // _A18
+	f32 mWalkAngleSpeed;         // _A1C
+	f32 mRotateAngleDelta;       // _A20
+	f32 mUnused4;                // _A24
+	f32 mEyeYOffset;             // _A28
+	f32 mBlindTurnRateReduction; // _A2C
+	f32 mDefaultEyeScale;        // _A30
+	f32 mTailScale;              // _A34
 };
 
 struct Obj : public EnemyBase {
@@ -174,7 +174,7 @@ struct Obj : public EnemyBase {
 	virtual bool eatWhitePikminCallBack(Creature* creature, f32 f)
 	{
 		return EnemyBase::eatWhitePikminCallBack(creature, C_PROPERPARMS.mWhiteDamage);
-	}                                                                            // _298 (weak)
+	} // _298 (weak)
 	virtual EnemyTypeID::EEnemyTypeID getEnemyTypeID() { return mBloysterType; } // _258 (weak)
 	virtual MouthSlots* getMouthSlots() { return &mMouthSlots; }                 // _25C (weak)
 	virtual void doGetLifeGaugeParam(LifeGaugeParam&);                           // _260
@@ -226,28 +226,28 @@ struct Obj : public EnemyBase {
 	MouthSlots mMouthSlots;                  // _2CC
 	SysShape::Joint* mHeadJoint;             // _2D4
 	Navi* mTargetNavi;                       // _2D8
-	bool _2DC;                               // _2DC, unknown
-	u8 _2DD;                                 // _2DD, unknown
-	int _2E0;                                // _2E0, unknown
-	Vector3f _2E4;                           // _2E4
-	int _2F0;                                // _2F0
-	int _2F4;                                // _2F0
-	f32 _2F8;                                // _2F8
-	f32 _2FC;                                // _2FC
-	int _300;                                // _300
-	Vector3f _304;                           // _304
-	J3DMaterial* _310;                       // _310, unknown
-	J3DGXColorS10 _314;                      // _314
-	J3DGXColorS10 _31C;                      // _31C
+	bool mNeedNaviTargetSound;               // _2DC
+	u8 mDoSkipEyeCalc;                       // _2DD
+	int mCantSearchTargetTimer;              // _2E0
+	Vector3f mLastCheckedPosition;           // _2E4
+	int mMoveCheckIntervalTimer;             // _2F0
+	int mReachGoalStopTimer;                 // _2F0
+	f32 mPrevFaceDir;                        // _2F8
+	f32 mWalkRotateAngle;                    // _2FC
+	int mChaseSoundTimer;                    // _300
+	Vector3f mTargetPosition;                // _304
+	J3DMaterial* mTailMaterial;              // _310
+	J3DGXColorS10 mActiveTailColor;          // _314
+	J3DGXColorS10 mPrevTailColor;            // _31C
 	J3DGXColorS10 mOlimarColor1;             // _324
 	J3DGXColorS10 mOlimarColor2;             // _32C
 	J3DGXColorS10 mLouieColor1;              // _334
 	J3DGXColorS10 mLouieColor2;              // _33C
 	J3DGXColorS10 mNormalColor1;             // _344
 	J3DGXColorS10 mNormalColor2;             // _34C
-	Sys::MatLoopAnimator* _354;              // _354
+	Sys::MatLoopAnimator* mMatAnim;          // _354
 	UmimushiShadowMgr* mShadowMgr;           // _358
-	f32 _35C;                                // _35C
+	f32 mEyeScale;                           // _35C
 	u16 mEyeJointIdx;                        // _360
 	u16 mWeakJointIdx;                       // _362
 	efx::TUmiHamon* mEfxHamon;               // _364
@@ -257,7 +257,7 @@ struct Obj : public EnemyBase {
 	efx::TUmiEyeBlue* mEfxEyeBlue[2];        // _378
 	efx::TUmiEat* mEfxEat;                   // _380
 	efx::TUmiDeadawa* mEfxBubble;            // _384
-	Matrixf* _388;                           // _388
+	Matrixf* mEatJointMtx;                   // _388
 	Vector3f mHamonPosition;                 // _38C
 	FSM* mFsm;                               // _398
 	EnemyTypeID::EEnemyTypeID mBloysterType; // _39C

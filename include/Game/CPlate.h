@@ -17,14 +17,14 @@ struct CPlate : public Container<Creature> {
 	struct Slot {
 		Slot()
 		{
-			mCreature = nullptr;
-			mListener = nullptr;
-			_00       = Vector3f(0.0f);
-			_0C       = Vector3f(0.0f);
+			mCreature         = nullptr;
+			mListener         = nullptr;
+			mRelativePosition = Vector3f(0.0f);
+			mPosition         = Vector3f(0.0f);
 		}
 
-		Vector3f _00;                  // _00
-		Vector3f _0C;                  // _0C
+		Vector3f mRelativePosition;    // _00
+		Vector3f mPosition;            // _0C
 		Creature* mCreature;           // _18
 		SlotChangeListener* mListener; // _1C
 	};
@@ -33,9 +33,9 @@ struct CPlate : public Container<Creature> {
 	struct Parms : public Parameters {
 		inline Parms()
 		    : Parameters(nullptr, "Navi::Parms")
-		    , mStartingOffset(this, 'p000', "êÊì™ÉIÉtÉZÉbÉg", 17.5f, 0.0f, 100.0f)          // 'starting offset'
-		    , mLengthLimit(this, 'p001', "í∑Ç≥ÉäÉ~ÉbÉg", 130.0f, 10.0f, 1000.0f)            // 'length limit'
-		    , mMaxPositionSize(this, 'p002', "É|ÉWÉVÉáÉìÇÃëÂÇ´Ç≥(ç≈ëÂ)", 6.0f, 1.0f, 50.0f) // 'position size (max)'
+		    , mStartingOffset(this, 'p000', "ÂÖàÈ†≠„Ç™„Éï„Çª„ÉÉ„Éà", 17.5f, 0.0f, 100.0f)          // 'starting offset'
+		    , mLengthLimit(this, 'p001', "Èï∑„Åï„É™„Éü„ÉÉ„Éà", 130.0f, 10.0f, 1000.0f)            // 'length limit'
+		    , mMaxPositionSize(this, 'p002', "„Éù„Ç∏„Ç∑„Éß„É≥„ÅÆÂ§ß„Åç„Åï(ÊúÄÂ§ß)", 6.0f, 1.0f, 50.0f) // 'position size (max)'
 		{
 		}
 		Parm<f32> mStartingOffset;  // _0C
@@ -71,26 +71,24 @@ struct CPlate : public Container<Creature> {
 
 	// _00     = VTBL
 	// _00-_1C = Container
-	Parms mParms;                   // _1C
-	Vector3f _A4;                   // _A4
-	f32 mBaseRadius;                // _B0
-	f32 _B4;                        // _B4
-	f32 _B8;                        // _B8
-	int mActiveGroupSize;           // _BC
-	Slot* mSlots;                   // _C0
-	int mSlotLimit;                 // _C4
-	int mSlotCount;                 // _C8
-	Vector3f mPosition;             // _CC
-	Vector3f _D8;                   // _D8
-	Vector3f mVelocity;             // _E4
-	f32 mAngle;                     // _F0
-	f32 _F4;                        // _F4
-	f32 _F8;                        // _F8
-	f32 _FC;                        // _FC
-	u8 _100;                        // _100
-	int _104[PikiGrowthStageCount]; // _104, indexed by happakind?
-	u8 _110;                        // _110
-	u8 _111;                        // _111
+	Parms mParms;                                // _1C
+	Vector3f mMaxPositionOffset;                 // _A4
+	f32 mBaseRadius;                             // _B0
+	f32 mMoveStickRadius;                        // _B4
+	f32 mMaxRadius;                              // _B8
+	int mActiveGroupSize;                        // _BC
+	Slot* mSlots;                                // _C0
+	int mSlotLimit;                              // _C4
+	int mSlotCount;                              // _C8
+	Vector3f mPosition;                          // _CC
+	Vector3f mBasePositionOffset;                // _D8
+	Vector3f mVelocity;                          // _E4
+	f32 mAngle;                                  // _F0
+	Vector3f mUnused;                            // _F4
+	u8 mShrinkTimer;                             // _100
+	int mHappaStageCounts[PikiGrowthStageCount]; // _104, indexed by happakind?
+	u8 _110;                                     // _110
+	u8 mIsPositionUnset;                         // _111
 };
 } // namespace Game
 

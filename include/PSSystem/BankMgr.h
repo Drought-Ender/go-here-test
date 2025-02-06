@@ -4,6 +4,20 @@
 #include "types.h"
 #include "JSystem/JKernel/JKRDisposer.h"
 
+struct PSBankData {
+	u8 mData[3]; // _00
+};
+
+struct PSWsData {
+	u8 mData[2]; // _00
+};
+
+struct PSInstData {
+	u32 _00;
+	u32 _04;
+	u32 mIndex;
+};
+
 namespace PSSystem {
 struct BankMgr : public JKRDisposer {
 	BankMgr();
@@ -28,13 +42,12 @@ struct BankMgr : public JKRDisposer {
 	static void firstLoadS() { }
 	static void secondLoadS() { }
 
-	u8 _18;          // _18
-	u8 _19;          // _19
-	u8 _1A;          // _1A
-	u8 _1B;          // _1B
-	u32** mBankData; // _1C, array of u32* ptrs, in groups of 3
-	u8 _20;          // _20 - "bank count"?
-	u32** mWsData;   // _24, array of u32* ptrs, in groups of 3
+	u8 mIsPreInitialized;  // _18
+	u8 mIsInitialized;     // _19
+	u8 mInstBankNum;       // _1A, number of instrument banks
+	PSInstData* mBankData; // _1C, array of u32* ptrs, in groups of 3
+	u8 mWaveBankNum;       // _20, number of wave banks
+	PSInstData* mWsData;   // _24, array of u32* ptrs, in groups of 3
 
 	static BankMgr* sBankMgr;
 };

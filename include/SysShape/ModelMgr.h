@@ -11,18 +11,18 @@ namespace SysShape {
 struct Model;
 
 struct ModelMgr {
-	ModelMgr(int, J3DModelData**, int, u32, u32, IDelegate1<Model*>*);
+	ModelMgr(int modelDataLimit, J3DModelData** modelData, int heapLimit, u32 p4, u32 p5, IDelegate1<Model*>* delegate);
 
 	int calcMaximumModelSize();
-	int calcModelSize(J3DModelData*);
-	Model* createModel(int, int);
+	int calcModelSize(J3DModelData* modelData);
+	Model* createModel(int modelIndex, int heapIndex);
 
 	int mModelDataLimit;           // _00
 	J3DModelData** mModelData;     // _04
 	int mHeapLimit;                // _08
 	JKRSolidHeap** mHeaps;         // _0C
-	u32 _10;                       // _10
-	u32 _14;                       // _14
+	u32 mModelFlags;               // _10
+	u32 mViewNum;                  // _14
 	IDelegate1<Model*>* mDelegate; // _18
 };
 } // namespace SysShape

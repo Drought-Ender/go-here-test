@@ -36,7 +36,7 @@ void FSM::init(Item* item)
 void AppearState::init(Item* item, StateArg* arg)
 {
 	item->mBuryDepth = 45.0f;
-	_10              = 0.0f;
+	mAppearTimer     = 0.0f;
 	item->setAlive(true);
 }
 
@@ -46,9 +46,9 @@ void AppearState::init(Item* item, StateArg* arg)
  */
 void AppearState::exec(Item* item)
 {
-	_10 += sys->mDeltaTime;
+	mAppearTimer += sys->mDeltaTime;
 
-	f32 timeRemaining = 1.0f - 0.8333333f * _10;
+	f32 timeRemaining = 1.0f - 0.8333333f * mAppearTimer;
 
 	if (timeRemaining <= 0.0f) {
 		timeRemaining = 0.0f;
@@ -81,7 +81,7 @@ void CloseState::init(Item* item, StateArg* arg)
  * @note Address: 0x801EC498
  * @note Size: 0x14
  */
-void CloseState::exec(Item* item) { item->mLod.resetFlag(AILOD_IsVisible | AILOD_IsVisVP0 | AILOD_IsVisVP1); }
+void CloseState::exec(Item* item) { item->mLod.resetFlag(AILOD_IsVisibleBoth); }
 
 /**
  * @note Address: 0x801EC4AC
@@ -146,7 +146,7 @@ void OutState::init(Item* item, StateArg* arg)
 	item->mEfxGeyserSet->fade();
 	efx::Arg effectArg(item->mPosition);
 	item->mEfxGeyserAct->create(&effectArg);
-	if (gameSystem->isFlag(GAMESYS_IsSoundFXActive)) {
+	if (gameSystem->isFlag(GAMESYS_IsSoundSceneActive)) {
 		item->mSoundEvent.finish();
 		P2ASSERTLINE(248, item->mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(item->mSoundObj)->eventFinish();
@@ -173,7 +173,7 @@ void OutState::cleanup(Item* item) { }
 void Item::movieUserCommand(u32 command, MoviePlayer* player)
 {
 	switch (command) {
-	case 100:
+	case CC_MovieCommand1:
 		PelletIterator iter;
 		CI_LOOP(iter)
 		{
@@ -247,7 +247,7 @@ void Item::constructor() { mSoundObj = new PSM::WorkItem(this); }
  */
 void Item::onInit(CreatureInitArg* initArg)
 {
-	mModel = new SysShape::Model(mgr->getModelData(0), 0x20000, 2);
+	mModel = new SysShape::Model(mgr->getModelData(0), J3DMODEL_CreateNewDL, 2);
 	mModel->mJ3dModel->calc();
 	mModel->mJ3dModel->calcMaterial();
 	mModel->mJ3dModel->makeDL();
@@ -277,7 +277,7 @@ void Item::onInit(CreatureInitArg* initArg)
 	}
 
 	// weird but required for stack.
-	Vector3f(1.0f).setVec(mModel->mJ3dModel->mModelScale);
+	Vector3f(1.0f).set(mModel->mJ3dModel->mModelScale);
 	mMass    = 0.0f;
 	mFaceDir = 0.0f;
 }
@@ -372,7 +372,7 @@ void Item::doAI()
 {
 	mFsm->exec(this);
 	switch (mSoundEvent.update()) {
-	case 2:
+	case TSE_ApplyTransition:
 		P2ASSERTLINE(492, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(mSoundObj)->eventStop();
 		break;
@@ -437,11 +437,11 @@ bool Item::interactAttack(InteractAttack& attack)
 	if (mCurrentState) {
 		mCurrentState->onDamage(this, attack.mDamage);
 		switch (mSoundEvent.event()) {
-		case 1:
+		case TSE_Active:
 			P2ASSERTLINE(559, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 			static_cast<PSM::WorkItem*>(mSoundObj)->eventStart();
 			break;
-		case 3:
+		case TSE_Apply:
 			P2ASSERTLINE(566, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 			static_cast<PSM::WorkItem*>(mSoundObj)->eventRestart();
 			break;
@@ -497,13 +497,14 @@ Mgr::Mgr()
 {
 	setModelSize(1);
 	mObjectPathComponent = "user/Kando/objects/kanketusen";
-	mItemName            = "‹AŠÒŠÔŒ‡ò"; // 'return geyser'
-	mParms               = new FountainParms();
-	void* data           = JKRDvdRipper::loadToMainRAM("user/Abe/item/fountainParms.txt", nullptr, Switch_0, 0, nullptr,
-                                             JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
+	mItemName            = "å¸°é‚„é–“æ¬ æ³‰"; // 'return geyser'
+	mParms               = new FountainParms;
+
+	void* data = JKRDvdRipper::loadToMainRAM("user/Abe/item/fountainParms.txt", nullptr, Switch_0, 0, nullptr,
+	                                         JKRDvdRipper::ALLOC_DIR_BOTTOM, 0, nullptr, nullptr);
 	if (data != nullptr) {
 		RamStream input(data, -1);
-		input.resetPosition(true, 1);
+		input.setMode(STREAM_MODE_TEXT, 1);
 		mParms->read(input);
 		delete[] data;
 	}
@@ -516,7 +517,7 @@ Mgr::Mgr()
 void Mgr::onLoadResources()
 {
 	loadArchive("arc.szs");
-	loadBmd("kanketusen.bmd", 0, 0x20020000);
+	loadBmd("kanketusen.bmd", 0, J3DMODEL_Unk30 | J3DMODEL_CreateNewDL);
 	mModelData[0]->newSharedDisplayList(0x40000);
 	mModelData[0]->makeSharedDL();
 
@@ -526,7 +527,7 @@ void Mgr::onLoadResources()
 	mPlatform = loadPlatform(textArc, "platform.bin");
 
 	MapCode::Code mapCode;
-	mapCode.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode2, true);
+	mapCode.setCode(MapCode::Code::Attribute1, MapCode::Code::SlipCode_Steep, true);
 	mPlatform->setMapCodeAll(mapCode);
 
 	closeTextArc(textArc);

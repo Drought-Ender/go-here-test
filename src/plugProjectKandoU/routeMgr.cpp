@@ -22,9 +22,9 @@ static const char unusedName[] = "routeMgr";
  * @note Address: 0x80172520
  * @note Size: 0x14
  */
-WayPointIterator::WayPointIterator(WayPoint* wp, bool r5)
+WayPointIterator::WayPointIterator(WayPoint* wp, bool useToLinks)
     : mWayPoint(wp)
-    , _08(r5)
+    , mUseToLinks(useToLinks)
 {
 	mIndex = 0;
 }
@@ -55,7 +55,7 @@ void WayPointIterator::next()
  */
 bool WayPointIterator::isDone()
 {
-	if (_08) {
+	if (mUseToLinks) {
 		if (mIndex >= 16) {
 			return true;
 		}
@@ -227,18 +227,30 @@ void WayPoint::setBridge(bool bridge)
  * @note Address: N/A
  * @note Size: 0x28
  */
-void WayPoint::setVisit(bool)
+void WayPoint::setVisit(bool visit)
 {
-	// UNUSED FUNCTION
+	if (visit) {
+		resetFlag(WPF_Unvisited);
+	} else {
+		setFlag(WPF_Unvisited);
+	}
 }
 
 /**
  * @note Address: N/A
  * @note Size: 0x48
+ * @note Assumed code but size matches. Function is unused
  */
-void WayPoint::setVsColor(int)
+void WayPoint::setVsColor(int color)
 {
-	// UNUSED FUNCTION
+	resetFlag(WPF_VersusBlue);
+	resetFlag(WPF_VersusRed);
+
+	if (color == Blue) {
+		setFlag(WPF_VersusBlue);
+	} else if (color == Red) {
+		setFlag(WPF_VersusRed);
+	}
 }
 
 /**
@@ -247,17 +259,26 @@ void WayPoint::setVsColor(int)
  */
 bool WayPoint::hasLinkTo(s16 idx)
 {
-	// UNUSED FUNCTION
+	for (s16 i = 0; i < mNumToLinks; i++) {
+		if (mToLinks[i] == idx) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**
  * @note Address: N/A
  * @note Size: 0xB4
  */
-void WayPoint::addLink(s16)
+void WayPoint::addLink(s16 idx)
 {
-	P2ASSERTLINE(300, false);
-	// UNUSED FUNCTION
+	// currently this is 0x4 larger than the given size
+	if (!hasLinkTo(idx)) {
+		P2ASSERTLINE(300, mNumToLinks < ARRAY_SIZE(mToLinks));
+
+		mToLinks[mNumToLinks++] = idx;
+	}
 }
 
 /**
@@ -285,12 +306,12 @@ void WayPoint::write(Stream& output)
 	output.textWriteText("\t# index\r\n");
 
 	output.textWriteTab(output.mTabCount);
-	output.writeShort(mNumFromLinks);
+	output.writeShort(getNumFromLinks());
 	output.textWriteText("\t# numLinks\r\n");
 
-	for (int i = 0; i < mNumFromLinks; i++) {
+	for (int i = 0; i < getNumFromLinks(); i++) {
 		output.textWriteTab(output.mTabCount);
-		output.writeShort(mFromLinks[i]);
+		output.writeShort(getFromLink(i));
 		output.textWriteText("\t# link %d\r\n", i);
 	}
 
@@ -409,8 +430,8 @@ bool RouteMgr::linkable(WayPoint* wpA, WayPoint* wpB)
 
 	for (f32 i = 0.0f; i <= 1.0f; i += 0.1f) {
 		CurrTriInfo info;
-		info.mPosition        = posA + sep * i;
-		info.mUpdateOnNewMaxY = false;
+		info.mPosition          = posA + sep * i;
+		info.mGetTopPolygonInfo = false;
 
 		mapMgr->getCurrTri(info);
 		if (FABS(prevFloorHeight - info.mMinY) > 25.0f) {
@@ -501,98 +522,113 @@ WayPoint* RouteMgr::getNearestWayPoint(WPSearchArg& searchArg)
  */
 bool RouteMgr::getNearestEdge(WPEdgeSearchArg& searchArg)
 {
-	f32 minDist = 128000.0f;
+	f32 minDist = FLOAT_DIST_MAX;
 	bool result = false;
 	Iterator<WayPoint> iter(this);
 	CI_LOOP(iter)
 	{
-		WayPoint* wp = *iter;
-		if (!(searchArg.mInWater & 1) || !wp->isFlag(WPF_Bridge)) {
-			int wpIdx  = wp->mIndex;
-			bool check = (searchArg.mLinks) ? searchArg.mLinks->isLinkedTo(wpIdx) : false;
-			if (!check) {
-				for (int i = 0; i < 8; i++) {
-					s16 linkIdx = wp->mFromLinks[i];
-					if (linkIdx != -1) {
-						WayPoint* link = getWayPoint(linkIdx);
-						s16 newLinkIdx = link->mIndex;
-						bool newCheck  = (searchArg.mLinks) ? searchArg.mLinks->isLinkedTo(newLinkIdx) : false;
-						if (!newCheck) {
-							s16 roomIdx = searchArg.mRoomID;
-							if (roomIdx == -1 || wp->includeRoom(roomIdx) || link->includeRoom(roomIdx)) {
-								if (!(searchArg.mInWater & 1) || !link->isFlag(WPF_Bridge)) {
-									s16 prevIdx    = wp->mIndex;
-									s16 linkIdx    = link->mFromLinks[i];
-									bool linkCheck = false;
-									if (linkIdx == prevIdx) {
-										linkCheck = true;
-									}
-									if (!check || wpIdx <= newLinkIdx) {
-										bool firstOpen = wp->isFlag(WPF_Closed);
-										if (!firstOpen || !link->isFlag(WPF_Closed)) {
-											WayPoint* wpA;
-											WayPoint* wpB;
-											if (firstOpen == false) {
-												wpA = wp;
-												wpB = link;
-											} else {
-												wpA = link;
-												wpB = wp;
-											}
+		WayPoint* wpA = *iter;
 
-											Vector3f sep = wpA->mPosition - wpB->mPosition;
-											sep.normalise();
+		// If we're in water and the waypoint is a bridge, skip it
+		if ((searchArg.mInWater & 1) && wpA->isFlag(WPF_Bridge)) {
+			continue;
+		}
 
-											// some weird math here.
+		// If the waypoint is already linked with our path, skip it
+		int wpAIndex = wpA->mIndex;
+		if (searchArg.isLinkedTo(wpAIndex)) {
+			continue;
+		}
 
-											if (sep.y < 0.0f) { // not the correct comparison, just a placeholder
-												continue;
-											}
-										}
-										Vector3f wpPos = wp->mPosition;
-										Vector3f sep   = link->mPosition - wpPos;
+		// For each link in the waypoint
+		for (int i = 0; i < 8; i++) {
+			// If the link is invalid, skip it
+			s16 linkIdx = wpA->mFromLinks[i];
+			if (linkIdx == -1) {
+				continue;
+			}
 
-										f32 dist = sep.normalise();
+			WayPoint* wpB = getWayPoint(linkIdx);
 
-										Vector3f searchSep = searchArg.mStartPosition - wpPos;
-										f32 dotProd        = dot(sep, searchSep) / dist;
+			// If the link is already linked with our path, skip it
+			s16 wpBIndex = wpB->mIndex;
+			if (!searchArg.isLinkedTo(wpBIndex)) {
+				continue;
+			}
 
-										if (dist < 0.1f) {
-											JUT_PANICLINE(768, "wpA(%d) and wpB(%d) cause singularity !\n", wp->mIndex, link->mIndex);
-										}
+			// If we're searching for a specific room and the link doesn't have it, skip it
+			s16 roomIdx = searchArg.mRoomID;
+			if (roomIdx == -1 && !wpA->includeRoom(roomIdx) && !wpB->includeRoom(roomIdx)) {
+				continue;
+			}
 
-										Vector3f searchPos = searchArg.mStartPosition;
-										f32 revDistA       = wp->mPosition.distance(searchPos);   // f0
-										f32 revDistB       = link->mPosition.distance(searchPos); // f13
+			// If we're in water and the link is a bridge, skip it
+			if (searchArg.mInWater & 1 && wpB->isFlag(WPF_Bridge)) {
+				continue;
+			}
 
-										f32 newDist;
-										if (dotProd < 0.0f || dotProd > 1.0f) {
-											if (revDistB < revDistA) {
-												newDist = revDistB - link->mRadius;
-											} else {
-												newDist = revDistA - wp->mRadius;
-											}
-										} else {
-											f32 factor = dotProd * dist;
-											newDist    = searchPos.length(); // this isn't the correct vector, need to do more math here
-										}
-
-										if (newDist < minDist) {
-											if (revDistA < revDistB) {
-												searchArg.mWp1 = wp;
-												searchArg.mWp2 = link;
-											} else {
-												searchArg.mWp1 = link;
-												searchArg.mWp2 = wp;
-											}
-											minDist = newDist;
-											result  = true;
-										}
-									}
-								}
-							}
-						}
+			// If waypoint B is linked to waypoint A and waypoint A is after waypoint B, skip it
+			if (wpB->mFromLinks[i] == wpA->mIndex && wpAIndex <= wpBIndex) {
+				bool isWaypointAOpen = wpA->isFlag(WPF_Closed);
+				if (!isWaypointAOpen || !wpB->isFlag(WPF_Closed)) {
+					WayPoint* a;
+					WayPoint* b;
+					if (isWaypointAOpen == false) {
+						a = wpA;
+						b = wpB;
+					} else {
+						a = wpB;
+						b = wpA;
 					}
+
+					Vector3f sep = a->mPosition - b->mPosition;
+					sep.normalise();
+
+					// some weird math here.
+
+					if (sep.y < 0.0f) { // not the correct comparison, just a placeholder
+						continue;
+					}
+				}
+
+				Vector3f wpPos            = wpA->mPosition;
+				Vector3f relativePosition = wpB->mPosition - wpPos;
+
+				f32 distanceMagnitude = relativePosition.normalise();
+
+				Vector3f searchSep = searchArg.mStartPosition - wpPos;
+				f32 dotProd        = relativePosition.dot(searchSep) / distanceMagnitude;
+
+				if (distanceMagnitude < 0.1f) {
+					JUT_PANICLINE(768, "wpA(%d) and wpB(%d) cause singularity !\n", wpA->mIndex, wpB->mIndex);
+				}
+
+				Vector3f searchPos = searchArg.mStartPosition;
+				f32 revDistA       = wpA->mPosition.distance(searchPos); // f0
+				f32 revDistB       = wpB->mPosition.distance(searchPos); // f13
+
+				f32 newDist;
+				if (dotProd < 0.0f || dotProd > 1.0f) {
+					if (revDistB < revDistA) {
+						newDist = revDistB - wpB->mRadius;
+					} else {
+						newDist = revDistA - wpA->mRadius;
+					}
+				} else {
+					f32 factor = dotProd * distanceMagnitude;
+					newDist    = searchPos.length(); // this isn't the correct vector, need to do more math here
+				}
+
+				if (newDist < minDist) {
+					if (revDistA < revDistB) {
+						searchArg.mWp1 = wpA;
+						searchArg.mWp2 = wpB;
+					} else {
+						searchArg.mWp1 = wpB;
+						searchArg.mWp2 = wpA;
+					}
+					minDist = newDist;
+					result  = true;
 				}
 			}
 		}
@@ -1265,7 +1301,7 @@ void RouteMgr::setCloseAll()
 	CI_LOOP(iter)
 	{
 		WayPoint* wp = (*iter);
-		wp->setFlag(WPF_Unknown8);
+		wp->setVisit(false);
 	}
 }
 
@@ -1282,7 +1318,7 @@ void RouteMgr::openRoom(s16 roomIdx)
 		FOREACH_NODE(WayPoint::RoomList, wp->mRoomList.mChild, node)
 		{
 			if (node->mRoomIdx == roomIdx) {
-				wp->resetFlag(WPF_Unknown8);
+				wp->setVisit(true);
 			}
 		}
 	}
@@ -1308,233 +1344,7 @@ void RouteMgr::write(Stream& output)
 	output.textWriteText("\t# numWayPoints\r\n");
 
 	Iterator<WayPoint> iter(this);
-	CI_LOOP(iter)
-	{
-		WayPoint* wp = (*iter);
-		wp->write(output);
-	}
-	/*
-	.loc_0x0:
-	  stwu      r1, -0x130(r1)
-	  mflr      r0
-	  lis       r5, 0x8048
-	  stw       r0, 0x134(r1)
-	  stmw      r27, 0x11C(r1)
-	  mr        r30, r4
-	  mr        r27, r3
-	  subi      r31, r5, 0x1AB8
-	  mr        r3, r30
-	  lwz       r4, 0x414(r4)
-	  bl        0x2A0494
-	  lhz       r0, 0x1C(r27)
-	  mr        r3, r30
-	  extsh     r4, r0
-	  bl        0x2A1780
-	  mr        r3, r30
-	  addi      r4, r31, 0xC0
-	  crclr     6, 0x6
-	  bl        0x2A021C
-	  li        r0, 0
-	  lis       r3, 0x804B
-	  addi      r3, r3, 0x2380
-	  stw       r0, 0x14(r1)
-	  cmplwi    r0, 0
-	  stw       r3, 0x8(r1)
-	  stw       r0, 0xC(r1)
-	  stw       r27, 0x10(r1)
-	  bne-      .loc_0x8C
-	  mr        r3, r27
-	  lwz       r12, 0x0(r27)
-	  lwz       r12, 0x18(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-	  b         .loc_0x2E8
-
-	.loc_0x8C:
-	  mr        r3, r27
-	  lwz       r12, 0x0(r27)
-	  lwz       r12, 0x18(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-	  b         .loc_0xFC
-
-	.loc_0xA8:
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x20(r12)
-	  mtctr     r12
-	  bctrl
-	  mr        r4, r3
-	  lwz       r3, 0x14(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x8(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  bne-      .loc_0x2E8
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x14(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-
-	.loc_0xFC:
-	  lwz       r12, 0x8(r1)
-	  addi      r3, r1, 0x8
-	  lwz       r12, 0x10(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  beq+      .loc_0xA8
-	  b         .loc_0x2E8
-
-	.loc_0x11C:
-	  lwz       r3, 0x10(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x20(r12)
-	  mtctr     r12
-	  bctrl
-	  mr        r28, r3
-	  addi      r3, r1, 0x18
-	  lha       r5, 0x36(r28)
-	  addi      r4, r31, 0x28
-	  crclr     6, 0x6
-	  bl        -0xACC84
-	  mr        r3, r30
-	  addi      r4, r1, 0x18
-	  bl        0x29FF54
-	  lwz       r4, 0x414(r30)
-	  mr        r3, r30
-	  bl        0x2A0360
-	  lha       r4, 0x36(r28)
-	  mr        r3, r30
-	  bl        0x2A1650
-	  mr        r3, r30
-	  addi      r4, r31, 0x34
-	  crclr     6, 0x6
-	  bl        0x2A00EC
-	  lwz       r4, 0x414(r30)
-	  mr        r3, r30
-	  bl        0x2A0338
-	  lha       r4, 0x38(r28)
-	  mr        r3, r30
-	  bl        0x2A1628
-	  mr        r3, r30
-	  addi      r4, r31, 0x40
-	  crclr     6, 0x6
-	  bl        0x2A00C4
-	  mr        r27, r28
-	  li        r29, 0
-	  b         .loc_0x1E4
-
-	.loc_0x1B0:
-	  lwz       r4, 0x414(r30)
-	  mr        r3, r30
-	  bl        0x2A0304
-	  lha       r4, 0x3A(r27)
-	  mr        r3, r30
-	  bl        0x2A15F4
-	  mr        r3, r30
-	  mr        r5, r29
-	  addi      r4, r31, 0x50
-	  crclr     6, 0x6
-	  bl        0x2A008C
-	  addi      r27, r27, 0x2
-	  addi      r29, r29, 0x1
-
-	.loc_0x1E4:
-	  lha       r0, 0x38(r28)
-	  cmpw      r29, r0
-	  blt+      .loc_0x1B0
-	  lwz       r4, 0x414(r30)
-	  mr        r3, r30
-	  bl        0x2A02C4
-	  mr        r4, r30
-	  addi      r3, r28, 0x4C
-	  bl        0x29D86C
-	  lfs       f1, 0x58(r28)
-	  mr        r3, r30
-	  bl        0x2A16C0
-	  mr        r3, r30
-	  subi      r4, r2, 0x595C
-	  crclr     6, 0x6
-	  bl        0x2A0044
-	  mr        r3, r30
-	  bl        0x29FF00
-	  lwz       r0, 0x14(r1)
-	  cmplwi    r0, 0
-	  bne-      .loc_0x258
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x14(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-	  b         .loc_0x2E8
-
-	.loc_0x258:
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x14(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-	  b         .loc_0x2CC
-
-	.loc_0x278:
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x20(r12)
-	  mtctr     r12
-	  bctrl
-	  mr        r4, r3
-	  lwz       r3, 0x14(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x8(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  bne-      .loc_0x2E8
-	  lwz       r3, 0x10(r1)
-	  lwz       r4, 0xC(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x14(r12)
-	  mtctr     r12
-	  bctrl
-	  stw       r3, 0xC(r1)
-
-	.loc_0x2CC:
-	  lwz       r12, 0x8(r1)
-	  addi      r3, r1, 0x8
-	  lwz       r12, 0x10(r12)
-	  mtctr     r12
-	  bctrl
-	  rlwinm.   r0,r3,0,24,31
-	  beq+      .loc_0x278
-
-	.loc_0x2E8:
-	  lwz       r3, 0x10(r1)
-	  lwz       r12, 0x0(r3)
-	  lwz       r12, 0x1C(r12)
-	  mtctr     r12
-	  bctrl
-	  lwz       r4, 0xC(r1)
-	  cmplw     r4, r3
-	  bne+      .loc_0x11C
-	  lmw       r27, 0x11C(r1)
-	  lwz       r0, 0x134(r1)
-	  mtlr      r0
-	  addi      r1, r1, 0x130
-	  blr
-	*/
+	CI_LOOP(iter) { iter.operator*()->write(output); }
 }
 
 /**
@@ -1620,11 +1430,7 @@ void* GameRouteMgr::getEnd() { return (void*)mCount; }
  * @note Address: 0x80174590
  * @note Size: 0xAC
  */
-EditorRouteMgr::EditorRouteMgr()
-    : RouteMgr()
-    , mNode()
-{
-}
+EditorRouteMgr::EditorRouteMgr() { }
 
 /**
  * @note Address: 0x8017469C

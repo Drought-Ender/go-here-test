@@ -8,12 +8,26 @@ template <typename T>
 struct TAllocator {
 	static TAllocator get() { }
 
-	inline TAllocator();
+	T* allocate(size_t count, void*) { return (T*)AllocateRaw(count * sizeof(T)); }
 
-	u8 _00;  // _00
-	u32 _04; // _04
-	u32 _08; // _08
-	u32 _0C; // _0C
+	void* AllocateRaw(size_t rawSize) { return operator new(rawSize); }
+
+	void deallocate(T* p, u32) { DeallocateRaw(p); }
+
+	void DeallocateRaw(void* p) { delete (p); }
+
+	void construct(T* pObject, T const& value)
+	{
+		if (pObject) {
+			*pObject = value;
+		}
+	}
+
+	void destroy(T* p) { p->~T(); }
+
+	// inline TAllocator() { }
+
+	u8 _00; // _00
 };
 
 typedef TAllocator<void*> TVoidAllocator;

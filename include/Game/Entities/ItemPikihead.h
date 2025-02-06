@@ -29,7 +29,7 @@ struct InitArg : public ItemInitArg {
 		mVelocity        = Vector3f::zero;
 		mIsAlreadyBuried = false;
 		mHeadType        = Leaf;
-		_1C              = -1.0f;
+		mAutopluckTimer  = -1.0f;
 	}
 
 	inline InitArg(EPikiKind pikiKind, Vector3f& vel)
@@ -38,7 +38,7 @@ struct InitArg : public ItemInitArg {
 		mVelocity        = vel;
 		mIsAlreadyBuried = false;
 		mHeadType        = Leaf;
-		_1C              = -1.0f;
+		mAutopluckTimer  = -1.0f;
 	}
 
 	inline InitArg(EPikiKind pikiKind, Vector3f& vel, bool isAlreadyBuried, int headType, f32 p5)
@@ -47,7 +47,7 @@ struct InitArg : public ItemInitArg {
 		mVelocity        = vel;
 		mIsAlreadyBuried = isAlreadyBuried;
 		mHeadType        = headType;
-		_1C              = -1.0f;
+		mAutopluckTimer  = -1.0f;
 	}
 
 	virtual const char* getName() { return "ItemPikiHead::InitArg"; } // _08 (weak)
@@ -57,7 +57,7 @@ struct InitArg : public ItemInitArg {
 	Vector3f mVelocity;    // _08
 	bool mIsAlreadyBuried; // _14
 	int mHeadType;         // _18
-	f32 _1C;               // _1C
+	f32 mAutopluckTimer;   // _1C
 };
 
 struct FSM : public ItemFSM<Item> {
@@ -111,8 +111,8 @@ struct FallState : public State {
 
 	// _00     = VTBL
 	// _00-_10 = State
-	f32 _10; // _10
-	f32 _14; // _14
+	f32 mHorizontalDrag; // _10
+	f32 mVerticalDrag;   // _14
 };
 
 struct GrowState : public State {
@@ -219,7 +219,7 @@ struct Item : public FSMItem<Item, FSM, State> {
 	// _00      = VTBL
 	// _00-_1E0 = FSMItem
 	efx::TPkEffectTane* mEfxTane; // _1E0
-	f32 _1E4;                     // _1E4
+	f32 mAutopluckedTimer;        // _1E4
 	Vector3f mEfxPosition;        // _1E8
 	u16 mColor;                   // _1F4
 	u16 mHeadType;                // _1F6
@@ -234,10 +234,10 @@ struct Mgr : public FixedSizeItemMgr<Item> {
 	virtual Item* generatorBirth(Vector3f& pos, Vector3f& rot, GenItemParm* genParm); // _5C
 	virtual void onCreateModel(SysShape::Model* model);                               // _A0
 	virtual Item* birth();                                                            // _A4
-	virtual Item* get(void*);                                                         // _AC (weak, thunk at _94)
-	virtual void* getNext(void*);                                                     // _B0 (weak, thunk at _88)
-	virtual void* getStart();                                                         // _B4 (weak, thunk at _8C)
-	virtual void* getEnd();                                                           // _B8 (weak, thunk at _90)
+	virtual Item* get(void* i) { return mMonoObjectMgr.get(i); }                      // _AC (weak, thunk at _94)
+	virtual void* getNext(void* i) { return mMonoObjectMgr.getNext(i); }              // _B0 (weak, thunk at _88)
+	virtual void* getStart() { return mMonoObjectMgr.getStart(); }                    // _B4 (weak, thunk at _8C)
+	virtual void* getEnd() { return mMonoObjectMgr.getEnd(); }                        // _B8 (weak, thunk at _90)
 
 	// _00     = VTBL
 	// _00-_7C = FixedSizeItemMgr

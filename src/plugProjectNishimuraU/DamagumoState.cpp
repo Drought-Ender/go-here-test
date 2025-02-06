@@ -41,8 +41,8 @@ void StateDead::init(EnemyBase* enemy, StateArg* stateArg)
 	damagumo->startMotion(DAMAGUMOANIM_Dead, nullptr);
 
 	Vector3f position = damagumo->getPosition();
-	cameraMgr->startVibration(0, position, 2);
-	rumbleMgr->startRumble(10, position, RUMBLEID_Both);
+	cameraMgr->startVibration(VIBTYPE_LightSlowShort, position, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed10, position, RUMBLEID_Both);
 }
 
 /**
@@ -57,7 +57,7 @@ void StateDead::exec(EnemyBase* enemy)
 			damagumo->throwupItem();
 			damagumo->createItemAndEnemy();
 		} else if ((u32)damagumo->mCurAnim->mType == KEYEVENT_3) {
-			damagumo->_2DC = 1;
+			damagumo->mDoPlayDeadMatAnim = true;
 		} else if ((u32)damagumo->mCurAnim->mType == KEYEVENT_END) {
 			damagumo->kill(nullptr);
 		}
@@ -159,8 +159,8 @@ void StateLand::exec(EnemyBase* enemy)
 			}
 
 			Vector3f position = damagumo->getPosition();
-			cameraMgr->startVibration(15, position, 2);
-			rumbleMgr->startRumble(15, position, RUMBLEID_Both);
+			cameraMgr->startVibration(VIBTYPE_MidFastShort, position, CAMNAVI_Both);
+			rumbleMgr->startRumble(RUMBLETYPE_Fixed15, position, RUMBLEID_Both);
 
 		} else if ((u32)damagumo->mCurAnim->mType == KEYEVENT_3) {
 			damagumo->createOnGroundEffect(3, damagumo->mWaterBox);

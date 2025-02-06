@@ -140,7 +140,7 @@ void ItemGate::doLoad(Stream& stream)
 	mSegmentsDown         = stream.readInt();
 	initMotion();
 	if (mSegmentsDown >= mMaxSegments) {
-		mCentrePlatInstance->setCollision(false); // Centre? ?\_(ãƒ?)_/? British
+		mCentrePlatInstance->setCollision(false); // Centre? ?\_(ï¿½?)_/? British
 		setAlive(false);
 		if (mIsElectric) {
 			mEgateEfxA->forceKill();
@@ -192,7 +192,7 @@ void ItemGate::doAI()
 	mMabiki.update(4);
 	mFsm->exec(this);
 	switch (mSoundEvent.update()) {
-	case 2:
+	case TSE_ApplyTransition:
 		P2ASSERTLINE(354, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 		static_cast<PSM::WorkItem*>(mSoundObj)->eventStop();
 	}
@@ -222,11 +222,11 @@ bool ItemGate::interactAttack(Game::InteractAttack& attack)
 	if (mCurrentState) {
 		mCurrentState->onDamage(this, attack.mDamage);
 		switch (mSoundEvent.event()) {
-		case 1:
+		case TSE_Active:
 			P2ASSERTLINE(380, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 			static_cast<PSM::WorkItem*>(mSoundObj)->eventStart();
 			break;
-		case 3:
+		case TSE_Apply:
 			P2ASSERTLINE(386, mSoundObj->getCastType() == PSM::CCT_WorkItem);
 			static_cast<PSM::WorkItem*>(mSoundObj)->eventRestart();
 			break;
@@ -286,18 +286,18 @@ bool ItemGate::getVectorField(Sys::Sphere& sphere, Vector3f& vectorField)
 {
 	if (mPlanes[0].calcDist(sphere.mPosition) >= -sphere.mRadius) {
 		if (mPlanes[2].calcDist(sphere.mPosition) >= -sphere.mRadius) {
-			vectorField = Vector3f(-_264.x, -_264.y, -_264.z);
+			vectorField = Vector3f(-mGateDirection.x, -mGateDirection.y, -mGateDirection.z);
 		} else if (mPlanes[3].calcDist(sphere.mPosition) >= -sphere.mRadius) {
-			vectorField = _264;
+			vectorField = mGateDirection;
 		} else {
 			vectorField = Vector3f(-_270.x, -_270.y, -_270.z);
 		}
 
 	} else if (mPlanes[1].calcDist(sphere.mPosition) >= -sphere.mRadius) {
 		if (mPlanes[2].calcDist(sphere.mPosition) >= -sphere.mRadius) {
-			vectorField = Vector3f(-_264.x, -_264.y, -_264.z);
+			vectorField = Vector3f(-mGateDirection.x, -mGateDirection.y, -mGateDirection.z);
 		} else if (mPlanes[3].calcDist(sphere.mPosition) >= -sphere.mRadius) {
-			vectorField = _264;
+			vectorField = mGateDirection;
 		} else {
 			vectorField = _270;
 		}
@@ -442,36 +442,36 @@ lbl_801C8454:
  */
 void ItemGate::initPlanes()
 {
-	_270 = getDirection(mFaceDir);
-	_264 = getPerpDirection(mFaceDir);
+	_270           = getDirection(mFaceDir);
+	mGateDirection = getPerpDirection(mFaceDir);
 
 	Vector3f pos = getPosition();
 
-	Vector3f plane0vec = pos + (_270 * 20.0f);
-	mPlanes[0].a       = _270.x;
-	mPlanes[0].b       = _270.y;
-	mPlanes[0].c       = _270.z;
-	mPlanes[0].d       = _270.dot(plane0vec);
+	Vector3f plane0vec   = pos + (_270 * 20.0f);
+	mPlanes[0].mNormal.x = _270.x;
+	mPlanes[0].mNormal.y = _270.y;
+	mPlanes[0].mNormal.z = _270.z;
+	mPlanes[0].mOffset   = _270.dot(plane0vec);
 
-	Vector3f vec2      = (-_270.x, -_270.y, _270.z);
-	Vector3f plane1vec = pos + (vec2 * 20.0f);
-	mPlanes[1].a       = vec2.x;
-	mPlanes[1].b       = vec2.y;
-	mPlanes[1].c       = vec2.z;
-	mPlanes[1].d       = vec2.dot(plane1vec);
+	Vector3f vec2        = (-_270.x, -_270.y, _270.z);
+	Vector3f plane1vec   = pos + (vec2 * 20.0f);
+	mPlanes[1].mNormal.x = vec2.x;
+	mPlanes[1].mNormal.y = vec2.y;
+	mPlanes[1].mNormal.z = vec2.z;
+	mPlanes[1].mOffset   = vec2.dot(plane1vec);
 
-	Vector3f plane2vec = pos + (_264 * 76.5f);
-	mPlanes[2].a       = _264.x;
-	mPlanes[2].b       = _264.y;
-	mPlanes[2].c       = _264.z;
-	mPlanes[2].d       = _264.dot(plane2vec);
+	Vector3f plane2vec   = pos + (mGateDirection * 76.5f);
+	mPlanes[2].mNormal.x = mGateDirection.x;
+	mPlanes[2].mNormal.y = mGateDirection.y;
+	mPlanes[2].mNormal.z = mGateDirection.z;
+	mPlanes[2].mOffset   = mGateDirection.dot(plane2vec);
 
-	Vector3f vec3      = (-_264.x, -_264.y, _264.z);
-	Vector3f plane3vec = pos + (vec3 * 76.5f);
-	mPlanes[3].a       = vec3.x;
-	mPlanes[3].b       = vec3.y;
-	mPlanes[3].c       = vec3.z;
-	mPlanes[3].d       = vec3.dot(plane3vec);
+	Vector3f vec3        = (-mGateDirection.x, -mGateDirection.y, mGateDirection.z);
+	Vector3f plane3vec   = pos + (vec3 * 76.5f);
+	mPlanes[3].mNormal.x = vec3.x;
+	mPlanes[3].mNormal.y = vec3.y;
+	mPlanes[3].mNormal.z = vec3.z;
+	mPlanes[3].mOffset   = vec3.dot(plane3vec);
 	/*
 	stwu     r1, -0xb0(r1)
 	mflr     r0
@@ -730,7 +730,7 @@ void ItemGate::changeMaterial()
 {
 	int jointIdx = (mIsElectric) ? 0 : mModel->getJoint("move")->mJointIndex;
 
-	bool showJoint = mCentrePlatInstance->mFlags & 1 && mLod.mFlags & 4;
+	bool showJoint = mCentrePlatInstance->isFlag(PLATFLAG_CollisionActive) && mLod.isFlag(AILOD_IsVisible);
 	mModel->jointVisible(showJoint, (u16)jointIdx);
 	if (mIsElectric) {
 		mMatAnimator->animate(30.0f);
@@ -751,9 +751,9 @@ void ItemGate::getLifeGaugeParam(Game::LifeGaugeParam& param)
 {
 	param.mPosition = mPosition;
 	param.mPosition.y += 120.0f;
-	param.mRadius              = 10.0f;
-	param.mCurHealthPercentage = getGateHealth() / (mMaxSegmentHealth * mMaxSegments);
-	param.mIsGaugeShown        = mLod.mFlags & 4;
+	param.mRadius          = 10.0f;
+	param.mCurrHealthRatio = getGateHealth() / (mMaxSegmentHealth * mMaxSegments);
+	param.mIsGaugeShown    = mLod.isFlag(AILOD_IsVisible);
 }
 
 /**
@@ -768,7 +768,7 @@ ItemGateMgr::ItemGateMgr()
 	mObjectPathComponent = "user/Kando/objects/gates";
 	setModelSize(1);
 	loadArchive("gate-arc.szs");
-	loadBmd("gate_soft.bmd", 0, 0x20000000);
+	loadBmd("gate_soft.bmd", 0, J3DMODEL_Unk30);
 	JKRArchive* arc = openTextArc("gate-texts.szs");
 	loadAnimMgr(arc, "gateAnimMgr.txt");
 	loadCollision(arc, "gateColl.txt");
@@ -870,7 +870,7 @@ void ItemGateMgr::generatorWrite(Stream& stream, Game::GenItemParm* param)
 	GenGateParm* gateParam = static_cast<GenGateParm*>(param);
 	stream.textWriteTab(stream.mTabCount);
 	stream.writeFloat(gateParam->mLife);
-	stream.textWriteText("\t#ƒ‰ƒCƒt\r\n"); // life
+	stream.textWriteText("\t#ãƒ©ã‚¤ãƒ•\r\n"); // life
 	stream.textWriteTab(stream.mTabCount);
 	stream.writeByte(gateParam->mColor);
 	stream.textWriteText("\t#Color\r\n");
@@ -1091,12 +1091,12 @@ void GateDownState::onKeyEvent(Game::ItemGate* gate, const SysShape::KeyEvent& k
  */
 ItemDengekiGate::Mgr::Mgr()
 {
-	mItemName = "“dŒ‚ƒQ[ƒg"; // electric shock gate
+	mItemName = "é›»æ’ƒã‚²ãƒ¼ãƒˆ"; // electric shock gate
 	sys->heapStatusStart("ItemDengekiGate", nullptr);
 	mObjectPathComponent = "user/Kando/objects/gates";
 	setModelSize(1);
 	loadArchive("e-gate-arc.szs");
-	loadBmd("e-gate.bmd", 0, 0x21000000);
+	loadBmd("e-gate.bmd", 0, J3DMODEL_Unk30 | J3DMODEL_Unk25);
 	JKRArchive* texts = openTextArc("e-gate-texts.szs");
 	loadAnimMgr(texts, "e-animmgr.txt");
 	loadCollision(texts, "e-coll.txt");
@@ -1170,7 +1170,7 @@ void ItemDengekiGate::Mgr::generatorWrite(Stream& stream, Game::GenItemParm* par
 	GenGateParm* gateParam = static_cast<GenGateParm*>(param);
 	stream.textWriteTab(stream.mTabCount);
 	stream.writeFloat(gateParam->mLife);
-	stream.textWriteText("\t#ƒ‰ƒCƒt\r\n"); // life
+	stream.textWriteText("\t#ãƒ©ã‚¤ãƒ•\r\n"); // life
 }
 
 /**

@@ -1,5 +1,7 @@
 #include "Game/DynCreature.h"
 #include "Game/DynParticle.h"
+#include "Game/MapMgr.h"
+#include "Game/PlatInstance.h"
 #include "DynamicsParms.h"
 #include "Iterator.h"
 #include "types.h"
@@ -38,7 +40,7 @@ DynParticle* DynParticle::getAt(int idx)
 		if (!particle) {
 			JUT_PANICLINE(134, "p is null n is %d\n", idx);
 		}
-		particle = static_cast<DynParticle*>(particle->mNext);
+		particle = particle->mNext;
 	}
 
 	return particle;
@@ -68,12 +70,12 @@ DynParticle* DynParticle::getAt(int idx)
  */
 DynCreature::DynCreature()
 {
-	_30C         = nullptr;
-	mDynParticle = nullptr;
-	_2F4         = Vector3f(0.0f);
-	_300         = Vector3f(0.0f);
-	_310         = 0;
-	_311         = 0;
+	mCurrentChildPtcl    = nullptr;
+	mDynParticle         = nullptr;
+	mRotation            = Vector3f(0.0f);
+	mTransformedPosition = Vector3f(0.0f);
+	mCanBounce           = 0;
+	mHasCollided         = 0;
 }
 
 /**
@@ -112,7 +114,7 @@ void DynCreature::releaseParticles()
 	if (particle) {
 		while (particle) {
 			dynParticleMgr->kill(particle);
-			DynParticle* nextParticle = static_cast<DynParticle*>(particle->mNext);
+			DynParticle* nextParticle = particle->mNext;
 			particle->mNext           = nullptr;
 			particle                  = nextParticle;
 		}
@@ -126,10 +128,8 @@ void DynCreature::releaseParticles()
  */
 void DynCreature::updateParticlePositions()
 {
-	DynParticle* particle = mDynParticle;
-	while (particle) {
-		particle->_0C = mBaseTrMatrix.mtxMult(particle->_00);
-		particle      = static_cast<DynParticle*>(particle->mNext);
+	for (DynParticle* particle = mDynParticle; particle; particle = particle->mNext) {
+		particle->mPosition = mBaseTrMatrix.mtxMult(particle->mRotation);
 	}
 }
 
@@ -137,8 +137,84 @@ void DynCreature::updateParticlePositions()
  * @note Address: 0x801A82E4
  * @note Size: 0x4F4
  */
-void DynCreature::computeForces(f32)
+void DynCreature::computeForces(f32 friction)
 {
+	if (DynamicsParms::mInstance->mNewFriction()) {
+		for (DynParticle* particle = mDynParticle; particle; particle = particle->mNext) {
+			if (!particle->mIsTouching) {
+				continue;
+			}
+
+			Vector3f sep      = particle->mPosition - mTransformedPosition;
+			Vector3f crossVec = mRigid.mConfigs[0].mRotatedMomentum.cross(sep) + mRigid.mConfigs[0].mVelocity;
+
+			f32 dotProd  = crossVec.dot(particle->mCollisionNormal); // f13
+			f32 dotProd2 = mRigid.mConfigs[0].mForce.dot(particle->mCollisionNormal);
+
+			Vector3f sep2 = crossVec - particle->mCollisionNormal * dotProd;
+			sep2.normalise();
+
+			mRigid.mConfigs[0].mForce += particle->mCollisionNormal * dotProd2;
+
+			// f32 dotProd3 = sep2.dot(crossVec);
+			if (absF(sep2.dot(crossVec)) < DynamicsParms::mInstance->mStatic()) {
+				sep2.normalise();
+				mRigid.mConfigs[0].mForce -= sep2 * DynamicsParms::mInstance->mStaParm();
+			} else {
+				Vector3f sep3 = crossVec - particle->mCollisionNormal * crossVec.dot(particle->mCollisionNormal);
+				sep3.normalise();
+				mRigid.mConfigs[0].mForce += sep3 * -DynamicsParms::mInstance->mFixedFrictionValue();
+			}
+		}
+		return;
+	}
+
+	int validCount = 0;
+	int count      = 0;
+	for (DynParticle* particle = mDynParticle; particle; particle = particle->mNext, count++) {
+		if (particle->mIsTouching) {
+			validCount++;
+		}
+	}
+
+	if (validCount == 0) {
+		return;
+	}
+
+	if (!DynamicsParms::mInstance->mFriction()) {
+		return;
+	}
+
+	f32 prop = (f32)validCount / (f32)count;
+
+	if (DynamicsParms::mInstance->mFixedFriction()) {
+		friction = DynamicsParms::mInstance->mFixedFrictionValue();
+	}
+
+	f32 coeff = -friction * prop; // f3
+
+	for (DynParticle* particle = mDynParticle; particle; particle = particle->mNext) {
+		if (!particle->mIsTouching) {
+			continue;
+		}
+		Vector3f sep      = particle->mPosition - mTransformedPosition;
+		Vector3f crossVec = mRigid.mConfigs[0].mRotatedMomentum.cross(sep) + mRigid.mConfigs[0].mVelocity;
+		Vector3f vec      = particle->mCollisionNormal * crossVec.dot(particle->mCollisionNormal);
+		vec               = crossVec - vec;
+		if (DynamicsParms::mInstance->mFrictionTangentVelocity()) {
+			vec.normalise();
+		}
+
+		Vector3f coeffVec         = vec * coeff;
+		Vector3f vec2             = mRigid.mConfigs[0].mForce + coeffVec;
+		mRigid.mConfigs[0].mForce = vec2;
+
+		if (!DynamicsParms::mInstance->mNoRotationEffect()) {
+			Vector3f vec3              = mRigid.mConfigs[0].mTorque;
+			mRigid.mConfigs[0].mTorque = vec3 + sep.cross(coeffVec);
+		}
+	}
+
 	/*
 	stwu     r1, -0x20(r1)
 	lwz      r6, mInstance__13DynamicsParms@sda21(r13)
@@ -514,18 +590,18 @@ lbl_801A87D0:
  * @note Address: 0x801A87D8
  * @note Size: 0xB4
  */
-void DynCreature::tracemoveCallback(Vector3f& vec1, Vector3f& vec2)
+void DynCreature::tracemoveCallback(Vector3f& point, Vector3f& normal)
 {
-	bool collCheck = mRigid.resolveCollision(0, vec1, vec2, DynamicsParms::mInstance->mElasticity());
+	bool collCheck = mRigid.resolveCollision(0, point, normal, DynamicsParms::mInstance->mElasticity());
 
-	if (_30C && collCheck) {
-		if (!_310) {
+	if (mCurrentChildPtcl && collCheck) {
+		if (!mCanBounce) {
 			bounceCallback(nullptr);
 		}
 
-		_311      = 1;
-		_30C->_2C = 1;
-		_30C->_20 = vec2;
+		mHasCollided                        = 1;
+		mCurrentChildPtcl->mIsTouching      = 1;
+		mCurrentChildPtcl->mCollisionNormal = normal;
 	}
 }
 
@@ -535,18 +611,21 @@ void DynCreature::tracemoveCallback(Vector3f& vec1, Vector3f& vec2)
  * @note Address: N/A
  * @note Size: 0x28
  */
-void range_check(f32)
+bool range_check(f32 val)
 {
-	// UNUSED FUNCTION
+	if (val < FLOAT_DIST_MIN || val > FLOAT_DIST_MAX) {
+		return false;
+	}
+	return true;
 }
 
 /**
  * @note Address: N/A
  * @note Size: 0xBC
  */
-void range_check(Vector3f&)
+bool range_check(Vector3f& vec)
 {
-	// UNUSED FUNCTION
+	return !((u8)range_check(vec.x) == false || (u8)range_check(vec.y) == false || (u8)range_check(vec.z) == false);
 }
 
 namespace Game {
@@ -584,6 +663,45 @@ int DynCreature::getParticleNum()
  */
 void DynCreature::simulate(f32 rate)
 {
+	mCanBounce   = mHasCollided;
+	mHasCollided = 0;
+
+	RigidBodyCallback delegate(this, &DynCreature::tracemoveCallback);
+
+	mTransformedPosition = mBaseTrMatrix.mtxMult(mRotation);
+	mRigid.integrate(rate, 0);
+
+	Vector3f velocity;
+	Sys::Sphere moveSphere;
+	for (DynParticle* particle = mDynParticle; particle; particle = particle->mNext) {
+		particle->mPosition = mBaseTrMatrix.mtxMult(particle->mRotation);
+
+		velocity     = mRigid.mConfigs[0].mRotatedMomentum;
+		Vector3f sep = particle->mPosition - mTransformedPosition;
+		velocity.cross(velocity, sep);
+		velocity = velocity + mRigid.mConfigs[0].mVelocity;
+
+		f32 radius   = particle->mRadius;
+		f32 extraRad = rate * velocity.length();
+		if (extraRad > 50.0f) {
+			extraRad = 50.0f;
+		}
+		radius += extraRad;
+
+		JUT_ASSERTLINE(497, range_check(particle->mRotation) && range_check(particle->mPosition), "simulate error\n");
+		moveSphere.mPosition           = particle->mPosition;
+		moveSphere.mRadius             = radius;
+		mCurrentChildPtcl              = particle;
+		mCurrentChildPtcl->mIsTouching = 0;
+
+		MoveInfo info(&moveSphere, &velocity, 1.0f, &delegate);
+		info.mDoHardIntersect = true;
+		mapMgr->traceMove(info, rate);
+		info.mDoHardIntersect = false;
+		if (platMgr) {
+			platMgr->traceMove(info, rate);
+		}
+	}
 	/*
 	stwu     r1, -0x190(r1)
 	mflr     r0
@@ -948,7 +1066,7 @@ Vector3f DynCreature::getPosition() { return mRigid.mConfigs[0].mPosition; }
 void DynCreature::onSetPosition(Vector3f& pos)
 {
 	mRigid.initPosition(pos, Vector3f::zero);
-	mBaseTrMatrix = mRigid._04;
+	mBaseTrMatrix = mRigid.mPrimaryMatrix;
 	onSetPosition();
 }
 
@@ -972,7 +1090,7 @@ void DynCreature::getVelocityAt(Vector3f& position, Vector3f& outVelocity)
 {
 	outVelocity       = mRigid.mConfigs[0].mVelocity;
 	Vector3f diff     = position - mRigid.mConfigs[0].mPosition;
-	Vector3f otherVec = mRigid.mConfigs[0]._24;
+	Vector3f otherVec = mRigid.mConfigs[0].mRotatedMomentum;
 	outVelocity       = outVelocity + cross(otherVec, diff);
 }
 
@@ -994,7 +1112,6 @@ void DynCreature::applyImpulse(Vector3f&, Vector3f& vel) { mRigid.mConfigs[0].mV
  */
 void DynCreature::simulateCylinder(Sys::Cylinder&, f32)
 {
-	JUT_PANICLINE(1000, "simulate error\n");
 	// UNUSED FUNCTION
 }
 

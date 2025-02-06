@@ -36,6 +36,13 @@ struct Node : public CNode, JKRDisposer {
 	MgrCommand* mMgrCommand; // _3C
 };
 
+// fabricated struct, needs to exist for MgrCommand dtor to build correctly
+struct CommandNode {
+	bool mIsWorking;           // _00
+	Node* mNode;               // _04
+	DvdThreadCommand mCommand; // _08
+};
+
 struct MgrCommand : public CNode, JKRDisposer {
 	MgrCommand(char* name);
 
@@ -60,14 +67,12 @@ struct MgrCommand : public CNode, JKRDisposer {
 	// CNode _00 - _18
 	// JKRDisposer _18 - _30
 	s32 mMode;                              // _30
-	u8 _34;                                 // _34
-	Node* mNode1;                           // _38
-	DvdThreadCommand mDvdThread;            // _3C
+	CommandNode mCommandNode;               // _34
 	Node* mNode2;                           // _A8
 	JKRHeap* mActiveHeap;                   // _AC
 	IDelegate1<MgrCommand*>* mUserCallback; // _B0
-	Delegate<MgrCommand> mDelegateMemory;   // _B4
-	Delegate<MgrCommand> mDelegateDvdLoad;  // _C8
+	Delegate<MgrCommand> mDelegateDvdLoad;  // _B4
+	Delegate<MgrCommand> mDelegateMemory;   // _C8
 	Delegate<MgrCommand> mDelegateAramLoad; // _DC
 };
 
@@ -85,10 +90,12 @@ struct Mgr {
 	bool sync(MgrCommand*, bool);
 
 	// Unused/inlined:
-	void search(const char*);
+	Node* search(const char* path);
 	void dump();
 	void syncAll(bool);
 	void watchHeap();
+
+	JKRHeap* getHeap() const { return mHeap; }
 
 	// _00 = VTBL
 	JKRHeap* mHeap;      // _04

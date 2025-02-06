@@ -11,7 +11,7 @@ namespace PSAutoBgm {
 bool MeloArr_RandomAvoid::avoidChk(MeloArrArg& meloArg)
 {
 	f32 randDec = JALCalc::getRandom_0_1();
-	u8 out      = (randDec < _1C);
+	u8 out      = (randDec < mChance);
 	return out;
 }
 
@@ -21,8 +21,8 @@ bool MeloArr_RandomAvoid::avoidChk(MeloArrArg& meloArg)
  */
 inline void MeloArrArg::assertCheck() const
 {
-	P2ASSERTLINE(89, _00 < 0x10);
-	P2ASSERTLINE(90, _01 != 0xFF);
+	P2ASSERTLINE(89, mTrackIndex < 16);
+	P2ASSERTLINE(90, mCycleNum != 0xFF);
 }
 
 /**
@@ -32,32 +32,40 @@ inline void MeloArrArg::assertCheck() const
 bool MeloArrMgr::isToAvoid(MeloArrArg& meloArg)
 {
 	MeloArrBase* currLink;
+
 	meloArg.assertCheck();
+
 	if (!mIsActive) {
 		return false;
 	}
-	bool check = false;
-	if ((_10 >> meloArg._00) & 1) {
+
+	bool isMelodyToAvoid = false;
+	if ((mTrackMaskIds >> meloArg.mTrackIndex) & 1) {
 		currLink = static_cast<MeloArrBase*>(mList.mHead);
+
 		for (currLink; currLink; currLink = static_cast<MeloArrBase*>(currLink->mNext)) {
-			MeloArrBase* randAvoid = static_cast<MeloArrBase*>(currLink->mValue);
-			randAvoid->pre(meloArg);
-			if (check == false) {
-				randAvoid = static_cast<MeloArrBase*>(currLink->mValue);
+			MeloArrBase* avoidanceLink = static_cast<MeloArrBase*>(currLink->mValue);
+			avoidanceLink->pre(meloArg);
+
+			if (!isMelodyToAvoid) {
+				avoidanceLink = static_cast<MeloArrBase*>(currLink->mValue);
+
 				bool interCheck;
-				if (randAvoid->_19 == true) {
-					interCheck = randAvoid->avoidChk(meloArg);
+				if (avoidanceLink->mIsEnabled == true) {
+					interCheck = avoidanceLink->avoidChk(meloArg);
 				} else {
 					interCheck = false;
 				}
-				check = interCheck;
+
+				isMelodyToAvoid = interCheck;
 			}
 
-			randAvoid = static_cast<MeloArrBase*>(currLink->mValue);
-			randAvoid->post(meloArg);
+			avoidanceLink = static_cast<MeloArrBase*>(currLink->mValue);
+			avoidanceLink->post(meloArg);
 		}
 	}
-	return check;
+
+	return isMelodyToAvoid;
 }
 
 /**

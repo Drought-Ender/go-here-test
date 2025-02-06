@@ -11,8 +11,7 @@ struct JKRThread;
 struct JUTConsole;
 struct JUTFont;
 
-struct JKRThreadName_ {
-};
+struct JKRThreadName_ { };
 
 struct JKRThreadSwitch {
 	typedef void (*Callback)(OSThread*, OSThread*);
@@ -120,6 +119,32 @@ struct JKRThread : public JKRDisposer {
 		}
 
 		mCurrentHeap = heap;
+	}
+
+	void resume() { OSResumeThread(mThread); }
+	BOOL sendMessage(OSMessage message) { return OSSendMessage(&mMsgQueue, message, OS_MESSAGE_NOBLOCK); }
+	void sendMessageBlock(OSMessage message) { OSSendMessage(&mMsgQueue, message, OS_MESSAGE_BLOCK); }
+	OSMessage waitMessage()
+	{
+		OSMessage message;
+		OSReceiveMessage(&mMsgQueue, &message, OS_MESSAGE_NOBLOCK);
+		return message;
+	}
+
+	OSMessage waitMessage(BOOL* received)
+	{
+		OSMessage message;
+		BOOL rv = OSReceiveMessage(&mMsgQueue, &message, OS_MESSAGE_NOBLOCK);
+		if (received) {
+			*received = rv;
+		}
+		return message;
+	}
+	OSMessage waitMessageBlock()
+	{
+		OSMessage message;
+		OSReceiveMessage(&mMsgQueue, &message, OS_MESSAGE_BLOCK);
+		return message;
 	}
 
 	static JSUList<JKRThread>& getList() { return (JSUList<JKRThread>&)sThreadList; }

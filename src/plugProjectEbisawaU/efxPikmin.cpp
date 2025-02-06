@@ -23,9 +23,9 @@ namespace efx {
  */
 void TParticleCallBack_Yodare::init(JPABaseEmitter*, JPABaseParticle*)
 {
-	_00 = 0.0f;
-	_04 = "ArgType";
-	_08 = 1.0f;
+	_00   = 0.0f;
+	mName = "ArgType";
+	_08   = 1.0f;
 	// UNUSED FUNCTION
 }
 
@@ -265,7 +265,7 @@ bool TFueactCircle::create(Arg* arg)
 		if (mEmitter) {
 			mEmitter->mEmitterCallback  = this;
 			mEmitter->mParticleCallback = this;
-			mEmitter->mFlags |= 0x40;
+			mEmitter->setFlag(JPAEMIT_Immortal);
 			return true;
 		} else {
 			return false;
@@ -282,21 +282,14 @@ void TFueactCircle::execute(JPABaseEmitter* emit)
 	P2ASSERTLINE(530, mMtx);
 	P2ASSERTLINE(531, mPos);
 
-	Vector3f sep = *mPos - mMtx->getColumn(3);
+	// Vector3f probably doesnt belong in these functions
+	// the JGeometry Util stuff seems to be what was used
 
-	// super wacky normalisation.
-	f32 sqrLen = sep.x * sep.x + sep.y * sep.y + sep.z * sep.z;
-	if (!(sqrLen <= 32.0f * __float_epsilon[0])) {
-		if (sqrLen <= 0.0f) {
+	JGeometry::TVec3f sep2;
+	sep2.set(mPos->x - (*mMtx)(0, 3), mPos->y - (*mMtx)(1, 3), mPos->z - (*mMtx)(2, 3));
+	sep2.normalize();
 
-		} else {
-			f32 len = (f32)__frsqrte(sqrLen);
-			sqrLen  = (0.5f * len) * (3.0f - sqrLen * (len * len));
-		}
-		sep = sep * sqrLen;
-	}
-
-	emit->setAngle(sep.x, sep.y, sep.z);
+	emit->setAngle(&sep2);
 
 	/*
 	stwu     r1, -0x10(r1)
@@ -391,18 +384,29 @@ lbl_803B7000:
  */
 void TFueactCircle::execute(JPABaseEmitter*, JPABaseParticle* prt)
 {
-	P2ASSERTLINE(530, mMtx);
-	P2ASSERTLINE(531, mPos);
+	P2ASSERTLINE(547, mMtx);
+	P2ASSERTLINE(548, mPos);
 
-	Vector3f ang = *mPos - mMtx->getColumn(0);
-	if (ang.normalise() > 175.0f) {
-		ang.normalise();
-		ang *= 175.0f;
+	// Vector3f sep = *mPos - mMtx->getTranslation();
+	JGeometry::TVec3f pos = *(JGeometry::TVec3f*)mPos; // 0x38
+	JGeometry::TVec3f mtxPos;
+	mtxPos.set((*mMtx)(0, 3), (*mMtx)(1, 3), (*mMtx)(2, 3));
+	JGeometry::TVec3f sep2;
+	sep2.sub(pos, mtxPos);
+	f32 dist = sep2.squared();
+	sep2.normalize();
+	if (dist > 175.0f) {
+		sep2.setLength(dist);
+
+		pos.set(sep2);
 	}
 
-	prt->mOffsetPosition.x = ang.x;
-	prt->mOffsetPosition.y = ang.y;
-	prt->mOffsetPosition.z = ang.z;
+	if (!prt->checkStatus(0x4)) {
+		JGeometry::TVec3f newScaledVec;
+		newScaledVec.scale(prt->mTime, pos);
+		sep2.scaleAdd(1.0f - prt->mTime, mtxPos, newScaledVec);
+		prt->setOffsetPosition(sep2);
+	}
 	/*
 	stwu     r1, -0x60(r1)
 	mflr     r0
@@ -610,15 +614,23 @@ lbl_803B72D8:
  */
 void TFueactBiriBase::doExecuteEmitterOperation(JPABaseEmitter* emit)
 {
-	P2ASSERTLINE(530, mMtx);
-	P2ASSERTLINE(531, mPos);
+	P2ASSERTLINE(579, mMtx);
+	P2ASSERTLINE(580, mPos);
 
-	Vector3f ang = *mPos - mMtx->getColumn(0);
-	ang.normalise();
-	Matrixf mtx; // i cant even
-	JPASetRMtxTVecfromMtx(mtx.mMatrix.mtxView, mMtx->mMatrix.mtxView, mPos);
-	ang /= 100.0f;
-	emit->setAngle(ang.x, ang.y, ang.z);
+	Vector3f* pos   = (Vector3f*)&mPos;
+	Vector3f mtxPos = mMtx->getTranslation();
+	Vector3f angle  = *pos - mtxPos;
+	f32 scale       = pos->distance(mtxPos);
+	angle.normalise();
+
+	Matrixf mtx;
+	mtx.setTransformationMtx2(angle, mtxPos);
+
+	JPASetRMtxTVecfromMtx(mtx.mMatrix.mtxView, emit->mGlobalRot, &emit->mGlobalTrs);
+	if (scale > 175.0f) {
+		scale = 175.0f;
+	}
+	emit->setScaleOnly(scale / 100.0f);
 	/*
 	stwu     r1, -0x50(r1)
 	mflr     r0
@@ -1015,105 +1027,32 @@ void TNaviEffect::init(Vector3f* pos, Mtx mtx, Vector3f* naviPos, enumNaviType n
 /**
  * @note Address: 0x803B7E24
  * @note Size: 0xD8
+ * TODO: fix enums
  */
 void TNaviEffect::setNaviType(enumNaviType type)
 {
 	switch (type) {
 	case NAVITYPE_Olimar:
-		mCursor.mContextNum           = WHISTLE_CONTEXT_NUM;
-		mCursor.mAngleSpeed           = TCursor::kAngleSpeed;
-		mCursor.mOneEmitter.mEffectID = PID_Cursor_Olimar;
-		mLight.mNaviType              = 0;
-		mLightAct.mNaviType           = 0;
+		mCursor.initNoCheck(0, WHISTLE_CONTEXT_NUM);
+		mLight.mNaviType    = 0;
+		mLightAct.mNaviType = 0;
 		break;
 	case NAVITYPE_Louie:
-		mCursor.mContextNum           = WHISTLE_CONTEXT_NUM;
-		mCursor.mAngleSpeed           = TCursor::kAngleSpeed;
-		mCursor.mOneEmitter.mEffectID = PID_Cursor_Louie;
-		mLight.mNaviType              = 1;
-		mLightAct.mNaviType           = 1;
+		mCursor.initNoCheck(0, WHISTLE_CONTEXT_NUM);
+		mLight.mNaviType    = 1;
+		mLightAct.mNaviType = 1;
 		break;
 	case NAVITYPE_President:
-		mCursor.mContextNum           = WHISTLE_CONTEXT_NUM;
-		mCursor.mAngleSpeed           = TCursor::kAngleSpeed;
-		mCursor.mOneEmitter.mEffectID = PID_Cursor_President;
-		mLight.mNaviType              = 0;
-		mLightAct.mNaviType           = 0;
+		mCursor.initNoCheck(1, WHISTLE_CONTEXT_NUM);
+		mLight.mNaviType    = 0;
+		mLightAct.mNaviType = 0;
 		break;
-	case 3:
-		mCursor.mContextNum           = WHISTLE_CONTEXT_NUM;
-		mCursor.mAngleSpeed           = TCursor::kAngleSpeed;
-		mCursor.mOneEmitter.mEffectID = PID_Cursor_Louie;
-		mLight.mNaviType              = 1;
-		mLightAct.mNaviType           = 1;
+	case NAVITYPE_Fuebug:
+		mCursor.initNoCheck(2, WHISTLE_CONTEXT_NUM);
+		mLight.mNaviType    = 1;
+		mLightAct.mNaviType = 1;
 		break;
 	}
-	/*
-	cmpwi    r4, 2
-	beq      lbl_803B7EA4
-	bge      lbl_803B7E40
-	cmpwi    r4, 0
-	beq      lbl_803B7E4C
-	bge      lbl_803B7E78
-	blr
-
-lbl_803B7E40:
-	cmpwi    r4, 4
-	bgelr
-	b        lbl_803B7ED0
-
-lbl_803B7E4C:
-	li       r0, 0x10
-	cmpwi    r0, 0
-	stw      r0, 0xe4(r3)
-	li       r4, 0x19
-	li       r0, 0
-	lfs      f0, kAngleSpeed__Q23efx7TCursor@sda21(r13)
-	stfs     f0, 0x338(r3)
-	sth      r4, 0xbc(r3)
-	stw      r0, 0x368(r3)
-	stw      r0, 0x398(r3)
-	blr
-
-lbl_803B7E78:
-	li       r0, 0x10
-	cmpwi    r0, 0
-	stw      r0, 0xe4(r3)
-	li       r4, 0x19
-	li       r0, 1
-	lfs      f0, kAngleSpeed__Q23efx7TCursor@sda21(r13)
-	stfs     f0, 0x338(r3)
-	sth      r4, 0xbc(r3)
-	stw      r0, 0x368(r3)
-	stw      r0, 0x398(r3)
-	blr
-
-lbl_803B7EA4:
-	li       r0, 0x10
-	cmpwi    r0, 0
-	stw      r0, 0xe4(r3)
-	li       r4, 0x1b
-	li       r0, 0
-	lfs      f0, kAngleSpeed__Q23efx7TCursor@sda21(r13)
-	stfs     f0, 0x338(r3)
-	sth      r4, 0xbc(r3)
-	stw      r0, 0x368(r3)
-	stw      r0, 0x398(r3)
-	blr
-
-lbl_803B7ED0:
-	li       r0, 0x10
-	cmpwi    r0, 0
-	stw      r0, 0xe4(r3)
-	li       r4, 0x1a
-	li       r0, 1
-	lfs      f0, kAngleSpeed__Q23efx7TCursor@sda21(r13)
-	stfs     f0, 0x338(r3)
-	sth      r4, 0xbc(r3)
-	stw      r0, 0x368(r3)
-	stw      r0, 0x398(r3)
-	blr
-	*/
 }
 
 /**
@@ -1293,14 +1232,14 @@ void TNaviEffect::killOrimadamage_()
  */
 void TPkEffect::init()
 {
-	mPikiColor     = -1;
-	_0C            = nullptr;
-	mHamonPosPtr   = nullptr;
-	_14            = nullptr;
-	_18            = nullptr;
-	_1C            = nullptr;
-	mHeight        = nullptr;
-	mMoeSmokeTimer = 0;
+	mPikiColor       = -1;
+	mStemPosition    = nullptr;
+	mHamonPosPtr     = nullptr;
+	mAltStemPosition = nullptr;
+	mHappaJointMtx   = nullptr;
+	mBaseObjMatrix   = nullptr;
+	mHeight          = nullptr;
+	mMoeSmokeTimer   = 0;
 	mFlags.clear();
 }
 
@@ -1535,11 +1474,11 @@ void TPkEffect::killHamonB_() { mOeHamonB.kill(); }
  */
 void TPkEffectTane::init()
 {
-	mPikiColor = -1;
-	mPos       = nullptr;
-	_0C        = nullptr;
-	_08        = nullptr;
-	_10        = nullptr;
+	mPikiColor   = -1;
+	mEfxPos      = nullptr;
+	mHappaJntMtx = nullptr;
+	mObjPos      = nullptr;
+	mObjMatrix   = nullptr;
 }
 
 /**

@@ -1,14 +1,33 @@
 #ifndef MSL_ALGORITHM_H_
 #define MSL_ALGORITHM_H_
 
+#include "mem.h"
+
 namespace std {
 template <class ForwardIterator, class T>
-ForwardIterator lower_bound(ForwardIterator first, ForwardIterator last, const T& val);
+ForwardIterator lower_bound(ForwardIterator first, ForwardIterator last, const T& val)
+{
+	int count = last - first; // probably needs to be std::distance or w/e but im not gonna be the one to implement it
+	ForwardIterator it;
+	u32 step;
+
+	while (count > 0) {
+		it   = first;
+		step = count / 2;
+		it += step;
+		if (*it < val) {
+			first = ++it;
+			count -= step + 1;
+		} else {
+			count = step;
+		}
+	}
+}
 
 template <class ForwardIterator, class T>
 ForwardIterator upper_bound(ForwardIterator first, ForwardIterator last, const T& val);
 
-template<class InputIt, class UnaryPredicate>
+template <class InputIt, class UnaryPredicate>
 InputIt find_if(InputIt first, InputIt last, UnaryPredicate p);
 
 /*
@@ -37,30 +56,48 @@ void __fill(ForwardIt first, ForwardIt last, const T& value, std::random_access_
 }
 */
 
-template<class ForwardIt, class T>
-void fill(ForwardIt first, ForwardIt last, const T& value) {
-    for (; first != last; ++first){
-        *first = value;
-    }
+template <class ForwardIt, class T>
+void fill(ForwardIt first, ForwardIt last, const T& value)
+{
+	for (; first != last; ++first) {
+		*first = value;
+	}
 }
 
-template<class InputIt, class OutputIt>
-inline OutputIt copy(InputIt first, InputIt last,
-              OutputIt d_first) {
-    for (; first < last; ++first, ++d_first) {
-        *d_first = *first;
-    }
-    return d_first;
+template <class InputIt, class OutputIt>
+inline OutputIt copy(InputIt first, InputIt last, OutputIt d_first)
+{
+	for (; first < last;) {
+		*d_first++ = *first++;
+	}
+	return d_first;
 }
 
-template<class BidirIt1, class BidirIt2>
-inline BidirIt2 copy_backward(BidirIt1 first, BidirIt1 last, BidirIt2 d_last) {
-    while (first != last) {
-        *(--d_last) = *(--last);
-    }
-    return d_last;
+template <class T, int N>
+class __copy_backward {
+public:
+	static T* copy_backward(T* begin, T* end, T* dest)
+	{
+#ifdef DEBUG
+		size_t size = (end - begin);
+		dest -= size;
+		memmove(dest, begin, size * sizeof(begin));
+		return dest;
+#else
+		for (; end > begin;) {
+			*--dest = *--end;
+		}
+		return end;
+#endif
+	}
+};
+
+template <class T>
+inline T* copy_backward(T* first, T* last, T* d_last)
+{
+	return __copy_backward<T, 1>::copy_backward(first, last, d_last);
 }
 
-}  // namespace std
+} // namespace std
 
 #endif

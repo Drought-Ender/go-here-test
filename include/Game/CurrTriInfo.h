@@ -21,12 +21,12 @@ struct CurrTriInfo {
 
 		mNormalVec = Vector3f(0.0f, 1.0f, 0.0f);
 
-		mUpdateOnNewMaxY = true;
-		mGetFullInfo     = false;
+		mGetTopPolygonInfo = true;
+		mGetFullInfo       = false;
 	}
 
 	Vector3f mPosition;         // _00
-	bool mUpdateOnNewMaxY;      // _0C, an enigma to name
+	bool mGetTopPolygonInfo;    // _0C, an enigma to name
 	bool mGetFullInfo;          // _0D, grabs normal and maxY/minY
 	Sys::TriangleTable* mTable; // _10
 	Sys::Triangle* mTriangle;   // _14

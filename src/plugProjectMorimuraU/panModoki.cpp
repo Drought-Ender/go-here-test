@@ -86,19 +86,19 @@ void Obj::onInit(CreatureInitArg* args)
 	mNextWayPointPosition = mHomePosition;
 	mCarryDir             = mFaceDir;
 	setEmotionNone();
-	_304                 = 0;
-	mPrevCheckPosition   = mHomePosition;
-	mCarryingYPosition   = mPosition.y;
-	mMoveToWpTimer       = 0;
-	_2E4                 = 1;
-	mIsPathfinding       = false;
-	_2F1                 = 0;
-	mMoveSpeedTimer      = 0;
-	mWpIndex1            = 0;
-	mWpIndex3            = 0;
-	mWpIndex2            = 0;
-	mPelletCarryVelocity = 0.0f;
-	_31C                 = 0;
+	mFindNextRouteCounter = 0;
+	mPrevCheckPosition    = mHomePosition;
+	mCarryingYPosition    = mPosition.y;
+	mMoveToWpTimer        = 0;
+	_2E4                  = 1;
+	mIsPathfinding        = false;
+	mCanReactToPress      = 0;
+	mMoveSpeedTimer       = 0;
+	mWpIndex1             = 0;
+	mWpIndex3             = 0;
+	mWpIndex2             = 0;
+	mPelletCarryVelocity  = 0.0f;
+	mIsCarryStuck         = 0;
 
 	mBodyJoint = mModel->getJoint("body");
 	P2ASSERTLINE(137, mBodyJoint);
@@ -128,7 +128,7 @@ Obj::Obj()
     , mEfxSmoke(nullptr)
     , mCarrySizeDiff(20.0f)
     , mShadowSize(15.0f)
-    , _338(5.0f)
+    , mUnusedVal(5.0f)
     , mBounceEffectSize(0.6f)
     , mAppearEffectSize(1.0f)
     , mNest(nullptr)
@@ -223,7 +223,7 @@ void Obj::updateCaptureMatrix()
 		releaseCarryTarget();
 	}
 
-	if (pellet->getKind() == PELTYPE_CARCASS && !pellet->isAlive()) {
+	if (pellet->getKind() == PelletType::Carcass && !pellet->isAlive()) {
 		releaseCarryTarget();
 	}
 
@@ -235,24 +235,33 @@ void Obj::updateCaptureMatrix()
 		Vector3f slotPos;
 		calcSlotGlobalPos(slotPos);
 
-		Vector3f pelletPos1(pellet->getPosition().x, 0.0f, pellet->getPosition().z);
-		Vector3f diff = slotPos - pelletPos1;
-		diff.y        = 0.0f;
-		f32 dist2D    = 0.0f;
-		if (diff.sqrMagnitude2D() > 0.0f) {
+		f32 dist = pellet->getSquarePositionTo(slotPos);
+		// Vector3f pelletPos1(pellet->getPosition().x, 0.0f, pellet->getPosition().z);
+		// Vector3f diff = slotPos - pelletPos1;
+		// diff.y        = 0.0f;
+		f32 dist2D = 0.0f;
+		if (dist > dist2D) {
+			dist2D = pellet->getPositionTo(slotPos);
+			// f32 z = pellet->getPosition().z;
+			// f32 x = pellet->getPosition().x;
+			// f32 slotX = slotPos.x;
+			// f32 slotZ = slotPos.z;
+			// f32 diffX = slotX - x;
+			// f32 diffZ = slotZ - z;
+			// dist2D = diffX * diffX + diffZ * diffZ;
+			// sqrtf(dist2D);
+			// dist2D =
 			// THIS has to be an inline
-			Vector3f pelletPos2(pellet->getPosition().x, 0.0f, pellet->getPosition().z);
-			Vector3f diff2D = slotPos - pelletPos2;
-			diff2D.y        = 0.0f;
-			dist2D          = diff2D.length2D();
+			// diff2D.y        = 0.0f;
+			// dist2D          = diff2D.length2D();
 		}
 
 		f32 pelletZ = mCarrySizeDiff * 0.2f + dist2D;
 		matrix      = mKamuJoint->getWorldMatrix();
 		PSMTXCopy(matrix->mMatrix.mtxView, mCarryMatrix.mMatrix.mtxView);
-		mCarryMatrix.mMatrix.vecView.x[3] += (f32)(xVec.x * pelletZ);
-		mCarryMatrix.mMatrix.vecView.y[3] += (f32)(xVec.y * pelletZ);
-		mCarryMatrix.mMatrix.vecView.z[3] += (f32)(xVec.z * pelletZ);
+		mCarryMatrix.mMatrix.structView.tx += (f32)(xVec.x * pelletZ);
+		mCarryMatrix.mMatrix.structView.ty += (f32)(xVec.y * pelletZ);
+		mCarryMatrix.mMatrix.structView.tz += (f32)(xVec.z * pelletZ);
 		pellet->startCapture(&mCarryMatrix);
 		Vector3f rot(0.0f, HALF_PI - mAlsoRotationOffset, PI);
 
@@ -481,7 +490,7 @@ bool Obj::pressCallBack(Creature* creature, f32 damage, CollPart* part)
 				mTargetVelocity.x  = 0.0f;
 				mTargetVelocity.y  = 0.0f;
 				mTargetVelocity.z  = 0.0f;
-				_2F1               = 0;
+				mCanReactToPress   = 0;
 				if (C_PARMS->mCanPressType) {
 					EnemyBase::finishMotion();
 					mNextState = PANMODOKI_Damage;
@@ -499,7 +508,7 @@ bool Obj::pressCallBack(Creature* creature, f32 damage, CollPart* part)
 				mTargetVelocity.x  = 0.0f;
 				mTargetVelocity.y  = 0.0f;
 				mTargetVelocity.z  = 0.0f;
-				_2F1               = 0;
+				mCanReactToPress   = 0;
 				if (C_PARMS->mCanPressType) {
 					EnemyBase::finishMotion();
 					mNextState = PANMODOKI_Damage;
@@ -577,8 +586,8 @@ void Obj::bounceCallback(Sys::Triangle* triangle)
  */
 void Obj::damageRumble()
 {
-	cameraMgr->startVibration(3, mPosition, 2);
-	rumbleMgr->startRumble(11, mPosition, RUMBLEID_Both);
+	cameraMgr->startVibration(VIBTYPE_LightMidShort, mPosition, CAMNAVI_Both);
+	rumbleMgr->startRumble(RUMBLETYPE_Fixed11, mPosition, RUMBLEID_Both);
 }
 
 /**
@@ -590,9 +599,10 @@ void Obj::doSimulation(f32 simspeed)
 	if (isStickTo()) {
 		mAcceleration = Vector3f(0.0f);
 	}
-	_304 -= 1;
-	if (_304 < 0) {
-		_304 = 0;
+
+	mFindNextRouteCounter -= 1;
+	if (mFindNextRouteCounter < 0) {
+		mFindNextRouteCounter = 0;
 	}
 	EnemyBase::doSimulation(simspeed);
 	EnemyBase::getStateID();
@@ -757,8 +767,8 @@ WalkSmokeEffect::Mgr* Obj::getWalkSmokeEffectMgr() { return &mWalkSmokeMgr; }
 void Obj::findNextRoutePoint(bool cond)
 {
 	RouteMgr* routeMgr = mapMgr->mRouteMgr;
-	_31C               = 0;
-	if (_304 > 0 && cond) {
+	mIsCarryStuck      = 0;
+	if (mFindNextRouteCounter > 0 && cond) {
 		if (mWpIndex3 == mWpIndex2 && mWpIndex2 == mWpIndex1) {
 			mNextWayPointPosition = mHomePosition;
 			return;
@@ -847,7 +857,7 @@ bool Obj::isCarryToGoal()
 		homeRadius = 60.0f;
 	}
 	homeRadius *= homeRadius;
-	// Vector3f diff = mPosition - mHomePosition;
+
 	Vector3f pos = mPosition;
 	if (sqrDistanceXZ(pos, mHomePosition) < homeRadius) {
 		releasePathFinder();
@@ -862,23 +872,13 @@ bool Obj::isCarryToGoal()
 	rad2 *= rad2;
 	rad3 *= rad3;
 
-	// Vector3f nextWPPos = mNextWayPointPosition;
-	// nextWPPos = pos - nextWPPos;
-	// f32 posZ = mNextWayPointPosition.z;
-	// f32 posX = mNextWayPointPosition.x;
-	f32 sqrDist = sqrDistanceXZ(pos, mNextWayPointPosition);
-	// f32 cross          = (posX * posX + posZ * posZ);
-	Creature* creature = getCarryTarget();
-	f32 something      = -1.0f;
+	f32 sqrDist      = pos.sqrDistance2D(mNextWayPointPosition);
+	Creature* pellet = getCarryTarget();
+	f32 something    = -1.0f;
 
 	// this is so a pellet inline.
-	if (creature) {
-		something             = mNextWayPointPosition.z;
-		f32 waypointX         = mNextWayPointPosition.x;
-		Vector3f creaturePos  = creature->getPosition();
-		f32 creaturePosZ      = creaturePos.z;
-		Vector3f creaturePos2 = creature->getPosition();
-		something = (creaturePos2.x - waypointX) * (creaturePos2.x - waypointX) + (creaturePosZ - something) * (creaturePosZ - something);
+	if (pellet) {
+		something = getSquareDistanceTo2D(pellet, mNextWayPointPosition);
 	}
 	if ((sqrDist < rad2) || (something > 0.0f && (something < rad3))) {
 		mMoveSpeedTimer = 0;
@@ -905,193 +905,6 @@ bool Obj::isCarryToGoal()
 		}
 	}
 	return false;
-	/*
-	stwu     r1, -0x90(r1)
-	mflr     r0
-	stw      r0, 0x94(r1)
-	stfd     f31, 0x80(r1)
-	psq_st   f31, 136(r1), 0, qr0
-	stfd     f30, 0x70(r1)
-	psq_st   f30, 120(r1), 0, qr0
-	stfd     f29, 0x60(r1)
-	psq_st   f29, 104(r1), 0, qr0
-	stfd     f28, 0x50(r1)
-	psq_st   f28, 88(r1), 0, qr0
-	stfd     f27, 0x40(r1)
-	psq_st   f27, 72(r1), 0, qr0
-	stfd     f26, 0x30(r1)
-	psq_st   f26, 56(r1), 0, qr0
-	stw      r31, 0x2c(r1)
-	stw      r30, 0x28(r1)
-	mr       r30, r3
-	lbz      r0, 0x2f0(r3)
-	cmplwi   r0, 0
-	bne      lbl_803511E4
-	li       r3, 0
-	b        lbl_803513B4
-
-lbl_803511E4:
-	lwz      r0, 0x318(r30)
-	lwz      r3, 0xc0(r30)
-	cmpwi    r0, 0x64
-	lfs      f5, 0x384(r3)
-	ble      lbl_803511FC
-	lfs      f5, lbl_8051E508@sda21(r2)
-
-lbl_803511FC:
-	lfs      f4, 0x194(r30)
-	fmuls    f5, f5, f5
-	lfs      f0, 0x1a0(r30)
-	lfs      f3, 0x18c(r30)
-	fsubs    f1, f4, f0
-	lfs      f0, 0x198(r30)
-	fsubs    f2, f3, f0
-	fmuls    f0, f1, f1
-	fmadds   f0, f2, f2, f0
-	fcmpo    cr0, f0, f5
-	bge      lbl_80351238
-	mr       r3, r30
-	bl       releasePathFinder__Q34Game13PanModokiBase3ObjFv
-	li       r3, 1
-	b        lbl_803513B4
-
-lbl_80351238:
-	cmpwi    r0, 0x64
-	lfs      f26, lbl_8051E4DC@sda21(r2)
-	lfs      f31, lbl_8051E4D8@sda21(r2)
-	ble      lbl_80351250
-	lfs      f26, lbl_8051E508@sda21(r2)
-	lfs      f31, lbl_8051E50C@sda21(r2)
-
-lbl_80351250:
-	lfs      f0, 0x2c4(r30)
-	fmuls    f26, f26, f26
-	lfs      f1, 0x2bc(r30)
-	fmuls    f31, f31, f31
-	fsubs    f0, f4, f0
-	mr       r3, r30
-	fsubs    f1, f3, f1
-	fmuls    f0, f0, f0
-	fmadds   f27, f1, f1, f0
-	bl       getCarryTarget__Q34Game13PanModokiBase3ObjFv
-	or.      r31, r3, r3
-	lfs      f1, lbl_8051E510@sda21(r2)
-	beq      lbl_803512D4
-	mr       r4, r31
-	addi     r3, r1, 8
-	lwz      r12, 0(r31)
-	lfs      f28, 0x2c4(r30)
-	lwz      r12, 8(r12)
-	lfs      f29, 0x2bc(r30)
-	mtctr    r12
-	bctrl
-	mr       r4, r31
-	addi     r3, r1, 0x14
-	lwz      r12, 0(r31)
-	lfs      f30, 0x10(r1)
-	lwz      r12, 8(r12)
-	mtctr    r12
-	bctrl
-	fsubs    f0, f30, f28
-	lfs      f1, 0x14(r1)
-	fsubs    f1, f1, f29
-	fmuls    f0, f0, f0
-	fmadds   f1, f1, f1, f0
-
-lbl_803512D4:
-	fcmpo    cr0, f27, f26
-	blt      lbl_803512F0
-	lfs      f0, lbl_8051E490@sda21(r2)
-	fcmpo    cr0, f1, f0
-	ble      lbl_803513B0
-	fcmpo    cr0, f1, f31
-	bge      lbl_803513B0
-
-lbl_803512F0:
-	li       r0, 0
-	stw      r0, 0x318(r30)
-	lha      r3, 0x2e8(r30)
-	lha      r0, 0x2e6(r30)
-	cmpw     r3, r0
-	bne      lbl_80351330
-	lfs      f0, 0x198(r30)
-	fcmpo    cr0, f1, f31
-	stfs     f0, 0x2bc(r30)
-	lfs      f0, 0x19c(r30)
-	stfs     f0, 0x2c0(r30)
-	lfs      f0, 0x1a0(r30)
-	stfs     f0, 0x2c4(r30)
-	bge      lbl_803513B0
-	li       r3, 1
-	b        lbl_803513B4
-
-lbl_80351330:
-	lwz      r4, 0x384(r30)
-	b        lbl_803513A8
-
-lbl_80351338:
-	lha      r0, 0x20(r4)
-	cmpw     r0, r3
-	bne      lbl_803513A4
-	sth      r3, 0x2ea(r30)
-	lwz      r3, 0xc(r4)
-	cmplwi   r3, 0
-	beq      lbl_80351360
-	lha      r0, 0x20(r3)
-	sth      r0, 0x2e8(r30)
-	b        lbl_80351368
-
-lbl_80351360:
-	lha      r0, 0x2e6(r30)
-	sth      r0, 0x2e8(r30)
-
-lbl_80351368:
-	lwz      r3, mapMgr__4Game@sda21(r13)
-	lha      r4, 0x2e8(r30)
-	lwz      r3, 8(r3)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 0x50(r3)
-	lfs      f2, 0x54(r3)
-	lfs      f0, 0x4c(r3)
-	li       r3, 0
-	stfs     f0, 0x2bc(r30)
-	stfs     f1, 0x2c0(r30)
-	stfs     f2, 0x2c4(r30)
-	b        lbl_803513B4
-
-lbl_803513A4:
-	lwz      r4, 0xc(r4)
-
-lbl_803513A8:
-	cmplwi   r4, 0
-	bne      lbl_80351338
-
-lbl_803513B0:
-	li       r3, 0
-
-lbl_803513B4:
-	psq_l    f31, 136(r1), 0, qr0
-	lfd      f31, 0x80(r1)
-	psq_l    f30, 120(r1), 0, qr0
-	lfd      f30, 0x70(r1)
-	psq_l    f29, 104(r1), 0, qr0
-	lfd      f29, 0x60(r1)
-	psq_l    f28, 88(r1), 0, qr0
-	lfd      f28, 0x50(r1)
-	psq_l    f27, 72(r1), 0, qr0
-	lfd      f27, 0x40(r1)
-	psq_l    f26, 56(r1), 0, qr0
-	lfd      f26, 0x30(r1)
-	lwz      r31, 0x2c(r1)
-	lwz      r0, 0x94(r1)
-	lwz      r30, 0x28(r1)
-	mtlr     r0
-	addi     r1, r1, 0x90
-	blr
-	*/
 }
 
 /**
@@ -1120,7 +933,7 @@ void Obj::walkFunc()
 		mMoveSpeedTimer = 0;
 	}
 
-	if (!_304) {
+	if (!mFindNextRouteCounter) {
 		mTargetCreature = static_cast<Creature*>(findNearestPellet());
 		if (mTargetCreature) {
 			mNextWayPointPosition = mTargetCreature->getPosition();
@@ -1130,8 +943,8 @@ void Obj::walkFunc()
 		rotAccel = C_PROPERPARMS.mFastTurnSpeed.mValue;
 	}
 	EnemyFunc::walkToTarget(this, mNextWayPointPosition, moveSpeed, rotAccel, rotSpeed);
-	if (mBounceTriangle) {
-		f32 collPos = mCollisionPosition.x;
+	if (mFloorTriangle) {
+		f32 collPos = mFloorNormal.x;
 		f32 ten     = 10.0f;
 		if (collPos > 0.1f) {
 			mPelletCarryVelocity.x = -ten;
@@ -1141,7 +954,7 @@ void Obj::walkFunc()
 			mPelletCarryVelocity.x *= 0.9f;
 		}
 		mCurrentVelocity.x += mPelletCarryVelocity.x;
-		f32 collPosZ = mCollisionPosition.z;
+		f32 collPosZ = mFloorNormal.z;
 		if (collPosZ > 0.1f) {
 			mPelletCarryVelocity.z = -ten;
 		} else if (collPosZ < -0.1f) {
@@ -1152,14 +965,14 @@ void Obj::walkFunc()
 		mCurrentVelocity.z += mPelletCarryVelocity.z;
 	}
 
-	if (!_304) {
+	if (!mFindNextRouteCounter) {
 		mMoveToWpTimer++;
 		if (mMoveToWpTimer > 0x3c) {
 			f32 posZCross = mPosition.z - mPrevCheckPosition.z;
 			f32 posXCross = mPosition.x - mPrevCheckPosition.x;
 			if (((posXCross * posXCross) + (posZCross * posZCross)) < 100.0f) {
-				_304            = 0x78;
-				mTargetCreature = nullptr;
+				mFindNextRouteCounter = 0x78;
+				mTargetCreature       = nullptr;
 				findNextRoutePoint(true);
 			}
 			mPrevCheckPosition = mPosition;
@@ -1352,7 +1165,7 @@ Pellet* Obj::findNearestPellet()
 	CI_LOOP(iterator)
 	{
 		Pellet* pelt = *iterator;
-		if (pelt->isPickable() && pelt->isAlive() && pelt->getKind() != PELTYPE_UPGRADE && pelt->mCaptureMatrix == nullptr
+		if (pelt->isPickable() && pelt->isAlive() && pelt->getKind() != PelletType::Upgrade && pelt->mCaptureMatrix == nullptr
 		    && isTargetable(pelt) && canTarget(pelt->mConfig->mParams.mMin.mData, C_PROPERPARMS.mMaxCarryWeight.mValue)) {
 			f32 y = pelt->getPosition().y - 0.5f * pelt->getCylinderHeight();
 			if (absF(y - mPosition.y) > 10.0f) {
@@ -1361,7 +1174,7 @@ Pellet* Obj::findNearestPellet()
 			f32 angle = getCreatureViewAngle(pelt);
 			if (absF(angle) <= maxAngle) {
 				s32 id = pelt->getCreatureID();
-				if (pelt->getKind() == PELTYPE_CARCASS && (id == 0 || id == 1)) {
+				if (pelt->getKind() == PelletType::Carcass && (id == 0 || id == 1)) {
 					if (strcmp("orima", pelt->getCreatureName()) == 0) {
 						continue;
 					}
@@ -1509,19 +1322,19 @@ bool Obj::carryTarget(f32 param)
 		peltVel.z = targetVel.z;
 		// Vector3f resultVec(targetVel.x, peltVel.y + (0.0f - peltVel.y) * (sys->mFpsFactor / 0.15f) + 0.0f, targetVel.z);
 		if (CG_PARMS(this)->_99A && pelt) {
-			if (!_31C) {
+			if (!mIsCarryStuck) {
 				mMoveToWpTimer++;
 				if (mMoveToWpTimer > 0x5A) {
 					if (sqrDistanceXZ(mPosition, mPrevCheckPosition) < 100.0f) {
-						_31C = 1;
+						mIsCarryStuck = 1;
 					} else {
 						mMoveToWpTimer = 0;
 					}
 					mPrevCheckPosition = mPosition;
 				}
 			}
-			if (!_31C) {
-				f32 collPos = mCollisionPosition.x;
+			if (!mIsCarryStuck) {
+				f32 collPos = mFloorNormal.x;
 				f32 ten     = 10.0f;
 				if (collPos > 0.1f) {
 					mPelletCarryVelocity.x = -ten;
@@ -1532,7 +1345,7 @@ bool Obj::carryTarget(f32 param)
 						mPelletCarryVelocity.x *= 0.99f;
 					}
 				}
-				f32 collPosZ = mCollisionPosition.z;
+				f32 collPosZ = mFloorNormal.z;
 				if (collPosZ > 0.1f) {
 					mPelletCarryVelocity.z = -ten;
 				} else {
@@ -1624,7 +1437,7 @@ void Obj::endCarry()
 	endStick();
 	pelt->mPelletCarry->giveup(2);
 	bool doKillPellet = true;
-	if (pelt->getKind() == PELTYPE_TREASURE) {
+	if (pelt->getKind() == PelletType::Treasure) {
 		mHeldTreasures[mHeldTreasureNum] = pelt;
 		if (mHeldTreasureNum == 0) {
 			pelt->setAlive(false);
@@ -1755,8 +1568,8 @@ bool Obj::setPathFinder(bool cond)
 		mWpIndex3 = mWpIndex2;
 		mWpIndex2 = nearIdx;
 
-		// this bit is being weird
-		int flag = (0x1 + 0x2 + 0x40 + 0x80) + !!cond;
+		int flag = cond != 0 ? (PATHFLAG_PathThroughWater | PATHFLAG_AllowUnvisited | PATHFLAG_TwoWayPathing)
+		                     : (PATHFLAG_RequireOpen | PATHFLAG_PathThroughWater | PATHFLAG_AllowUnvisited | PATHFLAG_TwoWayPathing);
 
 		if (mPathID) {
 			testPathfinder->release(mPathID);
@@ -1771,199 +1584,6 @@ bool Obj::setPathFinder(bool cond)
 	}
 	JUT_PANICLINE(1810, nullptr);
 	return false;
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stfd     f30, 0x50(r1)
-	psq_st   f30, 88(r1), 0, qr0
-	stmw     r27, 0x3c(r1)
-	mr       r28, r3
-	mr       r29, r4
-	bl       releasePathFinder__Q34Game13PanModokiBase3ObjFv
-	lfs      f0, lbl_8051E490@sda21(r2)
-	li       r4, 0
-	li       r0, -1
-	stfs     f0, 0x320(r28)
-	stfs     f0, 0x324(r28)
-	stfs     f0, 0x328(r28)
-	stw      r4, 0x2c(r1)
-	lwz      r3, mapMgr__4Game@sda21(r13)
-	stw      r4, 0x28(r1)
-	stb      r4, 0x1c(r1)
-	sth      r0, 0x24(r1)
-	stw      r4, 0x20(r1)
-	lfs      f0, 0x18c(r28)
-	stfs     f0, 0x10(r1)
-	lfs      f0, 0x190(r28)
-	stfs     f0, 0x14(r1)
-	lfs      f0, 0x194(r28)
-	stfs     f0, 0x18(r1)
-	lwz      r30, 8(r3)
-	cmplwi   r30, 0
-	bne      lbl_80352E84
-	lis      r3, lbl_80490EF8@ha
-	lis      r5, lbl_80490F08@ha
-	addi     r3, r3, lbl_80490EF8@l
-	li       r4, 0x6dc
-	addi     r5, r5, lbl_80490F08@l
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-
-lbl_80352E84:
-	mr       r3, r30
-	addi     r4, r1, 0x10
-	bl       getNearestEdge__Q24Game8RouteMgrFRQ24Game15WPEdgeSearchArg
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_80353064
-	lwz      r3, 0x28(r1)
-	lwz      r4, 0x2c(r1)
-	lfs      f3, 0x1a0(r28)
-	lfs      f1, 0x54(r4)
-	lfs      f0, 0x54(r3)
-	fsubs    f4, f1, f3
-	lfs      f2, 0x4c(r4)
-	fsubs    f3, f0, f3
-	lfs      f6, 0x198(r28)
-	lfs      f1, 0x4c(r3)
-	fsubs    f5, f2, f6
-	fmuls    f0, f4, f4
-	lha      r0, 0x36(r3)
-	fsubs    f2, f1, f6
-	lha      r5, 0x36(r4)
-	fmuls    f1, f3, f3
-	fmadds   f0, f5, f5, f0
-	lfs      f31, 0x50(r3)
-	mr       r31, r0
-	fmadds   f1, f2, f2, f1
-	lfs      f30, 0x50(r4)
-	mr       r27, r5
-	fcmpo    cr0, f1, f0
-	ble      lbl_80352F00
-	mr       r27, r0
-	mr       r31, r5
-
-lbl_80352F00:
-	mr       r3, r30
-	mr       r4, r31
-	lwz      r12, 0(r30)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lbz      r0, 0x34(r3)
-	clrlwi.  r0, r0, 0x1f
-	beq      lbl_80352F28
-	mr       r31, r27
-
-lbl_80352F28:
-	mr       r3, r30
-	lwz      r4, 0x28(r1)
-	lwz      r12, 0(r30)
-	lha      r4, 0x36(r4)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lbz      r0, 0x34(r3)
-	clrlwi.  r0, r0, 0x1f
-	bne      lbl_80352FD4
-	mr       r3, r30
-	lwz      r4, 0x2c(r1)
-	lwz      r12, 0(r30)
-	lha      r4, 0x36(r4)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lbz      r0, 0x34(r3)
-	clrlwi.  r0, r0, 0x1f
-	bne      lbl_80352FD4
-	lwz      r3, 0x28(r1)
-	extsh    r4, r31
-	lha      r0, 0x36(r3)
-	cmpw     r4, r0
-	bne      lbl_80352FB4
-	lfs      f1, 0x190(r28)
-	lfs      f0, lbl_8051E4A8@sda21(r2)
-	fsubs    f1, f31, f1
-	fabs     f1, f1
-	frsp     f1, f1
-	fcmpo    cr0, f1, f0
-	ble      lbl_80352FD4
-	lwz      r3, 0x2c(r1)
-	lha      r31, 0x36(r3)
-	b        lbl_80352FD4
-
-lbl_80352FB4:
-	lfs      f1, 0x190(r28)
-	lfs      f0, lbl_8051E4A8@sda21(r2)
-	fsubs    f1, f30, f1
-	fabs     f1, f1
-	frsp     f1, f1
-	fcmpo    cr0, f1, f0
-	ble      lbl_80352FD4
-	mr       r31, r0
-
-lbl_80352FD4:
-	lha      r4, 0x2e8(r28)
-	clrlwi   r3, r29, 0x18
-	neg      r0, r3
-	sth      r4, 0x2ea(r28)
-	or       r0, r0, r3
-	srawi    r3, r0, 0x1f
-	sth      r31, 0x2e8(r28)
-	addi     r29, r3, 0xc3
-	lwz      r4, 0x2ec(r28)
-	cmplwi   r4, 0
-	beq      lbl_80353008
-	lwz      r3, testPathfinder__4Game@sda21(r13)
-	bl       release__Q24Game10PathfinderFUl
-
-lbl_80353008:
-	lha      r5, 0x2e6(r28)
-	addi     r4, r1, 8
-	lha      r0, 0x2e8(r28)
-	lwz      r3, testPathfinder__4Game@sda21(r13)
-	sth      r0, 8(r1)
-	sth      r5, 0xa(r1)
-	stb      r29, 0xc(r1)
-	bl       start__Q24Game10PathfinderFRQ24Game15PathfindRequest
-	stw      r3, 0x2ec(r28)
-	mr       r3, r30
-	lwz      r12, 0(r30)
-	lha      r4, 0x2e8(r28)
-	lwz      r12, 0x2c(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 0x50(r3)
-	lfs      f2, 0x54(r3)
-	lfs      f0, 0x4c(r3)
-	li       r3, 1
-	stfs     f0, 0x2bc(r28)
-	stfs     f1, 0x2c0(r28)
-	stfs     f2, 0x2c4(r28)
-	b        lbl_80353080
-
-lbl_80353064:
-	lis      r3, lbl_80490EF8@ha
-	li       r4, 0x712
-	addi     r3, r3, lbl_80490EF8@l
-	li       r5, 0
-	crclr    6
-	bl       panic_f__12JUTExceptionFPCciPCce
-	li       r3, 0
-
-lbl_80353080:
-	psq_l    f31, 104(r1), 0, qr0
-	lfd      f31, 0x60(r1)
-	psq_l    f30, 88(r1), 0, qr0
-	lfd      f30, 0x50(r1)
-	lmw      r27, 0x3c(r1)
-	lwz      r0, 0x74(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-	*/
 }
 
 /**
@@ -2001,7 +1621,7 @@ bool Obj::isTargetable(Pellet* pellet)
 	}
 
 	if (pellet) {
-		if (pellet->getKind() >= PELTYPE_TREASURE && mHeldTreasureNum >= PANMODOKI_MaxHeldTreasures) {
+		if (pellet->getKind() >= PelletType::Treasure && mHeldTreasureNum >= PANMODOKI_MaxHeldTreasures) {
 			return false;
 		}
 
@@ -2122,8 +1742,8 @@ void Obj::throwUpEatItem()
 			Pellet* pellet = mHeldTreasures[i];
 			if (pellet) {
 				pellet->mMgr->setComeAlive(pellet);
-				initArg.mState = PELSTATE_Bury;
-				initArg._1C    = 1;
+				initArg.mState             = PelBirthType_ScaleAppear;
+				initArg.mDoSkipCreateModel = 1; // breadbug drops are already loaded
 				pellet->init(&initArg);
 
 				Vector3f pos = mHomePosition;
@@ -2160,7 +1780,7 @@ Obj::Obj()
 {
 	mCarrySizeDiff    = 40.0f;
 	mShadowSize       = 30.0f;
-	_338              = 12.0f;
+	mUnusedVal        = 12.0f;
 	mBounceEffectSize = 0.9f;
 	mAppearEffectSize = 1.6f;
 }
@@ -2169,13 +1789,13 @@ Obj::Obj()
  * @note Address: 0x80353C00
  * @note Size: 0x34
  */
-void Obj::appearRumble() { rumbleMgr->startRumble(11, mPosition, RUMBLEID_Both); }
+void Obj::appearRumble() { rumbleMgr->startRumble(RUMBLETYPE_Fixed11, mPosition, RUMBLEID_Both); }
 
 /**
  * @note Address: 0x80353C34
  * @note Size: 0x34
  */
-void Obj::hideRumble() { rumbleMgr->startRumble(10, mPosition, RUMBLEID_Both); }
+void Obj::hideRumble() { rumbleMgr->startRumble(RUMBLETYPE_Fixed10, mPosition, RUMBLEID_Both); }
 
 /**
  * @note Address: 0x80353C68

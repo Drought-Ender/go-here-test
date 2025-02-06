@@ -104,11 +104,11 @@ struct Parms : public EnemyParmsBase {
 	struct ProperParms : public Parameters {
 		inline ProperParms()
 		    : Parameters(nullptr, "EnemyParmsBase")
-		    , mSingleNectarChance(this, 'fp01', "–¨ƒŒ[ƒg", 1.0f, 0.0f, 1.0f)       // 'nectar rate'
-		    , mDoubleNectarChance(this, 'fp02', "–¨x2ƒŒ[ƒg", 1.0f, 0.0f, 1.0f)     // 'nectar x2 rate'
-		    , mMititesChance(this, 'fp03', "ƒ^ƒ}ƒSƒ€ƒVx10ƒŒ[ƒg", 1.0f, 0.0f, 1.0f) // 'mitite x10 rate'
-		    , mSpicyChance(this, 'fp04', "Ôƒh[ƒsƒ“ƒOƒŒ[ƒg", 1.0f, 0.0f, 1.0f)    // 'red doping rate'
-		    , mBitterChance(this, 'fp05', "•ƒh[ƒsƒ“ƒOƒŒ[ƒg", 1.0f, 0.0f, 1.0f)   // 'black doping rate'
+		    , mSingleNectarChance(this, 'fp01', "èœœãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)       // 'nectar rate'
+		    , mDoubleNectarChance(this, 'fp02', "èœœx2ãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)     // 'nectar x2 rate'
+		    , mMititesChance(this, 'fp03', "ã‚¿ãƒã‚´ãƒ ã‚·x10ãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f) // 'mitite x10 rate'
+		    , mSpicyChance(this, 'fp04', "èµ¤ãƒ‰ãƒ¼ãƒ”ãƒ³ã‚°ãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)    // 'red doping rate'
+		    , mBitterChance(this, 'fp05', "é»’ãƒ‰ãƒ¼ãƒ”ãƒ³ã‚°ãƒ¬ãƒ¼ãƒˆ", 1.0f, 0.0f, 1.0f)   // 'black doping rate'
 		{
 		}
 
@@ -121,8 +121,8 @@ struct Parms : public EnemyParmsBase {
 
 	Parms()
 	{
-		_8D0 = 0;
-		_8D1 = 1;
+		mForcedDropType  = 0;
+		mDoCheckHasSpray = 1;
 	}
 
 	virtual void read(Stream& stream) // _08 (weak)
@@ -134,8 +134,8 @@ struct Parms : public EnemyParmsBase {
 
 	// _00-_7F8	= EnemyParmsBase
 	ProperParms mProperParms; // _7F8
-	u8 _8D0;                  // _8D0
-	u8 _8D1;                  // _8D1
+	u8 mForcedDropType;       // _8D0
+	u8 mDoCheckHasSpray;      // _8D1
 };
 
 enum AnimID {

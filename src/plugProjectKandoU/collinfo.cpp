@@ -19,6 +19,8 @@
 #include "types.h"
 #include "Vector3.h"
 
+bool CollTree::mDebug;
+
 /**
  * __ct__8PlatformFv
  * @note Address: 0x801336A8
@@ -30,11 +32,7 @@ Platform::Platform() { mTriDivider = nullptr; }
  * @note Address: N/A
  * @note Size: 0x8
  */
-void Platform::setTriDivider(Sys::TriDivider* triDivider)
-{
-	// UNUSED FUNCTION
-	mTriDivider = (Sys::OBBTree*)triDivider;
-}
+void Platform::setTriDivider(Sys::TriDivider* triDivider) { mTriDivider = (Sys::OBBTree*)triDivider; }
 
 /**
  * @note Address: 0x801336EC
@@ -186,6 +184,7 @@ Platform* PlatAttacher::getPlatform(int i)
 AgePlatform::AgePlatform()
 {
 	mTriDivider = new Sys::OBBTree[2]; // something here has to generate four weak dtors
+	new Sys::GridDivider;
 }
 
 /**
@@ -248,7 +247,6 @@ void CollTree::release()
  * @note Address: 0x801341F8
  * @note Size: 0x348
  */
-// matches so long as kill isn't in the header........
 void CollTree::releaseRec(CollPart* part)
 {
 	CollPart* next  = part->getNext();
@@ -608,16 +606,16 @@ CollPart* CollTree::findCollPart(FindCollPartArg& findArg)
 		int count    = 0;
 		int numParts = mPart->getAllCollPartToArray(partArray, 256, count);
 
-		f32 minDist         = 128000.0f;
+		f32 minDist         = FLOAT_DIST_MAX;
 		CollPart* foundPart = nullptr;
 		for (int i = 0; i < numParts; i++) {
 			CollPart* currPart = partArray[i];
-			if (((findArg.mCondition == nullptr) || findArg.mCondition->satisfy(currPart)) && currPart->isSphere()) {
-				f32 dist = findArg.mPosition.mPosition.sqrDistance(currPart->mPosition) - SQUARE(currPart->mRadius);
+			if ((!findArg.mCondition || findArg.mCondition->satisfy(currPart)) && currPart->isSphere()) {
+				f32 distance = sqrDistance(findArg.getHitPosition(), currPart->mPosition) - currPart->getSqrRadius();
 
-				if (dist < minDist) {
+				if (distance < minDist) {
 					foundPart = currPart;
-					minDist   = dist;
+					minDist   = distance;
 				}
 			}
 		}
@@ -774,7 +772,7 @@ void CollPart::init(SysShape::MtxObject* mtxObject)
 	mPosition   = Vector3f(0.0f);
 	mModel      = mtxObject;
 	mJointIndex = -1;
-	_60         = 0;
+	mUnusedVal  = 0;
 	mAttribute  = 0;
 	mPartType   = COLLTYPE_SPHERE;
 	mSpecialID.setID('____');
@@ -852,13 +850,11 @@ void CollPart::calcStickLocal(Vector3f& input, Vector3f& localPosition)
 	case COLLTYPE_SPHERE:
 		Matrixf mtx;
 		makeMatrixTo(mtx);
+
 		Matrixf inv;
 		PSMTXInverse(mtx.mMatrix.mtxView, inv.mMatrix.mtxView);
 
-		Vector3f row1 = Vector3f(mtx.getRow(0));
-
-		f32 len = row1.length();
-
+		f32 len = mtx.getRowLength(0);
 		if (FABS(len) < 0.001f) {
 			localPosition = Vector3f(0.0f);
 			return;
@@ -1097,23 +1093,23 @@ void CollPart::calcPoseMatrix(Vector3f& input, Matrixf& poseMatrix)
 	case COLLTYPE_SPHERE:
 		Matrixf mtx;
 		makeMatrixTo(mtx);
-		Vector3f pos  = mtx.getColumn(3);
-		Vector3f diff = pos - input;
-		f32 len       = diff.normalise();
+
+		Vector3f pos;
+		mtx.getTranslation(pos);
+
+		pos -= input;
+		f32 len = pos.normalise();
+
 		if (len == 0.0f) {
-			diff = Vector3f(0.0f, 0.0f, 1.0f);
+			pos = Vector3f(0.0f, 0.0f, 1.0f);
 		}
+
 		Vector3f zAxis(0.0f, 0.0f, 1.0f);
-		Vector3f crossProd = cross(diff, zAxis);
+		Vector3f crossProd = pos.cross(zAxis);
 		crossProd.normalise();
 		poseMatrix.setColumn(0, crossProd);
-		f32 zVal = diff.y * crossProd.x;
-		Vector3f otherVec;
-		otherVec.x = diff.y * crossProd.z - diff.z * crossProd.y;
-		otherVec.y = diff.z * crossProd.x - diff.x * crossProd.z;
-		otherVec.z = diff.x * crossProd.y - diff.y * crossProd.x;
-		poseMatrix.setColumn(1, otherVec);
-		poseMatrix.setColumn(2, diff);
+		poseMatrix.setColumn(1, pos.cross(crossProd));
+		poseMatrix.setColumn(2, pos);
 		break;
 
 	case COLLTYPE_TUBETREE:
@@ -1142,15 +1138,17 @@ void CollPart::calcPoseMatrix(Vector3f& input, Matrixf& poseMatrix)
 	case COLLTYPE_TUBE:
 		Sys::Tube tube;
 		getTube(tube);
+
 		Vector3f axis;
 		tube.getAxisVector(axis);
-		axis.x             = -axis.x;
-		axis.y             = -axis.y;
-		axis.z             = -axis.z;
-		Vector3f axisCross = cross(input, axis);
-		axisCross.normalise();
-		Vector3f thirdAxis = cross(axisCross, axis);
-		thirdAxis.normalise();
+		axis.negate2();
+
+		Vector3f axisCross = input.cross(axis);
+		_normaliseVec(axisCross);
+
+		Vector3f thirdAxis = axisCross.cross(axis);
+		_normaliseVec(thirdAxis);
+
 		poseMatrix.setColumn(0, axisCross);
 		poseMatrix.setColumn(1, axis);
 		poseMatrix.setColumn(2, thirdAxis);
@@ -1584,12 +1582,12 @@ MouthCollPart::MouthCollPart()
 	mPosition   = Vector3f(0.0f);
 	mModel      = nullptr;
 	mJointIndex = -1;
-	_60         = 0;
+	mUnusedVal  = 0;
 	mAttribute  = 0;
 	mPartType   = COLLTYPE_SPHERE;
 	mSpecialID.setID('____');
 	mStuckCreature = nullptr;
-	_6C            = 0;
+	mIsOniKurage   = false;
 }
 
 /**
@@ -1691,10 +1689,7 @@ CollPartFactory* CollPartFactory::load(char* path)
 		return nullptr;
 	} else {
 		RamStream input(data, -1);
-		input.mMode = STREAM_MODE_TEXT;
-		if (input.mMode == STREAM_MODE_TEXT) {
-			input.mTabCount = 0;
-		}
+		input.setMode(STREAM_MODE_TEXT, 1);
 		factory = new CollPartFactory(input);
 		delete[] data;
 	}
@@ -1769,7 +1764,7 @@ CollPart* CollPart::clone(SysShape::MtxObject* mtxObject, CollPartMgr* mgr)
 	copy->mPartType   = mPartType;
 	copy->mJointIndex = mJointIndex;
 	copy->mModel      = mModel;
-	copy->_60         = _60;
+	copy->mUnusedVal  = mUnusedVal;
 	copy->mAttribute  = mAttribute;
 	copy->mModel      = mtxObject;
 

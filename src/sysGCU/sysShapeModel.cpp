@@ -13,10 +13,10 @@ int Model::cullCount;
  * @note Address: 0x8043E1D8
  * @note Size: 0xC4
  */
-Model::Model(J3DModelData* data, u32 flags, u32 modelType)
+Model::Model(J3DModelData* data, u32 flags, u32 viewNum)
 {
-	mJ3dModel   = new J3DModel(data, flags, modelType);
-	mJointCount = mJ3dModel->mModelData->getJointNum();
+	mJ3dModel   = new J3DModel(data, flags, viewNum);
+	mJointCount = mJ3dModel->getModelData()->getJointNum();
 	initJoints();
 	_05          = 1;
 	mIsAnimating = false;
@@ -27,9 +27,9 @@ Model::Model(J3DModelData* data, u32 flags, u32 modelType)
  * @note Address: 0x8043E29C
  * @note Size: 0x17C
  */
-void Model::enableMaterialAnim(J3DModelData* data, int p2)
+void Model::enableMaterialAnim(J3DModelData* data, int type)
 {
-	switch (p2) {
+	switch (type) {
 	case 0:
 		for (u16 i = 0; i < data->getMaterialNum(); i++) {
 			J3DMaterialAnm* anm = new J3DMaterialAnm;
@@ -46,11 +46,11 @@ void Model::enableMaterialAnim(J3DModelData* data, int p2)
  * @note Address: 0x8043E418
  * @note Size: 0x174
  */
-void Model::enableMaterialAnim(int p1)
+void Model::enableMaterialAnim(int type)
 {
-	switch (p1) {
+	switch (type) {
 	case 0:
-		J3DModelData* data = mJ3dModel->mModelData;
+		J3DModelData* data = mJ3dModel->getModelData();
 		for (u16 i = 0; i < data->getMaterialNum(); i++) {
 			J3DMaterialAnm* anm = new J3DMaterialAnm;
 			data->getMaterialNodePointer(i)->change();
@@ -280,7 +280,7 @@ void Model::entry(Sys::Sphere&)
 bool Model::isVisible(Sys::Sphere& sphere)
 {
 	Graphics* gfx = sys->mGfx;
-	for (int i = 0; i < gfx->mActiveViewports; i++) {
+	for (int i = 0; i < gfx->getViewportNum(); i++) {
 		Viewport* viewport = gfx->getViewport(i);
 		if (viewport->viewable() && viewport->mCamera->isVisible(sphere)) {
 			mIsVisible = true;
@@ -298,29 +298,28 @@ bool Model::isVisible(Sys::Sphere& sphere)
 void Model::jointVisible(bool newVisibility, int jointIndex)
 {
 	if (newVisibility != false) {
-		for (J3DMaterial* material = mJ3dModel->mModelData->mJointTree.mJoints[(u16)jointIndex]->mMaterial; material != nullptr;
-		     material              = material->mNext) {
-			material->mShape->mFlags &= ~J3DShape_Hide;
+		for (J3DMaterial* material = mJ3dModel->getModelData()->getJointNodePointer(jointIndex)->getMesh(); material != nullptr;
+		     material              = material->getNext()) {
+			material->getShape()->offFlag(J3DShape_Hide);
 		}
-		return;
-	}
-	for (J3DMaterial* material = mJ3dModel->mModelData->mJointTree.mJoints[(u16)jointIndex]->mMaterial; material != nullptr;
-	     material              = material->mNext) {
-		material->mShape->mFlags |= J3DShape_Hide;
+	} else {
+		for (J3DMaterial* material = mJ3dModel->getModelData()->getJointNodePointer(jointIndex)->getMesh(); material != nullptr;
+		     material              = material->getNext()) {
+			material->getShape()->onFlag(J3DShape_Hide);
+		}
 	}
 }
 
 /**
  * @note Address: 0x8043E9BC
  * @note Size: 0x58
- * Matching! https://decomp.me/scratch/ZILok
  */
 void Model::hide()
 {
 	for (u16 i = 0; i < mJointCount; i++) {
-		for (J3DMaterial* material = mJ3dModel->mModelData->mJointTree.mJoints[i]->mMaterial; material != nullptr;
-		     material              = material->mNext) {
-			material->mShape->mFlags |= J3DShape_Hide;
+		for (J3DMaterial* material = mJ3dModel->getModelData()->getJointNodePointer(i)->getMesh(); material != nullptr;
+		     material              = material->getNext()) {
+			material->getShape()->onFlag(J3DShape_Hide);
 		}
 	}
 }
@@ -332,9 +331,9 @@ void Model::hide()
 void Model::show()
 {
 	for (u16 i = 0; i < mJointCount; i++) {
-		for (J3DMaterial* material = mJ3dModel->mModelData->mJointTree.mJoints[i]->mMaterial; material != nullptr;
+		for (J3DMaterial* material = mJ3dModel->getModelData()->getJointNodePointer(i)->getMesh(); material != nullptr;
 		     material              = material->mNext) {
-			material->mShape->mFlags &= ~J3DShape_Hide;
+			material->getShape()->offFlag(J3DShape_Hide);
 		}
 	}
 }
@@ -346,7 +345,7 @@ void Model::show()
 void Model::hidePackets()
 {
 	for (u16 i = 0; i < mJ3dModel->getModelData()->getShapeNum(); i++) {
-		mJ3dModel->mShapePackets[i].onFlag(0x10);
+		mJ3dModel->getShapePacket(i)->onFlag(J3DShape_Hidden);
 	}
 }
 
@@ -357,7 +356,7 @@ void Model::hidePackets()
 void Model::showPackets()
 {
 	for (u16 i = 0; i < mJ3dModel->getModelData()->getShapeNum(); i++) {
-		getJ3DModel()->getShapePacket(i)->offFlag(0x10);
+		getJ3DModel()->getShapePacket(i)->offFlag(J3DShape_Hidden);
 	}
 }
 
@@ -396,15 +395,15 @@ void Model::initJointsRec(int id, Joint* jnt)
 	J3DJoint* jnt2 = joint->mJ3d->getChild();
 	J3DJoint* jnt3 = joint->mJ3d->getYounger();
 	if (jnt2) {
-		int id2       = jnt2->getJntNo();
-		joint->mChild = &mJoints[id2];
-		initJointsRec(id2, joint);
+		id            = jnt2->getJntNo();
+		joint->mChild = &mJoints[id];
+		initJointsRec(id, joint);
 	}
 
 	if (jnt3) {
-		int id2      = jnt3->getJntNo();
-		joint->mNext = &mJoints[id2];
-		initJointsRec(id2, jnt);
+		id           = jnt3->getJntNo();
+		joint->mNext = &mJoints[id];
+		initJointsRec(id, jnt);
 	}
 	/*
 	stwu     r1, -0x30(r1)
@@ -634,7 +633,7 @@ lbl_8043EF88:
  * @note Address: 0x8043EFB4
  * @note Size: 0x30
  */
-u16 Model::getJointIndex(char* name) { return mJ3dModel->mModelData->mJointTree.mNametab->getIndex(name); }
+u16 Model::getJointIndex(char* name) { return mJ3dModel->getModelData()->getJointName()->getIndex(name); }
 
 /**
  * @note Address: 0x8043EFE4
@@ -691,44 +690,9 @@ bool Model::needViewCalc()
  */
 void Model::viewCalc()
 {
-
 	if (needViewCalc()) {
 		mJ3dModel->viewCalc();
 	}
-	/*
-	stwu     r1, -0x10(r1)
-	mflr     r0
-	stw      r0, 0x14(r1)
-	stw      r31, 0xc(r1)
-	mr       r31, r3
-	lbz      r0, viewCalcMode__Q28SysShape5Model@sda21(r13)
-	cmplwi   r0, 0
-	bne      lbl_8043F080
-	bl       isMtxImmediate__Q28SysShape5ModelFv
-	b        lbl_8043F090
-
-lbl_8043F080:
-	bl       isMtxImmediate__Q28SysShape5ModelFv
-	clrlwi   r0, r3, 0x18
-	cntlzw   r0, r0
-	srwi     r3, r0, 5
-
-lbl_8043F090:
-	clrlwi.  r0, r3, 0x18
-	beq      lbl_8043F0AC
-	lwz      r3, 8(r31)
-	lwz      r12, 0(r3)
-	lwz      r12, 0x1c(r12)
-	mtctr    r12
-	bctrl
-
-lbl_8043F0AC:
-	lwz      r0, 0x14(r1)
-	lwz      r31, 0xc(r1)
-	mtlr     r0
-	addi     r1, r1, 0x10
-	blr
-	*/
 }
 
 /**
@@ -738,7 +702,7 @@ lbl_8043F0AC:
 void Model::setCurrentViewNo(u32 viewportNumber)
 {
 	if (!isMtxImmediate()) {
-		mJ3dModel->mMtxBuffer->mCurrentViewNumber = viewportNumber;
+		mJ3dModel->getMtxBuffer()->mCurrentViewNumber = viewportNumber;
 	}
 }
 
@@ -746,7 +710,7 @@ void Model::setCurrentViewNo(u32 viewportNumber)
  * @note Address: 0x8043F10C
  * @note Size: 0x14
  */
-bool Model::isMtxImmediate() { return mJ3dModel->mModelData->mModelLoaderFlags >> 4 & 1; }
+bool Model::isMtxImmediate() { return mJ3dModel->getModelData()->getFlag() >> 4 & 1; }
 
 /**
  * @note Address: 0x8043F130

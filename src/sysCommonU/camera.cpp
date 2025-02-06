@@ -74,9 +74,9 @@ CullFrustum::CullFrustum(int a)
 Vector3f CullFrustum::getUpVector()
 {
 	Vector3f upVec;
-	upVec.x = mViewMatrix->mMatrix.vecView.y[0];
-	upVec.y = mViewMatrix->mMatrix.vecView.y[1];
-	upVec.z = mViewMatrix->mMatrix.vecView.y[2];
+	upVec.x = mViewMatrix->mMatrix.structView.xy;
+	upVec.y = mViewMatrix->mMatrix.structView.yy;
+	upVec.z = mViewMatrix->mMatrix.structView.zy;
 	return upVec;
 }
 
@@ -87,9 +87,9 @@ Vector3f CullFrustum::getUpVector()
 Vector3f CullFrustum::getSideVector()
 {
 	Vector3f sideVec;
-	sideVec.x = -mViewMatrix->mMatrix.vecView.x[0];
-	sideVec.y = -mViewMatrix->mMatrix.vecView.x[1];
-	sideVec.z = -mViewMatrix->mMatrix.vecView.x[2];
+	sideVec.x = -mViewMatrix->mMatrix.structView.xx;
+	sideVec.y = -mViewMatrix->mMatrix.structView.yx;
+	sideVec.z = -mViewMatrix->mMatrix.structView.zx;
 	return sideVec;
 }
 
@@ -100,9 +100,9 @@ Vector3f CullFrustum::getSideVector()
 Vector3f CullFrustum::getViewVector()
 {
 	Vector3f viewVec;
-	viewVec.x = -mViewMatrix->mMatrix.vecView.z[0];
-	viewVec.y = -mViewMatrix->mMatrix.vecView.z[1];
-	viewVec.z = -mViewMatrix->mMatrix.vecView.z[2];
+	viewVec.x = -mViewMatrix->mMatrix.structView.xz;
+	viewVec.y = -mViewMatrix->mMatrix.structView.yz;
+	viewVec.z = -mViewMatrix->mMatrix.structView.zz;
 	return viewVec;
 }
 
@@ -112,30 +112,17 @@ Vector3f CullFrustum::getViewVector()
  */
 Vector3f CullFrustum::getPosition()
 {
-	Vector3f tVec;
-	tVec.x = -mViewMatrix->mMatrix.vecView.x[3];
-	tVec.y = -mViewMatrix->mMatrix.vecView.y[3];
-	tVec.z = -mViewMatrix->mMatrix.vecView.z[3];
+	Vector3f tVec = mViewMatrix->getBasis(3);
+	tVec.negate2();
 
-	Vector3f xVec;
-	xVec.x = mViewMatrix->mMatrix.vecView.x[0];
-	xVec.y = mViewMatrix->mMatrix.vecView.y[0];
-	xVec.z = mViewMatrix->mMatrix.vecView.z[0];
-
-	Vector3f yVec;
-	yVec.x = mViewMatrix->mMatrix.vecView.x[1];
-	yVec.y = mViewMatrix->mMatrix.vecView.y[1];
-	yVec.z = mViewMatrix->mMatrix.vecView.z[1];
-
-	Vector3f zVec;
-	zVec.x = mViewMatrix->mMatrix.vecView.x[2];
-	zVec.y = mViewMatrix->mMatrix.vecView.y[2];
-	zVec.z = mViewMatrix->mMatrix.vecView.z[2];
+	Vector3f xVec = mViewMatrix->getBasis(0);
+	Vector3f yVec = mViewMatrix->getBasis(1);
+	Vector3f zVec = mViewMatrix->getBasis(2);
 
 	Vector3f position;
-	position.x = dot(tVec, xVec);
-	position.y = dot(tVec, yVec);
-	position.z = dot(tVec, zVec);
+	position.x = tVec.dot(xVec);
+	position.y = tVec.dot(yVec);
+	position.z = tVec.dot(zVec);
 	return position;
 }
 
@@ -145,252 +132,32 @@ Vector3f CullFrustum::getPosition()
  */
 void CullFrustum::updatePlanes()
 {
+	Matrixf outMat;
+	Vec temp;
+
 	Vector3f row1 = getSideVector();
 	Vector3f row2 = getUpVector();
 
-	Vector3f posVec = getPosition(); // 38
+	Vector3f posVec = getPosition();
 
-	f32 viewAngle = PI * (mViewAngle / 360.0f);                    // 27
-	f32 fovAngle  = (f32)atan(mAspectRatio * (f32)tan(viewAngle)); // 31
-
-	Matrixf outMat;
-	Vec outVec;
-	Vector3f planeVec;
-	f32 dist;
+	f32 viewAngle = PI * (mViewAngle / 360.0f);
+	f32 fovAngle  = getFOV(viewAngle);
 
 	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row1, (PI - viewAngle));
-	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &outVec);
-	planeVec.x    = outVec.x;
-	planeVec.y    = outVec.y;
-	planeVec.z    = outVec.z;
-	mObjects[0].a = planeVec.x;
-	mObjects[0].b = planeVec.y;
-	mObjects[0].c = planeVec.z;
-	dist          = dot(planeVec, posVec);
-	mObjects[0].d = dist;
+	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &temp);
+	mObjects[0].updatePlane(posVec, temp);
 
-	Vec outVec1;
-	Vector3f planeVec1;
+	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row1, (viewAngle));
+	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &temp);
+	mObjects[1].updatePlane(posVec, temp);
 
-	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row1, viewAngle);
-	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &outVec1);
-	planeVec1.x   = outVec1.x;
-	planeVec1.y   = outVec1.y;
-	planeVec1.z   = outVec1.z;
-	mObjects[1].a = planeVec1.x;
-	mObjects[1].b = planeVec1.y;
-	mObjects[1].c = planeVec1.z;
-	mObjects[1].d = dot(planeVec1, posVec);
+	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row2, (-fovAngle));
+	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row1, &temp);
+	mObjects[2].updatePlane(posVec, temp);
 
-	Vec outVec2;
-	Vector3f planeVec2;
-
-	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row1, -fovAngle);
-	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &outVec2);
-	planeVec2.x   = outVec2.x;
-	planeVec2.y   = outVec2.y;
-	planeVec2.z   = outVec2.z;
-	mObjects[2].a = planeVec2.x;
-	mObjects[2].b = planeVec2.y;
-	mObjects[2].c = planeVec2.z;
-	mObjects[2].d = dot(planeVec2, posVec);
-
-	Vec outVec3;
-	Vector3f planeVec3;
-
-	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row1, (PI + fovAngle));
-	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row2, &outVec3);
-	planeVec3.x   = outVec3.x;
-	planeVec3.y   = outVec3.y;
-	planeVec3.z   = outVec3.z;
-	mObjects[3].a = planeVec3.x;
-	mObjects[3].b = planeVec3.y;
-	mObjects[3].c = planeVec3.z;
-	mObjects[3].d = dot(planeVec3, posVec);
-	/*
-	stwu     r1, -0xf0(r1)
-	mflr     r0
-	stw      r0, 0xf4(r1)
-	stfd     f31, 0xe0(r1)
-	psq_st   f31, 232(r1), 0, qr0
-	stfd     f30, 0xd0(r1)
-	psq_st   f30, 216(r1), 0, qr0
-	stfd     f29, 0xc0(r1)
-	psq_st   f29, 200(r1), 0, qr0
-	stfd     f28, 0xb0(r1)
-	psq_st   f28, 184(r1), 0, qr0
-	stfd     f27, 0xa0(r1)
-	psq_st   f27, 168(r1), 0, qr0
-	stw      r31, 0x9c(r1)
-	mr       r31, r3
-	addi     r3, r1, 0x38
-	lwz      r5, 0x30(r31)
-	mr       r4, r31
-	lfs      f2, 0(r5)
-	lfs      f1, 4(r5)
-	lfs      f0, 8(r5)
-	fneg     f2, f2
-	fneg     f1, f1
-	fneg     f0, f0
-	stfs     f2, 0x50(r1)
-	stfs     f1, 0x54(r1)
-	stfs     f0, 0x58(r1)
-	lfs      f0, 0x10(r5)
-	lfs      f1, 0x14(r5)
-	lfs      f2, 0x18(r5)
-	stfs     f0, 0x44(r1)
-	stfs     f1, 0x48(r1)
-	stfs     f2, 0x4c(r1)
-	lwz      r12, 0(r31)
-	lwz      r12, 0x4c(r12)
-	mtctr    r12
-	bctrl
-	lfs      f1, 0x28(r31)
-	lfs      f0, lbl_80520374@sda21(r2)
-	lfs      f2, lbl_80520370@sda21(r2)
-	fdivs    f0, f1, f0
-	lfs      f30, 0x38(r1)
-	lfs      f29, 0x3c(r1)
-	lfs      f28, 0x40(r1)
-	fmuls    f27, f2, f0
-	fmr      f1, f27
-	bl       tan
-	frsp     f1, f1
-	lfs      f0, 0x2c(r31)
-	fmuls    f1, f0, f1
-	bl       atan
-	lfs      f0, lbl_80520370@sda21(r2)
-	frsp     f31, f1
-	addi     r3, r1, 0x68
-	addi     r4, r1, 0x50
-	fsubs    f1, f0, f27
-	bl       PSMTXRotAxisRad
-	addi     r3, r1, 0x68
-	addi     r4, r1, 0x44
-	addi     r5, r1, 0x5c
-	bl       PSMTXMultVec
-	lwz      r0, 0x5c(r1)
-	fmr      f1, f27
-	lwz      r5, 0x60(r1)
-	addi     r3, r1, 0x68
-	stw      r0, 0x2c(r1)
-	addi     r4, r1, 0x50
-	lwz      r0, 0x64(r1)
-	stw      r5, 0x30(r1)
-	lwz      r5, 0x24(r31)
-	lfs      f0, 0x2c(r1)
-	stw      r0, 0x34(r1)
-	lfs      f2, 0x30(r1)
-	stfs     f0, 0(r5)
-	lfs      f0, 0x34(r1)
-	stfs     f2, 4(r5)
-	stfs     f0, 8(r5)
-	lfs      f0, 4(r5)
-	lfs      f2, 0(r5)
-	fmuls    f0, f0, f29
-	lfs      f3, 8(r5)
-	fmadds   f0, f2, f30, f0
-	fmadds   f0, f3, f28, f0
-	stfs     f0, 0xc(r5)
-	bl       PSMTXRotAxisRad
-	addi     r3, r1, 0x68
-	addi     r4, r1, 0x44
-	addi     r5, r1, 0x5c
-	bl       PSMTXMultVec
-	lwz      r0, 0x5c(r1)
-	fneg     f1, f31
-	lwz      r5, 0x60(r1)
-	addi     r3, r1, 0x68
-	stw      r0, 0x20(r1)
-	addi     r4, r1, 0x44
-	lwz      r0, 0x64(r1)
-	stw      r5, 0x24(r1)
-	lwz      r5, 0x24(r31)
-	lfs      f0, 0x20(r1)
-	stw      r0, 0x28(r1)
-	lfs      f2, 0x24(r1)
-	stfs     f0, 0x10(r5)
-	lfs      f0, 0x28(r1)
-	stfs     f2, 0x14(r5)
-	stfs     f0, 0x18(r5)
-	lfs      f0, 0x14(r5)
-	lfs      f2, 0x10(r5)
-	fmuls    f0, f0, f29
-	lfs      f3, 0x18(r5)
-	fmadds   f0, f2, f30, f0
-	fmadds   f0, f3, f28, f0
-	stfs     f0, 0x1c(r5)
-	bl       PSMTXRotAxisRad
-	addi     r3, r1, 0x68
-	addi     r4, r1, 0x50
-	addi     r5, r1, 0x5c
-	bl       PSMTXMultVec
-	lwz      r0, 0x5c(r1)
-	addi     r3, r1, 0x68
-	lwz      r5, 0x60(r1)
-	addi     r4, r1, 0x44
-	stw      r0, 0x14(r1)
-	lwz      r0, 0x64(r1)
-	stw      r5, 0x18(r1)
-	lwz      r5, 0x24(r31)
-	lfs      f1, 0x14(r1)
-	stw      r0, 0x1c(r1)
-	lfs      f0, 0x18(r1)
-	stfs     f1, 0x20(r5)
-	lfs      f1, 0x1c(r1)
-	stfs     f0, 0x24(r5)
-	lfs      f0, lbl_80520370@sda21(r2)
-	stfs     f1, 0x28(r5)
-	fadds    f1, f0, f31
-	lfs      f0, 0x24(r5)
-	lfs      f2, 0x20(r5)
-	fmuls    f0, f0, f29
-	lfs      f3, 0x28(r5)
-	fmadds   f0, f2, f30, f0
-	fmadds   f0, f3, f28, f0
-	stfs     f0, 0x2c(r5)
-	bl       PSMTXRotAxisRad
-	addi     r3, r1, 0x68
-	addi     r4, r1, 0x50
-	addi     r5, r1, 0x5c
-	bl       PSMTXMultVec
-	lwz      r0, 0x5c(r1)
-	lwz      r3, 0x60(r1)
-	stw      r0, 8(r1)
-	lwz      r0, 0x64(r1)
-	stw      r3, 0xc(r1)
-	lwz      r3, 0x24(r31)
-	lfs      f0, 8(r1)
-	stw      r0, 0x10(r1)
-	lfs      f1, 0xc(r1)
-	stfs     f0, 0x30(r3)
-	lfs      f0, 0x10(r1)
-	stfs     f1, 0x34(r3)
-	stfs     f0, 0x38(r3)
-	lfs      f0, 0x34(r3)
-	lfs      f1, 0x30(r3)
-	fmuls    f0, f0, f29
-	lfs      f2, 0x38(r3)
-	fmadds   f0, f1, f30, f0
-	fmadds   f0, f2, f28, f0
-	stfs     f0, 0x3c(r3)
-	psq_l    f31, 232(r1), 0, qr0
-	lfd      f31, 0xe0(r1)
-	psq_l    f30, 216(r1), 0, qr0
-	lfd      f30, 0xd0(r1)
-	psq_l    f29, 200(r1), 0, qr0
-	lfd      f29, 0xc0(r1)
-	psq_l    f28, 184(r1), 0, qr0
-	lfd      f28, 0xb0(r1)
-	psq_l    f27, 168(r1), 0, qr0
-	lfd      f27, 0xa0(r1)
-	lwz      r0, 0xf4(r1)
-	lwz      r31, 0x9c(r1)
-	mtlr     r0
-	addi     r1, r1, 0xf0
-	blr
-
-	*/
+	PSMTXRotAxisRad(outMat.mMatrix.mtxView, (Vec*)&row2, (PI + fovAngle));
+	PSMTXMultVec(outMat.mMatrix.mtxView, (Vec*)&row1, &temp);
+	mObjects[3].updatePlane(posVec, temp);
 }
 
 /**
@@ -400,13 +167,13 @@ void CullFrustum::updatePlanes()
 Camera::Camera()
     : CullFrustum(0)
 {
-	mJstObject      = 0;
-	mProjectionNear = 1.0f;
-	mProjectionFar  = 128000.0f;
-	_134            = 1.0f;
-	_138            = 1.0f;
-	_13C            = 1.0f;
-	mSoundPosition  = 0;
+	mJstObject          = 0;
+	mProjectionNear     = 1.0f;
+	mProjectionFar      = FLOAT_DIST_MAX;
+	mFieldOfViewRatio   = 1.0f;
+	mFieldOfViewTangent = 1.0f;
+	mCameraSizeModifier = 1.0f;
+	mSoundPosition      = 0;
 	PSMTXIdentity(mCurViewMatrix.mMatrix.mtxView);
 	mIsFixed = false;
 	mFar     = 0.0f;
@@ -442,9 +209,9 @@ void Camera::copyFrom(Camera* camera)
 	mProjectionNear = camera->mProjectionNear;
 	mProjectionFar  = camera->mProjectionFar;
 
-	_134 = camera->_134;
-	_138 = camera->_138;
-	_13C = camera->_13C;
+	mFieldOfViewRatio   = camera->mFieldOfViewRatio;
+	mFieldOfViewTangent = camera->mFieldOfViewTangent;
+	mCameraSizeModifier = camera->mCameraSizeModifier;
 
 	mJstObject = camera->mJstObject;
 
@@ -465,131 +232,24 @@ void Camera::copyFrom(Camera* camera)
 void Camera::updatePlanes()
 {
 	CullFrustum::updatePlanes();
-	Vector3f zVec;
-	zVec.x = -mViewMatrix->mMatrix.structView.xz;
-	zVec.y = -mViewMatrix->mMatrix.structView.yz;
-	zVec.z = -mViewMatrix->mMatrix.structView.zz;
 
-	Vector3f pos = getPosition();
+	Vector3f viewVector = getViewVector();
+	Vector3f position   = getPosition();
 
-	mObjects[4].a = -zVec.x;
-	mObjects[4].b = -zVec.y;
-	mObjects[4].c = -zVec.z;
-	Vector3f farPlaneVec(mObjects[4].a, mObjects[4].b, mObjects[4].c);
-	Vector3f farVec = zVec * mProjectionFar + pos;
-	mObjects[4].d   = dot(farPlaneVec, farVec);
+	// Update far plane
+	Vec temp;
+	temp.x            = -viewVector.x;
+	temp.y            = -viewVector.y;
+	temp.z            = -viewVector.z;
+	Vector3f farPoint = viewVector * mProjectionFar + position;
+	mObjects[4].updatePlane(farPoint, temp);
 
-	mObjects[5].a = -zVec.x;
-	mObjects[5].b = -zVec.y;
-	mObjects[5].c = -zVec.z;
-	Vector3f nearPlaneVec(mObjects[5].a, mObjects[5].b, mObjects[5].c);
-	Vector3f nearVec = zVec * mProjectionNear + pos;
-	mObjects[5].d    = dot(nearPlaneVec, farVec);
-	/*
-	stwu     r1, -0x70(r1)
-	mflr     r0
-	stw      r0, 0x74(r1)
-	stfd     f31, 0x60(r1)
-	psq_st   f31, 104(r1), 0, qr0
-	stfd     f30, 0x50(r1)
-	psq_st   f30, 88(r1), 0, qr0
-	stfd     f29, 0x40(r1)
-	psq_st   f29, 72(r1), 0, qr0
-	stw      r31, 0x3c(r1)
-	mr       r31, r3
-	bl       updatePlanes__11CullFrustumFv
-	lwz      r5, 0x30(r31)
-	mr       r4, r31
-	lwz      r12, 0(r31)
-	addi     r3, r1, 0x20
-	lfs      f2, 0x20(r5)
-	lfs      f1, 0x24(r5)
-	lfs      f0, 0x28(r5)
-	fneg     f31, f2
-	lwz      r12, 0x4c(r12)
-	fneg     f30, f1
-	fneg     f29, f0
-	mtctr    r12
-	bctrl
-	fneg     f0, f31
-	lfs      f5, 0x74(r31)
-	fneg     f6, f30
-	lfs      f1, 0x20(r1)
-	fneg     f4, f29
-	lfs      f7, 0x24(r1)
-	stfs     f0, 0x2c(r1)
-	fmuls    f2, f30, f5
-	fmuls    f3, f31, f5
-	lfs      f0, 0x28(r1)
-	lwz      r5, 0x2c(r1)
-	fmuls    f5, f29, f5
-	stfs     f6, 0x30(r1)
-	lwz      r4, 0x24(r31)
-	lwz      r3, 0x30(r1)
-	fadds    f2, f2, f7
-	stfs     f4, 0x34(r1)
-	fadds    f4, f3, f1
-	fadds    f5, f5, f0
-	lwz      r0, 0x34(r1)
-	stw      r5, 0x14(r1)
-	stw      r3, 0x18(r1)
-	lfs      f3, 0x14(r1)
-	stw      r0, 0x1c(r1)
-	lfs      f6, 0x18(r1)
-	stfs     f3, 0x40(r4)
-	lfs      f3, 0x1c(r1)
-	stfs     f6, 0x44(r4)
-	stfs     f3, 0x48(r4)
-	lfs      f3, 0x44(r4)
-	stfs     f31, 0x2c(r1)
-	fmuls    f2, f3, f2
-	lfs      f3, 0x40(r4)
-	stfs     f30, 0x30(r1)
-	lwz      r0, 0x2c(r1)
-	stfs     f29, 0x34(r1)
-	fmadds   f2, f3, f4, f2
-	lfs      f3, 0x48(r4)
-	stw      r0, 8(r1)
-	fmadds   f2, f3, f5, f2
-	lwz      r3, 0x30(r1)
-	lwz      r0, 0x34(r1)
-	stw      r3, 0xc(r1)
-	lfs      f4, 8(r1)
-	stfs     f2, 0x4c(r4)
-	lfs      f6, 0xc(r1)
-	lfs      f5, 0x70(r31)
-	lwz      r3, 0x24(r31)
-	stw      r0, 0x10(r1)
-	fmuls    f2, f30, f5
-	fmuls    f3, f31, f5
-	stfs     f4, 0x50(r3)
-	fmuls    f4, f29, f5
-	lfs      f5, 0x10(r1)
-	fadds    f2, f2, f7
-	stfs     f6, 0x54(r3)
-	fadds    f1, f3, f1
-	stfs     f5, 0x58(r3)
-	fadds    f4, f4, f0
-	lfs      f0, 0x54(r3)
-	lfs      f3, 0x50(r3)
-	fmuls    f0, f0, f2
-	lfs      f2, 0x58(r3)
-	fmadds   f0, f3, f1, f0
-	fmadds   f0, f2, f4, f0
-	stfs     f0, 0x5c(r3)
-	psq_l    f31, 104(r1), 0, qr0
-	lfd      f31, 0x60(r1)
-	psq_l    f30, 88(r1), 0, qr0
-	lfd      f30, 0x50(r1)
-	psq_l    f29, 72(r1), 0, qr0
-	lfd      f29, 0x40(r1)
-	lwz      r0, 0x74(r1)
-	lwz      r31, 0x3c(r1)
-	mtlr     r0
-	addi     r1, r1, 0x70
-	blr
-
-	*/
+	// Update near plane
+	temp.x             = viewVector.x;
+	temp.y             = viewVector.y;
+	temp.z             = viewVector.z;
+	Vector3f nearPoint = viewVector * mProjectionNear + position;
+	mObjects[5].updatePlane(nearPoint, temp);
 }
 
 /**
@@ -606,19 +266,6 @@ Vector3f Camera::getLookAtPosition()
 }
 
 /**
- * @note Address: 0x8041AB48
- * @note Size: 0x20
- */
-Vector3f Camera::getLookAtPosition_() { return Vector3f::zero; }
-
-/**
- * @note Address: 0x8041AB68
- * @note Size: 0x8
- */
-// WEAK - in header
-// void Game::P2JST::ObjectCamera::isRunning() { return mIsRunning; }
-
-/**
  * @note Address: 0x8041AB70
  * @note Size: 0x108
  */
@@ -628,11 +275,8 @@ Vector3f Camera::getPosition()
 		return mJstObject->mViewPos;
 	}
 
-	Vector3f vec;
-	vec.x = -mViewMatrix->mMatrix.structView.tx;
-	vec.y = -mViewMatrix->mMatrix.structView.ty;
-	vec.z = -mViewMatrix->mMatrix.structView.tz;
-
+	Vector3f vec = mViewMatrix->getColumn(3);
+	vec.negate2();
 	return mViewMatrix->multTranspose(vec);
 }
 
@@ -648,13 +292,6 @@ Vector3f* Camera::getPositionPtr()
 		return on_getPositionPtr();
 	}
 }
-
-/**
- * @note Address: 0x8041AD04
- * @note Size: 0x8
- */
-// WEAK - in header
-// Vector3f* Camera::on_getPositionPtr() { return nullptr; }
 
 /**
  * @note Address: 0x8041AD0C
@@ -700,7 +337,7 @@ void Camera::setProjection()
  */
 void Camera::update()
 {
-	PSMTX44Copy(mProjectionMtx, _F4);
+	PSMTX44Copy(mProjectionMtx, mBackupMtx);
 	Matrixf* viewMatrix = getViewMatrix(0);
 	PSMTXCopy(viewMatrix->mMatrix.mtxView, mCurViewMatrix.mMatrix.mtxView);
 	// temp_r3 = this->unk140;
@@ -717,13 +354,6 @@ void Camera::update()
 }
 
 /**
- * @note Address: 0x8041AEDC
- * @note Size: 0x4
- */
-// WEAK - in header
-// void Camera::updateMatrix() { }
-
-/**
  * @note Address: 0x8041AEE0
  * @note Size: 0x18
  */
@@ -737,36 +367,36 @@ Matrixf* Camera::getViewMatrix(bool getCurrentViewMtx)
 }
 
 /**
+ * Calculates the proper distance for the camera based on the given field of view percentage and initial distance.
+ *
+ * @param fovPercentage The field of view percentage. [0.0f, 100.0f]
+ * @param initialDistance The initial distance.
+ * @return The proper distance for the camera.
+ *
  * @note Address: 0x8041AEF8
  * @note Size: 0x120
  */
-f32 Camera::calcProperDistance(f32 f1, f32 f2)
+f32 Camera::calcProperDistance(f32 fovPercentage, f32 initialDistance)
 {
-	f32 input2;
-	f32 angle;
-	f32 cos;
-	f32 sin;
-	f32 pct;
-	f32 ratio;
-	f32 returnValue;
-	f32 new_var2;
-	f32 returnMax;
-
-	input2 = f2;
-	if (input2 < 0.01f) {
-		input2 = 100.0f;
+	f32 adjustedDistance = initialDistance;
+	if (adjustedDistance < 0.01f) {
+		adjustedDistance = 100.0f;
 	}
 
-	angle       = PI * (mViewAngle * 0.5f / 180.0f);
-	cos         = cosf(angle);
-	sin         = sinf(angle);
-	returnMax   = (-(mProjectionFar - mProjectionNear)) / ((mProjectionFar * 2.0f) * mProjectionNear);
-	pct         = f1 / 100.0f;
-	new_var2    = cos / sin;
-	ratio       = returnMax * (new_var2 * input2);
-	returnValue = fabs(ratio / (mAspectRatio * pct));
-	returnMax   = fabs(ratio / pct);
-	return (returnValue > returnMax) ? returnValue : returnMax;
+	f32 halfViewAngleRadians = PI * (mViewAngle * 0.5f / 180.0f);
+	f32 cosHalfAngle         = cosf(halfViewAngleRadians);
+	f32 sinHalfAngle         = sinf(halfViewAngleRadians);
+	f32 maxAllowedDistance   = (-(mProjectionFar - mProjectionNear)) / ((mProjectionFar * 2.0f) * mProjectionNear);
+
+	f32 viewPercentage = fovPercentage / 100.0f;
+	f32 aspectRatio    = cosHalfAngle / sinHalfAngle;
+
+	f32 properDistance = maxAllowedDistance * (aspectRatio * adjustedDistance);
+	f32 distance       = fabs(properDistance / (mAspectRatio * viewPercentage));
+
+	maxAllowedDistance = fabs(properDistance / viewPercentage);
+
+	return (distance > maxAllowedDistance) ? distance : maxAllowedDistance;
 }
 
 /**
@@ -775,13 +405,13 @@ f32 Camera::calcProperDistance(f32 f1, f32 f2)
  */
 void Camera::updateScreenConstants()
 {
-	_134    = ((mViewAngle * 0.5f) / 180.0f) * PI;
-	f32 cos = cosf(_134);
-	f32 sin = sinf(_134);
+	mFieldOfViewRatio = ((mViewAngle * 0.5f) / 180.0f) * PI;
+	f32 cos           = cosf(mFieldOfViewRatio);
+	f32 sin           = sinf(mFieldOfViewRatio);
 
-	_138 = cos / sin;
+	mFieldOfViewTangent = cos / sin;
 
-	_13C = -(mProjectionFar - mProjectionNear) / (mProjectionFar * 2.0f * mProjectionNear);
+	mCameraSizeModifier = -(mProjectionFar - mProjectionNear) / (mProjectionFar * 2.0f * mProjectionNear);
 }
 
 /**
@@ -790,26 +420,15 @@ void Camera::updateScreenConstants()
  */
 f32 Camera::calcScreenSize(Sys::Sphere& ball)
 {
-	Vector3f camPos = getPosition();
-	Matrixf* matrix = mViewMatrix;
-	Vector3f netPos = ball.mPosition - camPos;
-	f32 dotprod
-	    = netPos.x * -matrix->mMatrix.structView.xz + netPos.y * -matrix->mMatrix.structView.yz + netPos.z * -matrix->mMatrix.structView.zz;
-	f32 scaledRad = _138 * ball.mRadius;
+	Vector3f cameraPosition = getPosition();
+	Vector3f sphereToCamera = ball.mPosition - cameraPosition;
+	Vector3f viewDirection  = getViewVector();
 
-	f32 product = _13C * scaledRad / dotprod;
+	f32 scaledRadius = mFieldOfViewTangent * ball.mRadius;
+	f32 screenSize   = mCameraSizeModifier * scaledRadius / sphereToCamera.dot(viewDirection);
 
-	return absF(product);
+	return absF(screenSize);
 }
-
-/**
- * @note Address: N/A
- * @note Size: 0xE0
- */
-// void Camera::calcScreenSize(Sys::Sphere&, f32&, f32&, Vector3f&)
-// {
-// 	// UNUSED FUNCTION
-// }
 
 /**
  * @note Address: 0x8041B1B0
@@ -817,26 +436,25 @@ f32 Camera::calcScreenSize(Sys::Sphere& ball)
  */
 void Camera::updateSoundCamera(f32 angle)
 {
-	f32 cotan = cosf(angle) / sinf(angle);
+	f32 angleRatio = cosfc(angle) / sinf(angle);
 
-	Vector3f targetPos = getTargetDistance(); // wrong func call
+	Vector3f targetPos = getLookAtPosition();
 	Vector3f pos       = getPosition();
-	Vector3f viewVec1;
-	viewVec1.x = -(*mViewMatrix)(2, 0);
-	viewVec1.y = -(*mViewMatrix)(2, 1);
-	viewVec1.z = -(*mViewMatrix)(2, 2);
+	Vector3f viewVec1  = getViewVector();
 
 	f32 distance = targetPos.distance(pos);
-	f32 ratio    = (cotan * distance) / _138;
+	f32 ratio    = (angleRatio * distance) / mFieldOfViewTangent;
 
 	mSoundPosition.x = -(viewVec1.x * ratio - targetPos.x);
 	mSoundPosition.y = -(viewVec1.y * ratio - targetPos.y);
 	mSoundPosition.z = -(viewVec1.z * ratio - targetPos.z);
 
-	Matrixf mat = *mViewMatrix;
-
-	// mat.setMultNeg(mSoundPosition);
-	PSMTXCopy(mat.mMatrix.mtxView, mSoundMatrix.mMatrix.mtxView);
+	Vector3f soundPos = mSoundPosition;
+	Matrixf matrix    = *mViewMatrix;
+	Vector3f newPos;
+	matrix.getSoundPosition(soundPos, newPos); // need to tweak this inline probably
+	matrix.setTranslation(newPos);
+	PSMTXCopy(matrix.mMatrix.mtxView, mSoundMatrix.mMatrix.mtxView);
 }
 
 /**
@@ -917,41 +535,38 @@ void BlendCamera::setBlendFactor(f32 factor)
  */
 void BlendCamera::doUpdate()
 {
-	int blend          = mBlendFactor;
-	int blendIndex     = blend;
-	int nextBlendIndex = blendIndex + 1;
-
-	// Blend can't be higher than camera count
-	if (mCameraCount - 1 <= blend) {
-		blend          = blendIndex - 1;
-		nextBlendIndex = blend;
-	}
-
-	f32 blendFactorNextIndex = ((f32)blendIndex);
-
 	Quat indexQuat;
 	Quat nextIndexQuat;
 	Quat slerpQuat;
 
-	Matrixf* viewMatrix = mCameras[blendIndex]->getViewMatrix(false);
-	indexQuat.fromMatrixf(*viewMatrix);
+	int blend          = mBlendFactor;
+	int nextBlendIndex = blend + 1;
 
-	viewMatrix = mCameras[nextBlendIndex]->getViewMatrix(false);
-	nextIndexQuat.fromMatrixf(*viewMatrix);
+	// Blend can't be higher than camera count
+	if (blend >= mCameraCount - 1) {
+		blend--;
+		nextBlendIndex--;
+	}
+
+	f32 blendFactor = mBlendFactor - (f32)blend;
+
+	indexQuat.fromMatrixf(*mCameras[blend]->getViewMatrix(false));
+	nextIndexQuat.fromMatrixf(*mCameras[nextBlendIndex]->getViewMatrix(false));
 
 	indexQuat.normalise();
 	nextIndexQuat.normalise();
 
-	Vector3f vectIndex     = mCameras[blendIndex]->getPosition();
+	Vector3f vectIndex     = mCameras[blend]->getPosition();
 	Vector3f vectNextIndex = mCameras[nextBlendIndex]->getPosition();
 
-	f32 blendFactorIndex = 1.0f - blendFactorNextIndex;
+	f32 invBlendFactor = 1.0f - blendFactor;
 
-	mViewAngle = blendFactorIndex * mCameras[blendIndex]->mViewAngle + blendFactorNextIndex * mCameras[nextBlendIndex]->mViewAngle;
+	mViewAngle = invBlendFactor * mCameras[blend]->mViewAngle + blendFactor * mCameras[nextBlendIndex]->mViewAngle;
 
-	Vector3f vect3 = vectIndex * -blendFactorIndex + vectNextIndex * blendFactorNextIndex;
+	Vector3f vect3 = vectIndex * invBlendFactor + vectNextIndex * blendFactor;
+	vect3.negate2();
 
-	indexQuat.slerp(nextIndexQuat, blendFactorNextIndex, slerpQuat);
+	indexQuat.slerp(nextIndexQuat, blendFactor, slerpQuat);
 	slerpQuat.normalise();
 
 	Matrixf quatMatrix;
@@ -960,196 +575,8 @@ void BlendCamera::doUpdate()
 	quatMatrix.makeQ(slerpQuat);
 
 	PSMTXTranspose(quatMatrix.mMatrix.mtxView, vectMatrix.mMatrix.mtxView);
-
-	// Probably an Inline
-
-	vectMatrix.mMatrix.structView.zy *= vect3.y;
-	vectMatrix.mMatrix.structView.zx *= vect3.x;
-	vectMatrix.mMatrix.structView.yx *= vect3.x;
-
-	vect3.x = vect3.z * vectMatrix.mMatrix.structView.xz + vect3.x * vectMatrix.mMatrix.structView.xx
-	        + vect3.y * vectMatrix.mMatrix.structView.xy;
-
-	vect3.y = vect3.z * vectMatrix.mMatrix.structView.yz + vectMatrix.mMatrix.structView.yx + vect3.y * vectMatrix.mMatrix.structView.yy;
-
-	vect3.z = vect3.z * vectMatrix.mMatrix.structView.zz + vectMatrix.mMatrix.structView.zx + vectMatrix.mMatrix.structView.zy;
-
+	vect3 = vectMatrix.multTranspose(vect3);
 	mTargetMatrix.makeTQ(vect3, slerpQuat);
 
 	return;
-	/*
-	stwu     r1, -0x120(r1)
-	mflr     r0
-	stw      r0, 0x124(r1)
-	stfd     f31, 0x110(r1)
-	psq_st   f31, 280(r1), 0, qr0
-	stfd     f30, 0x100(r1)
-	psq_st   f30, 264(r1), 0, qr0
-	stfd     f29, 0xf0(r1)
-	psq_st   f29, 248(r1), 0, qr0
-	stfd     f28, 0xe0(r1)
-	psq_st   f28, 232(r1), 0, qr0
-	stw      r31, 0xdc(r1)
-	stw      r30, 0xd8(r1)
-	stw      r29, 0xd4(r1)
-	mr       r31, r3
-	addi     r3, r1, 0x4c
-	bl       __ct__4QuatFv
-	addi     r3, r1, 0x3c
-	bl       __ct__4QuatFv
-	addi     r3, r1, 0x2c
-	bl       __ct__4QuatFv
-	lfs      f2, 0x14c(r31)
-	lwz      r3, 0x144(r31)
-	fctiwz   f0, f2
-	addi     r0, r3, -1
-	stfd     f0, 0xc0(r1)
-	lwz      r4, 0xc4(r1)
-	cmpw     r4, r0
-	addi     r29, r4, 1
-	blt      lbl_8041BA14
-	addi     r4, r4, -1
-	addi     r29, r29, -1
-
-lbl_8041BA14:
-	xoris    r3, r4, 0x8000
-	lis      r0, 0x4330
-	stw      r3, 0xc4(r1)
-	slwi     r30, r4, 2
-	lwz      r3, 0x148(r31)
-	li       r4, 0
-	stw      r0, 0xc0(r1)
-	lwzx     r3, r3, r30
-	lfd      f1, lbl_80520368@sda21(r2)
-	lfd      f0, 0xc0(r1)
-	lwz      r12, 0(r3)
-	fsubs    f0, f0, f1
-	lwz      r12, 0x48(r12)
-	fsubs    f31, f2, f0
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r1, 0x4c
-	bl       fromMatrixf__4QuatFR7Matrixf
-	lwz      r3, 0x148(r31)
-	slwi     r29, r29, 2
-	li       r4, 0
-	lwzx     r3, r3, r29
-	lwz      r12, 0(r3)
-	lwz      r12, 0x48(r12)
-	mtctr    r12
-	bctrl
-	mr       r4, r3
-	addi     r3, r1, 0x3c
-	bl       fromMatrixf__4QuatFR7Matrixf
-	addi     r3, r1, 0x4c
-	bl       normalise__4QuatFv
-	addi     r3, r1, 0x3c
-	bl       normalise__4QuatFv
-	lwz      r4, 0x148(r31)
-	addi     r3, r1, 0x14
-	lwzx     r4, r4, r30
-	lwz      r12, 0(r4)
-	lwz      r12, 0x4c(r12)
-	mtctr    r12
-	bctrl
-	lwz      r4, 0x148(r31)
-	addi     r3, r1, 8
-	lfs      f30, 0x14(r1)
-	lwzx     r4, r4, r29
-	lfs      f29, 0x18(r1)
-	lwz      r12, 0(r4)
-	lfs      f28, 0x1c(r1)
-	lwz      r12, 0x4c(r12)
-	mtctr    r12
-	bctrl
-	lwz      r6, 0x148(r31)
-	fmr      f1, f31
-	lfs      f0, lbl_8052035C@sda21(r2)
-	addi     r3, r1, 0x4c
-	lwzx     r5, r6, r29
-	addi     r4, r1, 0x3c
-	fsubs    f9, f0, f31
-	lfs      f0, 0x28(r5)
-	addi     r5, r1, 0x2c
-	lfs      f2, 8(r1)
-	lfs      f6, 0xc(r1)
-	fmuls    f5, f31, f0
-	lfs      f8, 0x10(r1)
-	fmuls    f4, f30, f9
-	lwzx     r6, r6, r30
-	fmuls    f3, f2, f31
-	fmuls    f2, f29, f9
-	fmuls    f0, f6, f31
-	lfs      f7, 0x28(r6)
-	fadds    f6, f4, f3
-	fmadds   f3, f9, f7, f5
-	fadds    f5, f2, f0
-	fmuls    f4, f28, f9
-	stfs     f3, 0x28(r31)
-	fmuls    f0, f8, f31
-	fneg     f3, f6
-	stfs     f6, 0x20(r1)
-	fneg     f2, f5
-	fadds    f4, f4, f0
-	stfs     f5, 0x24(r1)
-	fneg     f0, f4
-	stfs     f4, 0x28(r1)
-	stfs     f3, 0x20(r1)
-	stfs     f2, 0x24(r1)
-	stfs     f0, 0x28(r1)
-	bl       slerp__4QuatFR4QuatfR4Quat
-	addi     r3, r1, 0x2c
-	bl       normalise__4QuatFv
-	addi     r3, r1, 0x8c
-	addi     r4, r1, 0x2c
-	bl       makeQ__7MatrixfFR4Quat
-	addi     r3, r1, 0x8c
-	addi     r4, r1, 0x5c
-	bl       PSMTXTranspose
-	lfs      f3, 0x24(r1)
-	addi     r3, r31, 0x150
-	lfs      f2, 0x6c(r1)
-	addi     r4, r1, 0x20
-	lfs      f1, 0x74(r1)
-	addi     r5, r1, 0x2c
-	lfs      f0, 0x70(r1)
-	fmuls    f4, f3, f2
-	fmuls    f2, f3, f1
-	lfs      f6, 0x20(r1)
-	lfs      f5, 0x5c(r1)
-	fmuls    f0, f3, f0
-	lfs      f3, 0x64(r1)
-	lfs      f1, 0x60(r1)
-	fmadds   f4, f6, f5, f4
-	lfs      f7, 0x28(r1)
-	lfs      f5, 0x7c(r1)
-	fmadds   f2, f6, f3, f2
-	lfs      f3, 0x84(r1)
-	fmadds   f0, f6, f1, f0
-	lfs      f1, 0x80(r1)
-	fmadds   f4, f7, f5, f4
-	fmadds   f2, f7, f3, f2
-	fmadds   f0, f7, f1, f0
-	stfs     f4, 0x20(r1)
-	stfs     f0, 0x24(r1)
-	stfs     f2, 0x28(r1)
-	bl       "makeTQ__7MatrixfFR10Vector3<f>R4Quat"
-	psq_l    f31, 280(r1), 0, qr0
-	lfd      f31, 0x110(r1)
-	psq_l    f30, 264(r1), 0, qr0
-	lfd      f30, 0x100(r1)
-	psq_l    f29, 248(r1), 0, qr0
-	lfd      f29, 0xf0(r1)
-	psq_l    f28, 232(r1), 0, qr0
-	lfd      f28, 0xe0(r1)
-	lwz      r31, 0xdc(r1)
-	lwz      r30, 0xd8(r1)
-	lwz      r0, 0x124(r1)
-	lwz      r29, 0xd4(r1)
-	mtlr     r0
-	addi     r1, r1, 0x120
-	blr
-
-	*/
 }

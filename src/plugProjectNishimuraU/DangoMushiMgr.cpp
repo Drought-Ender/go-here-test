@@ -20,7 +20,7 @@ static const char* cMatAnimBrkTexName = "/enemy/data/DangoMushi/dangomushi.brk";
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "ダンゴムシマネージャ"; // pill bug manager
+	mName = "繝繝ｳ繧ｴ繝繧ｷ繝槭ロ繝ｼ繧ｸ繝｣"; // pill bug manager
 }
 
 /**
@@ -80,13 +80,13 @@ void Mgr::loadTexData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 	P2ASSERTLINE(132, model != nullptr);
 
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "body")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x01000000);
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(J3DMDF_DiffColorReg);
 		}
 	}
 

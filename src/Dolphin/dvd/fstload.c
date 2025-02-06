@@ -4,10 +4,10 @@
 
 struct bb2struct {
 	u32 _00;
-	u32 _04;
-	s32 _08;
-	u32 _0C;
-	void* _10;
+	u32 offset;
+	s32 length;
+	u32 maxLength;
+	void* addr;
 };
 
 static u32 status;
@@ -32,24 +32,24 @@ struct blah {
  * @note Size: 0xD8
  */
 
-static void cb(s32 param_1, void* param_2) // param_2 is probably a struct
+static void cb(s32 type, DVDCommandBlock* cmdBlock)
 {
-	if (param_1 > 0) {
+	if (type > 0) {
 		switch (status) {
 		case 0:
 			status = 1;
-			DVDReadAbsAsyncForBS(param_2, bb2, 0x20, 0x420, cb);
+			DVDReadAbsAsyncForBS(cmdBlock, bb2, 0x20, 0x420, cb);
 			break;
 		case 1:
 			status = 2;
-			DVDReadAbsAsyncForBS(param_2, bb2->_10, OSRoundUp32B(bb2->_08), bb2->_04, cb);
+			DVDReadAbsAsyncForBS(cmdBlock, bb2->addr, OSRoundUp32B(bb2->length), bb2->offset, cb);
 			break;
 		}
-	} else if (param_1 == -1) {
-	} else if (param_1 == -4) {
+	} else if (type == -1) {
+	} else if (type == -4) {
 		status = 0;
 		DVDReset();
-		DVDReadDiskID(param_2, idTmp, cb);
+		DVDReadDiskID(cmdBlock, idTmp, cb);
 	}
 }
 
@@ -59,23 +59,23 @@ static void cb(s32 param_1, void* param_2) // param_2 is probably a struct
  */
 void __fstLoad(void)
 {
-	int iVar1;
-	char* pcVar2;
-	u8 auStack64[64];
+	int status;
+	char* onStr;
+	u8 idBuffer[64];
 	void* arenaHi;
 	struct blah* di;
 
 	arenaHi = OSGetArenaHi();
-	idTmp   = (void*)OSRoundUp32B(auStack64);
+	idTmp   = (void*)OSRoundUp32B(idBuffer);
 	bb2     = (void*)OSRoundUp32B(bb2Buf);
 	DVDReset();
 	DVDReadDiskID(&block, idTmp, cb);
 	do {
-		iVar1 = DVDGetDriveStatus();
-	} while (iVar1 != 0);
-	di                   = (void*)0x80000000;
-	di->FSTLocationInRam = bb2->_10;
-	di->FSTMaxLength     = bb2->_0C;
+		status = DVDGetDriveStatus();
+	} while (status != DVD_STATE_END);
+	di                   = (void*)OS_BASE_CACHED;
+	di->FSTLocationInRam = bb2->addr;
+	di->FSTMaxLength     = bb2->maxLength;
 	memcpy(di, idTmp, 32);
 	OSReport("\n");
 	OSReport("  Game Name ... %c%c%c%c\n", di->Gamecode[0], di->Gamecode[1], di->Gamecode[2], di->Gamecode[3]);
@@ -83,12 +83,12 @@ void __fstLoad(void)
 	OSReport("  Disk # ...... %d\n", di->DiskID);
 	OSReport("  Game ver .... %d\n", di->Version);
 	if (di->Streaming == 0) {
-		pcVar2 = "OFF";
+		onStr = "OFF";
 	} else {
-		pcVar2 = "ON";
+		onStr = "ON";
 	}
-	OSReport("  Streaming ... %s\n", pcVar2);
+	OSReport("  Streaming ... %s\n", onStr);
 	OSReport("\n");
-	OSSetArenaHi(bb2->_10);
+	OSSetArenaHi(bb2->addr);
 	return;
 }

@@ -23,27 +23,6 @@ Creature* Creature::currOp;
 bool Creature::usePacketCulling = true;
 
 /**
- * @brief Kills the creature and performs cleanup actions.
- */
-inline void Creature::killInline(Game::CreatureKillArg* arg)
-{
-	endStick();
-	setAlive(false);
-	Cell::sCurrCellMgr = cellMgr;
-	exitCell();
-	Cell::sCurrCellMgr = nullptr;
-	mUpdateContext.exit();
-	releaseAllStickers();
-	clearCapture();
-	onKill(arg);
-
-	if (mGenerator) {
-		mGenerator->informDeath(this);
-		mGenerator = nullptr;
-	}
-}
-
-/**
  * @note Address: 0x8013AE84
  * @note Size: 0x12C
  */
@@ -84,8 +63,8 @@ void Creature::init(CreatureInitArg* arg)
 	mAcceleration = Vector3f(0.0f);
 	clearCapture();
 
-	mBounceTriangle    = nullptr;
-	mCollisionPosition = Vector3f(0.0f, 1.0f, 0.0f);
+	mFloorTriangle = nullptr;
+	mFloorNormal   = Vector3f(0.0f, 1.0f, 0.0f);
 	clearCapture();
 
 	if (getMabiki()) {
@@ -99,7 +78,23 @@ void Creature::init(CreatureInitArg* arg)
  * @note Address: 0x8013B0F0
  * @note Size: 0xB4
  */
-void Creature::kill(CreatureKillArg* arg) { killInline(arg); }
+void Creature::kill(CreatureKillArg* arg)
+{
+	endStick();
+	setAlive(false);
+	Cell::sCurrCellMgr = cellMgr;
+	exitCell();
+	Cell::sCurrCellMgr = nullptr;
+	mUpdateContext.exit();
+	releaseAllStickers();
+	clearCapture();
+	onKill(arg);
+
+	if (mGenerator) {
+		mGenerator->informDeath(this);
+		mGenerator = nullptr;
+	}
+}
 
 /**
  * Sets the position of the Creature.
@@ -243,10 +238,10 @@ bool Creature::needShadow() { return mLod.isFlag(AILOD_IsVisible); }
  */
 void Creature::getLifeGaugeParam(LifeGaugeParam& param)
 {
-	param.mPosition            = getPosition();
-	param.mCurHealthPercentage = 1.0f;
-	param.mRadius              = 10.0f;
-	param.mIsGaugeShown        = true;
+	param.mPosition        = getPosition();
+	param.mCurrHealthRatio = 1.0f;
+	param.mRadius          = 10.0f;
+	param.mIsGaugeShown    = true;
 }
 
 /**
@@ -306,7 +301,7 @@ f32 Creature::calcSphereDistance(Creature* other)
 	getBoundingSphere(srcBoundSphere);
 
 	Vector3f dir = srcBoundSphere.mPosition - otherBoundSphere.mPosition;
-	return _length(dir) - (srcBoundSphere.mRadius + otherBoundSphere.mRadius);
+	return dir.length() - (srcBoundSphere.mRadius + otherBoundSphere.mRadius);
 }
 
 /**
@@ -369,7 +364,7 @@ void Creature::doSetView(int viewportNumber)
 
 	mModel->setCurrentViewNo((u16)viewportNumber);
 	if (Creature::usePacketCulling) {
-		if (mLod.mFlags & (16 << viewportNumber)) { // ??? more BitFlag<u8>, perhaps?
+		if (mLod.isVPVisible(viewportNumber)) {
 			mModel->showPackets();
 			return;
 		}
@@ -508,11 +503,11 @@ int Creature::checkHell(Creature::CheckHellArg& hellArg)
 
 	if (pos.y < -500.0f) {
 		if (isPiki() && static_cast<Piki*>(this)->isPikmin()) {
-			deathMgr->inc(0);
+			deathMgr->inc(DeathCounter::COD_Battle); // getting sent to hell would get you into valhalla in P2
 		}
 
 		if (hellArg.mIsKillPiki) {
-			killInline(nullptr);
+			kill(nullptr);
 		}
 
 		return CREATURE_HELL_DEATH;
@@ -730,7 +725,7 @@ void Creature::resolveOneColl(CollPart* source, CollPart* dest, Vector3f& direct
 	CollEvent destToSrcEvent(op, dest, source);
 
 	Vector3f velocityDifference = velAtSource - velAtDest;
-	f32 sepDot                  = dot(velocityDifference, collisionNormal);
+	f32 sepDot                  = velocityDifference.dot(collisionNormal);
 	collisionCallback(destToSrcEvent);
 
 	CollEvent srcToDestEvent(this, source, dest);

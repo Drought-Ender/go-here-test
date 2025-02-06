@@ -102,177 +102,6 @@ void TOmakeGame::doOpenScreen(ArgOpen*)
 	mPaneThumbnails[mSelection]->show();
 
 	mScreenObj->update();
-	/*
-stwu     r1, -0x50(r1)
-mflr     r0
-lfs      f1, lbl_8051FED0@sda21(r2)
-li       r4, 0
-stw      r0, 0x54(r1)
-li       r0, 1
-li       r5, 1
-stw      r31, 0x4c(r1)
-stw      r30, 0x48(r1)
-stw      r29, 0x44(r1)
-mr       r29, r3
-stw      r28, 0x40(r1)
-stb      r0, 0x10(r3)
-addi     r3, r29, 0x8c
-lwz      r6, sys@sda21(r13)
-lfs      f0, 0x54(r6)
-fmuls    f1, f1, f0
-bl       play__Q23ebi19E2DCallBack_AnmBaseFf10J3DAnmAttrb
-lwz      r5, sys@sda21(r13)
-addi     r3, r29, 0x104
-lfs      f1, lbl_8051FED0@sda21(r2)
-li       r4, 0
-lfs      f0, 0x54(r5)
-li       r5, 1
-fmuls    f1, f1, f0
-bl       play__Q23ebi19E2DCallBack_AnmBaseFf10J3DAnmAttrb
-li       r3, 1
-li       r0, 0
-stb      r3, 0x2b0(r29)
-stw      r0, 0x40(r29)
-lwz      r0, 0x40(r29)
-slwi     r0, r0, 2
-add      r3, r29, r0
-lwz      r3, 0x54(r3)
-bl       getBounds__7J2DPaneFv
-lwz      r4, sys@sda21(r13)
-lwz      r6, 0(r3)
-lfs      f1, lbl_8051FED4@sda21(r2)
-lfs      f0, 0x54(r4)
-lwz      r5, 4(r3)
-fdivs    f1, f1, f0
-lwz      r4, 8(r3)
-lwz      r0, 0xc(r3)
-stw      r6, 0x28(r1)
-stw      r5, 0x2c(r1)
-stw      r4, 0x30(r1)
-stw      r0, 0x34(r1)
-bl       __cvt_fp2unsigned
-stw      r3, 0x284(r29)
-li       r0, 1
-lwz      r5, 0x30(r1)
-mr       r31, r29
-stw      r3, 0x288(r29)
-li       r30, 0
-lwz      r6, 0x28(r1)
-lwz      r3, 0x2c(r1)
-stw      r6, 0x264(r29)
-lwz      r4, 0x34(r1)
-stw      r3, 0x268(r29)
-stw      r5, 0x26c(r29)
-stw      r4, 0x270(r29)
-stw      r6, 0x274(r29)
-stw      r3, 0x278(r29)
-stw      r5, 0x27c(r29)
-stw      r4, 0x280(r29)
-stb      r0, 0x260(r29)
-lwz      r0, 0x40(r29)
-stw      r5, 0x20(r1)
-slwi     r0, r0, 2
-add      r3, r29, r0
-stw      r4, 0x24(r1)
-lwz      r0, 0x48(r3)
-stw      r0, 0x2ac(r29)
-
-lbl_803F1384:
-li       r0, 0
-stb      r0, 0x17c(r31)
-lwz      r3, 0x178(r31)
-cmplwi   r3, 0
-beq      lbl_803F1430
-lwz      r7, 0x180(r31)
-mr       r28, r3
-addi     r4, r1, 0x18
-stw      r7, 0xc(r1)
-lbz      r5, 0xc(r1)
-lbz      r0, 0xd(r1)
-stb      r5, 0x104(r3)
-lbz      r5, 0xe(r1)
-stb      r0, 0x105(r3)
-lbz      r0, 0xf(r1)
-stb      r5, 0x106(r3)
-stb      r0, 0x107(r3)
-lwz      r6, 0x184(r31)
-stw      r7, 0x10(r1)
-stw      r6, 8(r1)
-lbz      r5, 8(r1)
-lbz      r0, 9(r1)
-stb      r5, 0x108(r3)
-lbz      r5, 0xa(r1)
-stb      r0, 0x109(r3)
-lbz      r0, 0xb(r1)
-stb      r5, 0x10a(r3)
-stb      r0, 0x10b(r3)
-lwz      r0, 0x188(r31)
-stw      r6, 0x14(r1)
-stw      r0, 0x18(r1)
-lwz      r12, 0(r3)
-lwz      r12, 0xa8(r12)
-mtctr    r12
-bctrl
-lwz      r0, 0x18c(r31)
-mr       r3, r28
-addi     r4, r1, 0x1c
-stw      r0, 0x1c(r1)
-lwz      r12, 0(r28)
-lwz      r12, 0xa4(r12)
-mtctr    r12
-bctrl
-
-lbl_803F1430:
-addi     r30, r30, 1
-addi     r31, r31, 0x4c
-cmpwi    r30, 3
-blt      lbl_803F1384
-lwz      r3, 0x40(r29)
-li       r6, 1
-lfs      f2, lbl_8051FED8@sda21(r2)
-li       r0, 0
-mulli    r5, r3, 0x4c
-lfs      f0, lbl_8051FECC@sda21(r2)
-mr       r3, r29
-li       r4, 0
-addi     r7, r5, 0x160
-add      r7, r29, r7
-stb      r6, 0x1c(r7)
-lwz      r5, sys@sda21(r13)
-lfs      f1, 0x54(r5)
-fmuls    f1, f2, f1
-stfs     f1, 0x44(r7)
-stfs     f0, 0x40(r7)
-stb      r6, 0x48(r7)
-stb      r0, 0x49(r7)
-bl       openMsg__Q33ebi6Screen10TOmakeGameFl
-lwz      r3, 0x80(r29)
-li       r0, 0
-li       r4, 1
-stb      r0, 0xb0(r3)
-lwz      r3, 0x84(r29)
-stb      r0, 0xb0(r3)
-lwz      r3, 0x88(r29)
-stb      r0, 0xb0(r3)
-lwz      r0, 0x40(r29)
-slwi     r0, r0, 2
-add      r3, r29, r0
-lwz      r3, 0x80(r3)
-stb      r4, 0xb0(r3)
-lwz      r3, 0x44(r29)
-lwz      r12, 0(r3)
-lwz      r12, 0x30(r12)
-mtctr    r12
-bctrl
-lwz      r0, 0x54(r1)
-lwz      r31, 0x4c(r1)
-lwz      r30, 0x48(r1)
-lwz      r29, 0x44(r1)
-lwz      r28, 0x40(r1)
-mtlr     r0
-addi     r1, r1, 0x50
-blr
-	*/
 }
 
 /**
@@ -300,7 +129,7 @@ bool TOmakeGame::doUpdateStateWait()
 	mScreenObj->update();
 	if (mExitState) {
 		mPad.update();
-		if (mPad._0D) {
+		if (mPad.mSelectionChanged) {
 			int oldsel = mPad.mLastIndex;
 			JGeometry::TBox2f box;
 			box              = *mPaneSelectBox[mSelection]->getBounds();
@@ -320,10 +149,10 @@ bool TOmakeGame::doUpdateStateWait()
 			PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_CURSOR, 0);
 		}
 		if (!mCursor.mCounter) {
-			if (mInput->mButton.mButtonDown & Controller::PRESS_A) {
+			if (mInput->getButtonDown() & Controller::PRESS_A) {
 				mExitState = false;
 			}
-			if (mInput->mButton.mButtonDown & Controller::PRESS_B) {
+			if (mInput->getButtonDown() & Controller::PRESS_B) {
 				PSSystem::spSysIF->playSystemSe(PSSE_SY_MENU_CANCEL, 0);
 				return true;
 			}
@@ -408,28 +237,28 @@ bool TOmakeGame::openMsg(s32 id)
 	case GameDesc:
 		switch (mSelection) {
 		case PikminPluck:
-			tag = '4800_00'; // "ƒIƒŠƒ}[‚Ü‚½‚Íƒ‹[ƒC‚ğ‘€ì‚µ‚ÄAƒsƒNƒ~ƒ“‚½‚¿‚ğ‚·‚×‚Ä‚Ğ‚Á‚±‚Ê‚­ƒQ[ƒ€‚Å‚·B"
+			tag = '4800_00'; // "ã‚ªãƒªãƒãƒ¼ã¾ãŸã¯ãƒ«ãƒ¼ã‚¤ã‚’æ“ä½œã—ã¦ã€ãƒ”ã‚¯ãƒŸãƒ³ãŸã¡ã‚’ã™ã¹ã¦ã²ã£ã“ã¬ãã‚²ãƒ¼ãƒ ã§ã™ã€‚"
 			break;           // translates to "In this game, you control Olimar or Louie and take out all the Pikmin."
 		case PikminPart:
-			tag = '4801_00'; // "“¯‚¶Œü‚«‚É“®‚­ƒsƒNƒ~ƒ“‚½‚¿‚ğ‚ ‚â‚Â‚èA‚¨•ó‚Ì‚ ‚éêŠ‚É˜A‚ê‚Ä‚¢‚­ƒQ[ƒ€‚Å‚·B"
+			tag = '4801_00'; // "åŒã˜å‘ãã«å‹•ããƒ”ã‚¯ãƒŸãƒ³ãŸã¡ã‚’ã‚ã‚„ã¤ã‚Šã€ãŠå®ã®ã‚ã‚‹å ´æ‰€ã«é€£ã‚Œã¦ã„ãã‚²ãƒ¼ãƒ ã§ã™ã€‚"
 			break; // translates to "In this game, you control Pikmin that move in the same direction and lead them to treasure locations."
 		case PikminPath:
-			tag = '4802_00'; // "ƒpƒlƒ‹‚ğ“ü‚ê‚©‚¦‚È‚ª‚çAƒ|ƒbƒh‚Ü‚Å‚Ì“¹‚ğŠ®¬‚³‚¹AƒsƒNƒ~ƒ“‚½‚¿‚ğ‚·‚×‚ÄƒS[ƒ‹‚³‚¹‚éƒQ[ƒ€‚Å‚·B"
+			tag = '4802_00'; // "ãƒ‘ãƒãƒ«ã‚’å…¥ã‚Œã‹ãˆãªãŒã‚‰ã€ãƒãƒƒãƒ‰ã¾ã§ã®é“ã‚’å®Œæˆã•ã›ã€ãƒ”ã‚¯ãƒŸãƒ³ãŸã¡ã‚’ã™ã¹ã¦ã‚´ãƒ¼ãƒ«ã•ã›ã‚‹ã‚²ãƒ¼ãƒ ã§ã™ã€‚"
 			break; // translates to "This is a game where you can complete the path to the pod by replacing the panels and get all the
 			       // Pikmin to the finish line."
 		}
 		break;
 	case Transferring:
-		tag = '4823_00'; // "ƒQ[ƒ€‚ğ“]‘—‚µ‚Ä‚¢‚Ü‚·B‚µ‚Î‚ç‚­‚¨‘Ò‚¿‚­‚¾‚³‚¢B"
+		tag = '4823_00'; // "ã‚²ãƒ¼ãƒ ã‚’è»¢é€ã—ã¦ã„ã¾ã™ã€‚ã—ã°ã‚‰ããŠå¾…ã¡ãã ã•ã„ã€‚"
 		break;           // translates to "Transferring games. Please wait."
 	case TransferFinished:
-		tag = '4824_00'; // "ƒQ[ƒ€‚Ì“]‘—‚ªI‚í‚è‚Ü‚µ‚½BƒP[ƒuƒ‹‚ğ”²‚¢‚Ä‚àƒQ[ƒ€‚Í—V‚×‚Ü‚·B"
+		tag = '4824_00'; // "ã‚²ãƒ¼ãƒ ã®è»¢é€ãŒçµ‚ã‚ã‚Šã¾ã—ãŸã€‚ã‚±ãƒ¼ãƒ–ãƒ«ã‚’æŠœã„ã¦ã‚‚ã‚²ãƒ¼ãƒ ã¯éŠã¹ã¾ã™ã€‚"
 		break;           // translates to "Game transfer finished. You can play the game even if you unplug the cable."
 	case TransferFailed:
-		tag = '4826_00'; // "ƒQ[ƒ€‚ğ“]‘—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½BÚ‘±‚Ìd•û‚ğŠm”F‚µ‚Ä‚­‚¾‚³‚¢B"
+		tag = '4826_00'; // "ã‚²ãƒ¼ãƒ ã‚’è»¢é€ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚æ¥ç¶šã®ä»•æ–¹ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚"
 		break;           // translates to "Failed to transfer game. Please check how to connect."
 	case TransferUnable:
-		tag = '4825_00'; // "“]‘—‚Å‚«‚Ü‚¹‚ñII ‚Å‚à‚Ç‚Á‚ÄAÚ‘±‚Ìd•û‚â‘€ì‚ğŠm”F‚µ‚Ä‚­‚¾‚³‚¢B"
+		tag = '4825_00'; // "è»¢é€ã§ãã¾ã›ã‚“ï¼ï¼ ã§ã‚‚ã©ã£ã¦ã€æ¥ç¶šã®ä»•æ–¹ã‚„æ“ä½œã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚"
 		break;           // translates to "Unable to transfer! ! But go back and check how to connect and how to operate."
 	default:
 		return false;

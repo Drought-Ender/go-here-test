@@ -98,7 +98,8 @@ static f64 one = 1.0, tiny = 1.0e-300;
 #ifdef __STDC__
 f64 __ieee754_sqrt(f64 x)
 #else
-f64 __ieee754_sqrt(x) f64 x;
+f64 __ieee754_sqrt(x)
+f64 x;
 #endif
 {
 	f64 z;
@@ -111,7 +112,7 @@ f64 __ieee754_sqrt(x) f64 x;
 
 	/* take care of Inf and NaN */
 	if ((ix0 & 0x7ff00000) == 0x7ff00000) {
-		errno = 33;
+		errno = EDOM;
 		return x * x + x; /* sqrt(NaN)=NaN, sqrt(+inf)=+inf
 		             sqrt(-inf)=sNaN */
 	}
@@ -120,7 +121,7 @@ f64 __ieee754_sqrt(x) f64 x;
 		if (((ix0 & (~sign)) | ix1) == 0)
 			return x; /* sqrt(+-0) = +-0 */
 		else if (ix0 < 0) {
-			errno = 33;
+			errno = EDOM;
 			return NAN;
 		} /* sqrt(-ve) = sNaN */
 	}

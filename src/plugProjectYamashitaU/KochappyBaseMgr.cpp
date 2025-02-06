@@ -13,7 +13,7 @@ namespace KochappyBase {
 Mgr::Mgr(int objLimit, u8 modelType)
     : EnemyMgrBase(objLimit, modelType)
 {
-	mName = "ƒRƒ`ƒƒƒbƒs[ƒx[ƒXƒ}ƒl[ƒWƒƒ";
+	mName = "ã‚³ãƒãƒ£ãƒƒãƒ”ãƒ¼ãƒ™ãƒ¼ã‚¹ãƒžãƒãƒ¼ã‚¸ãƒ£";
 }
 
 /**
@@ -70,12 +70,12 @@ void Mgr::loadAnimData()
  */
 SysShape::Model* Mgr::createModel()
 {
-	SysShape::Model* model = new SysShape::Model(mModelData, 0x80000, mModelType);
+	SysShape::Model* model = new SysShape::Model(mModelData, J3DMODEL_ShareDL, mMtxBufferSize);
 
 	for (u16 i = 0; i < mModelData->getMaterialNum(); i++) {
 		const char* name = mModelData->mMaterialTable.mMaterialNames->getName(i);
 		if (!strcmp(name, "lambert4")) {
-			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(0x04020000);
+			model->mJ3dModel->mMatPackets[i].mShapePacket->newDifferedDisplayList(J3DMDF_TexCoord1 | J3DMDF_DiffTexCoordScale);
 		}
 	}
 

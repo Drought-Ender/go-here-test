@@ -47,10 +47,10 @@ void Footmarks::add(Footmark& mark)
 {
 	mPosition = mark.mPosition;
 	if (mCapacity >= 2) {
-		int adjIndex       = ((mCurrentIndex + mCount) - 1) % mCount; // (_04 + (mCount - 1) % mCount);
+		int adjIndex       = ((mCurrentIndex + mCount) - 1) % mCount;
 		Footmark* currMark = &mMarks[adjIndex];
 
-		f32 dist = _distanceBetween(currMark->mPosition, mark.mPosition);
+		f32 dist = Vector3f::distance(currMark->mPosition, mark.mPosition);
 		if (dist < 20.0f) {
 			return;
 		}
@@ -95,7 +95,7 @@ Footmark* Footmarks::findNearest2(Vector3f& position, int minFlagValue)
 			Footmark* mark = &mMarks[adjIndex];
 
 			Vector3f diff = position - mark->mPosition;
-			f32 dist      = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+			f32 dist      = diff.sqrMagnitude();
 			if (dist < minDist) {
 				minDist  = dist;
 				minIndex = adjIndex;

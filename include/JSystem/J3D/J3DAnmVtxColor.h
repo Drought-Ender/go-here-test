@@ -7,8 +7,8 @@
 #include "types.h"
 
 struct J3DAnmVtxColorIndexData {
-	u16 _00; // _00
-	s32 _04; // _04
+	u16 mNum;    // _00
+	void* mData; // _04
 };
 
 struct J3DAnmVtxColor : public J3DAnmBase {
@@ -97,7 +97,7 @@ struct J3DAnmVtxColorKey : public J3DAnmVtxColor {
 struct J3DAnmVtxColorKeyData : J3DFileBlockBase {
 	u8 mAttribute;                      // _08
 	u8 _09;                             // _09
-	s16 mFrameMax;                      // _0A
+	s16 mTotalFrameCount;               // _0A
 	u16 mAnmTableNum[2];                // _0C
 	u8 _10[0x18 - 0x10];                // _10
 	s32 mTableOffsets[2];               // _18

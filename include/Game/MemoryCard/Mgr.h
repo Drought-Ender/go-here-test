@@ -14,16 +14,18 @@ struct PlayerFileInfo;
 struct PlayerInfoHeader;
 
 struct PlayerInfo {
-	u32 _00; // _00
-	u32 _04; // _04
+	u32 mMagic;       // _00
+	u32 mVersionType; // _04
 };
+
 struct OptionInfo {
-	u32 _00; // _00
-	u32 _04; // _04
+	u32 mMagic;         // _00
+	u32 mVersionType;   // _04
+	u32 mSaveSlotIndex; // _08
 };
 
 enum MemoryCardMgrFlags {
-	MCMFLAG_Unk1 = 0x1, // possibly InUse?
+	MCMFLAG_IsWriting = 0x1,
 };
 
 struct Mgr : public MemoryCardMgr {
@@ -127,17 +129,17 @@ struct Mgr : public MemoryCardMgr {
 	inline bool isCardInvalid() { return !mIsCard && checkStatus() != MCS_11; }
 
 	// _00-_E8 = MemoryCardMgr
-	u32 _D8;                // _D8
+	u32 mErrorCode;         // _D8
 	void* mBannerImageFile; // _DC
 	void* mIconImageFile;   // _E0
 	BitFlag<u32> mFlags;    // _E4
 };
 
 struct MgrCommandCopyPlayer : public MemoryCardMgrCommandBase {
-	MgrCommandCopyPlayer(int val, int p1, int p2)
-	    : MemoryCardMgrCommandBase(val)
-	    , _08(p1)
-	    , _0A(p2)
+	MgrCommandCopyPlayer(int flags, int fileIndex1, int fileIndex2)
+	    : MemoryCardMgrCommandBase(flags)
+	    , mFileIndex1(fileIndex1)
+	    , mFileIndex2(fileIndex2)
 	{
 	}
 
@@ -145,8 +147,8 @@ struct MgrCommandCopyPlayer : public MemoryCardMgrCommandBase {
 
 	// _04     = VTBL
 	// _00-_08 = MemoryCardMgrCommandBase
-	u16 _08; // _08
-	u16 _0A; // _0A
+	u16 mFileIndex1; // _08
+	u16 mFileIndex2; // _0A
 };
 
 struct MgrCommandPlayerNo : public MemoryCardMgrCommandBase {

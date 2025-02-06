@@ -68,9 +68,9 @@ struct GameMessageVsBirthTekiTreasure : public GameMessage {
 	virtual bool actVs(VsGameSection*); // _10
 
 	// _00 = VTBL
-	Vector3f mPosition; // _04
-	int _10;            // _10
-	bool _14;           // _14
+	Vector3f mPosition;   // _04
+	int mTekiBirthNum;    // _10
+	bool mDoSetExitTimer; // _14
 };
 
 struct GameMessageVsGetDoping : public GameMessage {
@@ -88,29 +88,29 @@ struct GameMessageVsGetDoping : public GameMessage {
 };
 
 struct GameMessageVsGetOtakara : public GameMessage {
-	inline GameMessageVsGetOtakara(u32 onyonType)
-	    : _04(onyonType)
-	    , _08(1)
+	inline GameMessageVsGetOtakara(u32 playerID)
+	    : mPlayerID(playerID)
+	    , mUnused08(1)
 	{
 	}
 
 	virtual bool actVs(VsGameSection*); // _10
 
 	// _00 = VTBL
-	u32 _04; // _04, onyon type according to ghidra, but that enum is meant to be a short
-	int _08; // _08
+	u32 mPlayerID; // _04
+	int mUnused08; // _08
 };
 
 struct GameMessageVsGotCard : public GameMessage {
-	inline GameMessageVsGotCard(u32 onyonType)
-	    : _04(onyonType)
+	inline GameMessageVsGotCard(u32 userIndex)
+	    : mUserIndex(userIndex)
 	{
 	}
 
 	virtual bool actVs(VsGameSection*); // _10
 
 	// _00 = VTBL
-	u32 _04; // _04, onyon type according to ghidra, but that enum is meant to be a short
+	u32 mUserIndex; // _04
 };
 
 struct GameMessageVsPikminDead : public GameMessage {
@@ -127,11 +127,11 @@ struct GameMessageVsRedOrSuckStart : public GameMessage {
 };
 
 struct GameMessageVsUseCard : public GameMessage {
-	GameMessageVsUseCard(int id) { _04 = id; }
+	GameMessageVsUseCard(int id) { mSlotIndex = id; }
 	virtual bool actVs(VsGameSection*); // _10
 
 	// _00 = VTBL
-	int _04; // _04
+	int mSlotIndex; // _04
 };
 
 } // namespace Game

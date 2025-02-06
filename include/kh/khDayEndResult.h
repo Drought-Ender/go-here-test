@@ -33,11 +33,23 @@ enum MailCategory {
 	AllTreasures   = 0x37,
 };
 
+union MailSaveFlags {
+	inline u8 getReverseByte(int i) { return byteView[15 - i]; }
+
+	u32 typeView[4];
+	u8 byteView[16];
+};
+
+union MailHistoryFlags {
+	int typeView[4];
+	s8 byteView[20];
+};
+
 struct MailSaveData {
 	MailSaveData()
 	{
 		for (int i = 0; i < 16; i++) {
-			mPastLogs[i] = 0;
+			mPastLogs.byteView[i] = 0;
 		}
 	}
 
@@ -46,8 +58,8 @@ struct MailSaveData {
 	void write(Stream&);
 	void set_history(s8);
 
-	u8 mPastLogs[0x10]; // _00
-	s8 mHistory[0x14];  // _10
+	MailSaveFlags mPastLogs;   // _00
+	MailHistoryFlags mHistory; // _10
 };
 
 struct IncP {
@@ -111,8 +123,8 @@ struct DispDayEndResultMail : public og::Screen::DispMemberBase {
 	JKRHeap* mHeap;             // _08
 	JKRHeap* mBackupHeap;       // _0C
 	MailCategory mMailCategory; // _10
-	u32 _14;                    // _14, unknown
-	u8 _18;                     // _18
+	u32 mExitStatus;            // _14
+	bool mHasOpened;            // _18
 	int mTodayMailID;           // _1C
 	uint mDayCount;             // _20
 };
@@ -250,8 +262,8 @@ struct ObjDayEndResultBase : public ::Screen::ObjBase {
 	P2DScreen::Mgr_tuning* mScreenTitle; // _38
 	J2DAnmTransform* mTitleAnmTransform; // _3C
 	J2DAnmColor* mTitleAnmColor;         // _40
-	f32 mTitleAnimTimer1;                // _44
-	f32 mTitleAnimTimer2;                // _48
+	f32 mTitleAnimTransformTimer;        // _44
+	f32 mTitleAnimColorTimer;            // _48
 	P2DScreen::Mgr_tuning* mScreenMain;  // _4C
 	J2DAnmTransform* mMainAnimTrans1;    // _50
 	J2DAnmTransform* mMainAnimTrans2;    // _54
@@ -276,56 +288,56 @@ struct ObjDayEndResultBase : public ::Screen::ObjBase {
 	struct StaticValues {
 		inline StaticValues()
 		{
-			_00       = 100.0f;
-			_04       = 0.25f;
-			mAnimRate = 1.0f;
-			_0C       = 1.0f;
-			_10       = 0.1f;
-			_24       = 8;
-			_28       = 3;
-			_4C       = 30;
-			_4D       = 90;
-			_4E       = 160;
-			_4F       = 32;
-			_50       = 20;
-			_14       = -8.0f;
-			_18       = 0.0f;
-			_1C       = 0.0f;
-			_20       = 23.0f;
-			_2C       = 0.899f;
-			_30       = 0.889f;
-			_34       = 0.336f;
-			_38       = 0.433f;
-			_40       = 0.4f;
-			_48       = 0.68;
-			_3C       = 0.1f;
-			_44       = 0.1f;
+			_00              = 100.0f;
+			_04              = 0.25f;
+			mAnimRate        = 1.0f;
+			_0C              = 1.0f;
+			_10              = 0.1f;
+			_24              = 8;
+			_28              = 3;
+			_4C              = 30;
+			_4D              = 90;
+			_4E              = 160;
+			_4F              = 32;
+			_50              = 20;
+			mStarsScreenPosX = -8.0f;
+			mMainScreenPosX  = 0.0f;
+			mTitleScreenPosX = 0.0f;
+			_20              = 23.0f;
+			_2C              = 0.899f;
+			_30              = 0.889f;
+			_34              = 0.336f;
+			_38              = 0.433f;
+			_40              = 0.4f;
+			_48              = 0.68;
+			_3C              = 0.1f;
+			_44              = 0.1f;
 		}
 
-		f32 _00;       // _00
-		f32 _04;       // _04
-		f32 mAnimRate; // _08
-		f32 _0C;       // _0C
-		f32 _10;       // _10
-		f32 _14;       // _14
-		f32 _18;       // _18
-		f32 _1C;       // _1C
-		f32 _20;       // _20
-		u32 _24;       // _24
-		u32 _28;       // _28
-		f32 _2C;       // _2C
-		f32 _30;       // _30
-		f32 _34;       // _34
-		f32 _38;       // _38
-		f32 _3C;       // _3C
-		f32 _40;       // _40
-		f32 _44;       // _44
-		f32 _48;       // _48
-		u8 _4C;        // _4C
-		u8 _4D;        // _4D
-		u8 _4E;        // _4E
-		u8 _4F;        // _4F
-		u8 _50;        // _50
+		f32 _00;              // _00
+		f32 _04;              // _04
+		f32 mAnimRate;        // _08
+		f32 _0C;              // _0C
+		f32 _10;              // _10
+		f32 mStarsScreenPosX; // _14
+		f32 mMainScreenPosX;  // _18
+		f32 mTitleScreenPosX; // _1C
+		f32 _20;              // _20
+		u32 _24;              // _24
+		u32 _28;              // _28
+		f32 _2C;              // _2C
+		f32 _30;              // _30
+		f32 _34;              // _34
+		f32 _38;              // _38
+		f32 _3C;              // _3C
+		f32 _40;              // _40
+		f32 _44;              // _44
+		f32 _48;              // _48
+		u8 _4C;               // _4C
+		u8 _4D;               // _4D
+		u8 _4E;               // _4E
+		u8 _4F;               // _4F
+		u8 _50;               // _50
 	};
 
 	static StaticValues msVal;
@@ -642,18 +654,42 @@ struct SceneDayEndResultItem : public ::Screen::SceneBase {
 	// TODO: work out if this has extra members
 };
 
-struct MailTableFile {
-	int mEntries;
-	u64 mMesgID;
-	u8 mFlags[4];
-	char mFileName[32];
+struct MailTableDataEntry {
+	u64 mMessageID;          // _00
+	u8 mFlag[4];             // _08
+	const char mFileName[0]; // _0C
 };
 
 struct MailTableData {
-	u64 mMessageID;  // _00
-	u8 mFlag[3];     // _08
-	char* mFileName; // _0C
-	u8 mSaveFlag;    // _10
+	MailTableData(MailTableDataEntry* data, MailSaveFlags& flags, int i)
+	{
+		u8 bit     = flags.getReverseByte(i >> 3);
+		int shift  = (i - (int(i >> 3) << 3));
+		mMessageID = data->mMessageID;
+		mFlag[0]   = data->mFlag[0];
+		mFlag[1]   = data->mFlag[1];
+		mFlag[2]   = data->mFlag[2];
+		mFileName  = (const char*)&data->mFileName;
+		mSaveFlag  = ((1 << shift) & bit) != 0;
+	}
+
+	inline u32 calcSaveFlag(MailSaveFlags& flags, int i)
+	{
+		u32 cleared = (i >> 3);
+		return (1 << (i - (cleared << 3))) & flags.byteView[15 - (i >> 3)];
+	}
+
+	inline const char* getFileName() { return mFileName; }
+
+	u64 mMessageID;        // _00
+	u8 mFlag[3];           // _08
+	const char* mFileName; // _0C
+	u8 mSaveFlag;          // _10
+};
+
+struct MailTableFile {
+	int mEntries;               // _00
+	MailTableDataEntry** mData; // _04
 };
 
 struct SceneDayEndResultMail : public ::Screen::SceneBase {
@@ -670,7 +706,7 @@ struct SceneDayEndResultMail : public ::Screen::SceneBase {
 	// _00-_220 = Screen::SceneBase
 	MailTableData** mTableData;  // _220, unknown
 	JKRMemArchive* mIconArchive; // _224
-	s8 mMailFlags[20];           // _228, unknown
+	MailHistoryFlags mMailFlags; // _228, unknown
 };
 
 struct SceneDayEndResultTitl : public ::Screen::SceneBase {
