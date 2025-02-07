@@ -181,7 +181,7 @@ void WaypointPathfinder::cleanup(NodeList& openList, NodeList& closedList)
 	}
 }
 
-u16 WaypointPathfinder::findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, bool isDesperate, Path& outPath)
+u16 WaypointPathfinder::findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, Path& outPath)
 {
 	if (startIdx == destIdx) {
 		outPath.allocate(1);
@@ -245,25 +245,22 @@ u16 WaypointPathfinder::findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, bo
 				continue; // Skip blue versus waypoints when disallowed
 			}
 
-			// Is this waypoint on a slippery slope?
-			if (!isDesperate) {
-				// Check path restrictions
-				if ((allowedFlags & Game::PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) {
-					continue; // Skip closed waypoints when open is required
-				}
+			// Check path restrictions
+			if ((allowedFlags & Game::PATHFLAG_RequireOpen) && (neighborWP->mFlags & Game::WPF_Closed)) {
+				continue; // Skip closed waypoints when open is required
+			}
 
-				if ((allowedFlags & Game::PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited)) {
-					continue; // Skip unvisited waypoints when only allowing unvisited
-				}
+			if (!(allowedFlags & Game::PATHFLAG_AllowUnvisited) && (neighborWP->mFlags & Game::WPF_Unvisited)) {
+				continue; // Skip unvisited waypoints when not allowed
+			}
 
-				// Leave the expensive till last
-				Game::CurrTriInfo triangleAtWp;
-				triangleAtWp.mPosition          = neighborWP->mPosition;
-				triangleAtWp.mGetTopPolygonInfo = false;
-				Game::mapMgr->getCurrTri(triangleAtWp);
-				if (!triangleAtWp.mTriangle || triangleAtWp.mTriangle->mCode.getSlipCode() != MapCode::Code::SlipCode_NoSlip) {
-					continue;
-				}
+			// Leave the expensive till last
+			Game::CurrTriInfo triangleAtWp;
+			triangleAtWp.mPosition          = neighborWP->mPosition;
+			triangleAtWp.mGetTopPolygonInfo = false;
+			Game::mapMgr->getCurrTri(triangleAtWp);
+			if (!triangleAtWp.mTriangle || triangleAtWp.mTriangle->mCode.getSlipCode() != MapCode::Code::SlipCode_NoSlip) {
+				continue;
 			}
 
 			f32 newGCost           = current->mGroundCost + calculateHeuristic(currentWP, neighborWP);

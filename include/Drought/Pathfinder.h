@@ -106,7 +106,7 @@ struct NodeMap {
 
 class WaypointPathfinder {
 public:
-	static u16 findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, bool isDesperate, Path& outPath);
+	static u16 findPath(s16 startIdx, s16 destIdx, u32 allowedFlags, Path& outPath);
 
 private:
 	static inline f32 calculateHeuristic(Game::WayPoint* from, Game::WayPoint* to);

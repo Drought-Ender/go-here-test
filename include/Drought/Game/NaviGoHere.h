@@ -34,6 +34,8 @@ struct NaviGoHereState : public NaviState {
 	virtual void collisionCallback(Navi*, CollEvent&);
 	virtual bool callable() { return true; }
 
+	void handlePlayerChangeFix(Navi*);
+
 	bool handleControlStick(Navi*);   // True if update should stop
 	bool navigateToFinalPoint(Navi*); // True if target reached, false if not
 	void navigateToWayPoint(Navi*, Game::WayPoint*);

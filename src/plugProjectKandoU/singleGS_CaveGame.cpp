@@ -173,7 +173,7 @@ void CaveState::exec(SingleGameSection* game)
 			Navi* navi = naviMgr->getActiveNavi();
 			if (!navi) {
 				int id = NAVIID_Louie;
-				if (gameSystem->mSection->mPrevNaviIdx == NAVIID_Olimar) {
+				if (gameSystem->mSection->mCurrentPlayerIndex == NAVIID_Olimar) {
 					id = NAVIID_Olimar;
 				}
 				navi = naviMgr->getAt(id);

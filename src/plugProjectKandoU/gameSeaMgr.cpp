@@ -193,7 +193,7 @@ void AABBWaterBox::doEntry()
 
 	if (gameSystem->isStoryMode()) {
 		BaseGameSection* section = gameSystem->getSection();
-		if (section->mPrevNaviIdx == NAVIID_Multiplayer) {
+		if (section->mCurrentPlayerIndex == NAVIID_Multiplayer) {
 			if (gameSystem) {
 				gameSystem->setDrawBuffer(DB_PostRenderLayer);
 

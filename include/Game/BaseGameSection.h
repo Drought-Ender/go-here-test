@@ -272,7 +272,7 @@ struct BaseGameSection : public BaseHIOSection {
 	WipeOutFader* mWipeOutFader;                              // _D8
 	WipeOutInFader* mWipeOutInFader;                          // _DC
 	u32 mUnusedVal;                                           // _E0
-	int mPrevNaviIdx;                                         // _E4
+	int mCurrentPlayerIndex;                                  // _E4
 	f32 mSecondViewportHeight;                                // _E8
 	f32 mSplit;                                               // _EC
 	u8 mSetSplit;                                             // _F0

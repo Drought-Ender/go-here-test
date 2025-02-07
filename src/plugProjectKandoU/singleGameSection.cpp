@@ -1172,7 +1172,7 @@ void SingleGameSection::updateMainMapScreen()
 	} else if (id == NAVIID_Louie) {
 		disp.mOlimarData.mActiveNaviID = FALSE;
 		disp.mLouieData.mActiveNaviID  = TRUE;
-	} else if (mPrevNaviIdx == NAVIID_Olimar) {
+	} else if (mCurrentPlayerIndex == NAVIID_Olimar) {
 		disp.mOlimarData.mActiveNaviID = FALSE;
 		disp.mLouieData.mActiveNaviID  = TRUE;
 	} else {
@@ -1264,7 +1264,7 @@ void SingleGameSection::updateCaveScreen()
 	} else if (id == NAVIID_Louie) {
 		disp.mOlimarData.mActiveNaviID = FALSE;
 		disp.mLouieData.mActiveNaviID  = TRUE;
-	} else if (mPrevNaviIdx == NAVIID_Olimar) {
+	} else if (mCurrentPlayerIndex == NAVIID_Olimar) {
 		disp.mOlimarData.mActiveNaviID = FALSE;
 		disp.mLouieData.mActiveNaviID  = TRUE;
 	} else {

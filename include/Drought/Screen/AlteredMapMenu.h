@@ -65,7 +65,6 @@ struct GoHereMapMenu : public og::newScreen::ObjSMenuMap {
 	bool mUseWaterNodes;
 	s16 mStartIndex;
 	s16 mDestinationIndex;
-	bool mDesperatePathfind;
 	PathfindState mPathfindState;
 	Path mPath;
 

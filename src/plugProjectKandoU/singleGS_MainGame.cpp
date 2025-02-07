@@ -316,7 +316,7 @@ void GameState::on_demo_timer(SingleGameSection* game, u32 id)
 		Navi* navi = naviMgr->getActiveNavi();
 		if (!navi) {
 			int id = 1;
-			if (!gameSystem->mSection->mPrevNaviIdx)
+			if (!gameSystem->mSection->mCurrentPlayerIndex)
 				id = 0;
 			navi = naviMgr->getAt(id);
 		}
@@ -332,7 +332,7 @@ void GameState::on_demo_timer(SingleGameSection* game, u32 id)
 		Navi* navi = naviMgr->getActiveNavi();
 		if (!navi) {
 			int id = 1;
-			if (!gameSystem->mSection->mPrevNaviIdx)
+			if (!gameSystem->mSection->mCurrentPlayerIndex)
 				id = 0;
 			navi = naviMgr->getAt(id);
 		}
@@ -354,7 +354,7 @@ void GameState::on_demo_timer(SingleGameSection* game, u32 id)
 		Navi* navi = naviMgr->getActiveNavi();
 		if (!navi) {
 			int id = 1;
-			if (!gameSystem->mSection->mPrevNaviIdx)
+			if (!gameSystem->mSection->mCurrentPlayerIndex)
 				id = 0;
 			navi = naviMgr->getAt(id);
 		}
@@ -542,7 +542,7 @@ void GameState::exec(SingleGameSection* game)
 			Navi* navi = naviMgr->getActiveNavi();
 			if (!navi) {
 				int id = 1;
-				if (!gameSystem->mSection->mPrevNaviIdx)
+				if (!gameSystem->mSection->mCurrentPlayerIndex)
 					id = 0;
 				navi = naviMgr->getAt(id);
 			}

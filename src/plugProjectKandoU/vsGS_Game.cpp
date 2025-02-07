@@ -603,7 +603,7 @@ void GameState::checkPikminZero(VsGameSection* section)
 		Navi* activeNavi = naviMgr->getActiveNavi();
 		if (!activeNavi) {
 			int naviIndex = 1;
-			if (!gameSystem->mSection->mPrevNaviIdx) {
+			if (!gameSystem->mSection->mCurrentPlayerIndex) {
 				naviIndex = 0;
 			}
 			activeNavi = naviMgr->getAt(naviIndex);
@@ -949,7 +949,7 @@ void GameState::update_GameChallenge(VsGameSection* section)
 			disp.mOlimarData.mActiveNaviID = FALSE;
 			disp.mLouieData.mActiveNaviID  = TRUE;
 
-		} else if (section->mPrevNaviIdx == NAVIID_Olimar) {
+		} else if (section->mCurrentPlayerIndex == NAVIID_Olimar) {
 			disp.mOlimarData.mActiveNaviID = FALSE;
 			disp.mLouieData.mActiveNaviID  = TRUE;
 
