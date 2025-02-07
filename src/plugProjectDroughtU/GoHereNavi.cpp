@@ -232,38 +232,46 @@ void NaviGoHereState::collisionCallback(Navi* player, CollEvent& event)
 		return;
 	}
 
-	// Calculate the flat (XZ) direction from the enemy to the player.
-	Vector3f enemyPos      = event.mCollidingCreature->getPosition();
-	Vector3f playerPos     = player->getPosition();
-	Vector3f baseDirection = playerPos;
-	Vector3f::getFlatDirectionFromTo(enemyPos, baseDirection);
-	baseDirection.normalise();
+	Vector3f enemyPos  = event.mCollidingCreature->getPosition();
+	Vector3f playerPos = player->getPosition();
 
-	// Create a perpendicular vector in the XZ plane.
-	// (For (x, 0, z), a perpendicular is (-z, 0, x) assuming Y is up.)
-	Vector3f perp(-baseDirection.z, 0.0f, baseDirection.x);
-	perp.normalise();
+	// Get the direction from enemy to player
+	Vector3f toPlayer = playerPos - enemyPos;
+	toPlayer.y        = 0.0f;
+	toPlayer.normalise();
 
-	// Define the offset angle in radians (30° here).
-	const float angleRad = TORADIANS(30.0f);
+	// Create the perpendicular vector in both directions
+	Vector3f rightPerp(-toPlayer.z, 0.0f, toPlayer.x);
+	Vector3f leftPerp(toPlayer.z, 0.0f, -toPlayer.x);
 
-	// Determine which side to slip by projecting the player's current velocity onto the perpendicular.
-	// Flatten the current velocity to ignore any vertical component.
+	// Get the current flattened velocity
 	Vector3f currentVel = player->mVelocity;
 	currentVel.y        = 0.0f;
-	float sign          = 1.0f;
-	if (currentVel.length() > 0.001f) {
-		// Dot product tells us if current velocity has a component along the perpendicular.
-		sign = (currentVel.dot(perp) > 0) ? 1.0f : -1.0f;
+
+	// If the velocity is too small, use the facing direction instead
+	if (currentVel.length() < 0.001f) {
+		const f32 faceAngle = player->getFaceDir();
+		currentVel          = Vector3f(sinf(faceAngle), 0.0f, cosf(faceAngle));
+		currentVel.normalise();
 	}
 
-	// Rotate the base direction by the offset angle. The rotation in the flat plane is:
-	// newDir = baseDirection * cos(angle) + (perp * sign) * sin(angle)
-	Vector3f newDirection = baseDirection * cos(angleRad) + (perp * sign) * sin(angleRad);
-	newDirection.normalise();
+	// Determine which side the player is currently more towards
+	f32 rightDot = currentVel.dot(rightPerp);
+	f32 leftDot  = currentVel.dot(leftPerp);
 
-	// Set the player's velocity in this new direction.
-	player->mVelocity = newDirection * player->getMoveSpeed();
+	// Choose the perpendicular direction that matches the player's current side
+	Vector3f slideDir = (rightDot > leftDot) ? rightPerp : leftPerp;
+
+	// Add a forward component to the slide
+	// Mix 70% of the slide direction with 30% of the forward direction
+	const f32 slideWeight   = 0.7f;
+	const f32 forwardWeight = 0.3f;
+
+	Vector3f finalDir = (slideDir * slideWeight + toPlayer * forwardWeight);
+	finalDir.normalise();
+
+	// Set the new velocity
+	player->mVelocity = finalDir * (player->getMoveSpeed() * 0.5f);
 }
 
 void NaviGoHereState::handlePlayerChangeFix(Navi* player)
@@ -340,7 +348,7 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 
 		// Compute an interpolation factor 't' based on the distance to the current waypoint.
 		// (Far away: t near 0, so use mostly primaryDir; close: t approaches 1, so blend in nextDir.)
-		float t = clamp(1.0f - (distanceToTarget / target->mRadius), 0.0f, 1.0f);
+		f32 t = clamp(1.0f - (distanceToTarget / target->mRadius), 0.0f, 1.0f);
 
 		// Linearly blend the two directions:
 		blendedDir = (primaryDir * (1.0f - t)) + nextDir * t;
