@@ -966,11 +966,11 @@ void BaseGameSection::saveToGeneratorCache(CourseInfo* courseinfo)
 
 void BaseGameSection::pmTogglePlayer()
 {
-	if (mPrevNaviIdx == NAVIID_Olimar) {
+	if (mCurrentPlayerIndex == NAVIID_Olimar) {
 		setPlayerMode(NAVIID_Louie);
 		moviePlayer->mViewport     = sys->mGfx->getViewport(PLAYER2_VIEWPORT);
 		moviePlayer->mActingCamera = mLouieCamera;
-	} else if (mPrevNaviIdx == NAVIID_Louie) {
+	} else if (mCurrentPlayerIndex == NAVIID_Louie) {
 		setPlayerMode(NAVIID_Olimar);
 		moviePlayer->mViewport     = sys->mGfx->getViewport(PLAYER1_VIEWPORT);
 		moviePlayer->mActingCamera = mOlimarCamera;
@@ -1054,7 +1054,7 @@ void BaseGameSection::setPlayerMode(int mode)
 		break;
 	}
 	}
-	mPrevNaviIdx = mode;
+	mCurrentPlayerIndex = mode;
 }
 
 /**
@@ -1098,7 +1098,7 @@ void BaseGameSection::setCamController()
 	navis[NAVIID_Olimar] = naviMgr->getAt(NAVIID_Olimar);
 	navis[NAVIID_Louie]  = naviMgr->getAt(NAVIID_Louie);
 
-	switch (mPrevNaviIdx) {
+	switch (mCurrentPlayerIndex) {
 	case NAVIID_Olimar: {
 		PlayCamera* olimarCam              = mOlimarCamera;
 		navis[NAVIID_Olimar]->mCamera      = olimarCam;
@@ -1155,7 +1155,7 @@ void BaseGameSection::setCamController()
 		break;
 	}
 	}
-	on_setCamController(mPrevNaviIdx);
+	on_setCamController(mCurrentPlayerIndex);
 }
 
 /**
@@ -1357,7 +1357,7 @@ void BaseGameSection::drawParticle(Graphics& gfx, int viewport)
 
 		port->setProjection();
 		port->setViewport();
-		if (!gameSystem->isMultiplayerMode() && mPrevNaviIdx != NAVIID_Multiplayer) {
+		if (!gameSystem->isMultiplayerMode() && mCurrentPlayerIndex != NAVIID_Multiplayer) {
 			mLightMgr->mFogMgr->off(gfx);
 			particleMgr->draw(port, 0);
 			mLightMgr->mFogMgr->set(gfx);
@@ -1671,7 +1671,7 @@ void BaseGameSection::initBlendCamera()
  */
 void BaseGameSection::updateBlendCamera()
 {
-	if (mPrevNaviIdx == NAVIID_Olimar) {
+	if (mCurrentPlayerIndex == NAVIID_Olimar) {
 		mBlendFactor -= sys->mDeltaTime / 0.2f;
 		if (mBlendFactor < 0.0f) {
 			mBlendFactor         = 0.0f;
@@ -1777,7 +1777,7 @@ void BaseGameSection::updateSplitter()
 	}
 
 	mSecondViewportHeight += mSplit * sys->mDeltaTime;
-	int id = mPrevNaviIdx;
+	int id = mCurrentPlayerIndex;
 	if (id == NAVIID_Multiplayer && mSecondViewportHeight <= 0.5f) {
 		mSecondViewportHeight = 0.5f;
 		mSplit                = 0.0f;

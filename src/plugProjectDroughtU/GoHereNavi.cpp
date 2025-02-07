@@ -100,6 +100,7 @@ void NaviGoHereState::init(Navi* player, StateArg* arg)
 	NaviGoHereStateArg* goHereArg = static_cast<NaviGoHereStateArg*>(arg);
 
 	player->startMotion(IPikiAnims::WALK, IPikiAnims::WALK, nullptr, nullptr);
+	player->setMoveRotation(true);
 
 	mTargetPosition = goHereArg->mPosition;
 	mPath           = goHereArg->mPath;
@@ -137,18 +138,12 @@ void NaviGoHereState::exec(Navi* player)
 {
 	// Handle early exit conditions (dead, frozen, etc)
 	{
+		if (moviePlayer && moviePlayer->mDemoState != DEMOSTATE_Inactive) {
+			return;
+		}
+
 		// No idea why we're in this state and dead
 		if (!player->isAlive()) {
-			return;
-		}
-
-		// If we're frozen then stop lol
-		if (gameSystem && gameSystem->mIsFrozen) {
-			player->mVelocity = 0.0f;
-			return;
-		}
-
-		if (handleControlStick(player)) {
 			return;
 		}
 	}
@@ -168,13 +163,14 @@ void NaviGoHereState::exec(Navi* player)
 	// Update the camera angle
 	Vector3f playerPos = player->getPosition();
 	{
-		static f32 currentAngle = player->getFaceDir();
+		static f32 currentAngle = roundAng(player->getFaceDir() + PI);
+		f32 targetAngle         = roundAng(player->getFaceDir() + PI);
 
-		Vector3f target = mActiveRouteNodeIndex != -1 ? getCurrentWaypoint()->mPosition : mTargetPosition;
-		f32 angle       = JMAAtan2Radian(target.x - playerPos.x, target.z - playerPos.z);
-		currentAngle += 0.05f * angDist(angle, currentAngle);
+		// Smoothly interpolate to the target angle
+		currentAngle += 0.075f * angDist(roundAng(targetAngle), currentAngle);
+		currentAngle = roundAng(currentAngle);
 
-		cameraMgr->setCameraAngle(roundAng(roundAng(currentAngle) + roundAng(mapMgr->getMapRotation())), player->mNaviIndex);
+		cameraMgr->setCameraAngle(roundAng(currentAngle + gMapRotation), player->mNaviIndex);
 	}
 
 	// If we haven't moved in a while, start incrementing the giveup timer
@@ -196,13 +192,11 @@ void NaviGoHereState::exec(Navi* player)
 
 	// Handle controller input
 	{
+		// Update the whistle's position
+		player->mWhistle->update(player->mTargetVelocity, false);
+
 		if (!player->mController1) {
-			return;
-		}
-
-		player->mWhistle->update(player->mVelocity, false);
-
-		if (!Game::IsGameWorldActive()) {
+			handlePlayerChangeFix(player); // Fixes the controller/camera not updating when the player changes
 			return;
 		}
 
@@ -238,38 +232,71 @@ void NaviGoHereState::collisionCallback(Navi* player, CollEvent& event)
 		return;
 	}
 
-	// Calculate the flat (XZ) direction from the enemy to the player.
-	Vector3f enemyPos      = event.mCollidingCreature->getPosition();
-	Vector3f playerPos     = player->getPosition();
-	Vector3f baseDirection = playerPos;
-	Vector3f::getFlatDirectionFromTo(enemyPos, baseDirection);
-	baseDirection.normalise();
+	Vector3f enemyPos  = event.mCollidingCreature->getPosition();
+	Vector3f playerPos = player->getPosition();
 
-	// Create a perpendicular vector in the XZ plane.
-	// (For (x, 0, z), a perpendicular is (-z, 0, x) assuming Y is up.)
-	Vector3f perp(-baseDirection.z, 0.0f, baseDirection.x);
-	perp.normalise();
+	// Get the direction from enemy to player
+	Vector3f toPlayer = playerPos - enemyPos;
+	toPlayer.y        = 0.0f;
+	toPlayer.normalise();
 
-	// Define the offset angle in radians (30° here).
-	const float angleRad = TORADIANS(30.0f);
+	// Create the perpendicular vector in both directions
+	Vector3f rightPerp(-toPlayer.z, 0.0f, toPlayer.x);
+	Vector3f leftPerp(toPlayer.z, 0.0f, -toPlayer.x);
 
-	// Determine which side to slip by projecting the player's current velocity onto the perpendicular.
-	// Flatten the current velocity to ignore any vertical component.
+	// Get the current flattened velocity
 	Vector3f currentVel = player->mVelocity;
 	currentVel.y        = 0.0f;
-	float sign          = 1.0f;
-	if (currentVel.length() > 0.001f) {
-		// Dot product tells us if current velocity has a component along the perpendicular.
-		sign = (currentVel.dot(perp) > 0) ? 1.0f : -1.0f;
+
+	// If the velocity is too small, use the facing direction instead
+	if (currentVel.length() < 0.001f) {
+		const f32 faceAngle = player->getFaceDir();
+		currentVel          = Vector3f(sinf(faceAngle), 0.0f, cosf(faceAngle));
+		currentVel.normalise();
 	}
 
-	// Rotate the base direction by the offset angle. The rotation in the flat plane is:
-	// newDir = baseDirection * cos(angle) + (perp * sign) * sin(angle)
-	Vector3f newDirection = baseDirection * cos(angleRad) + (perp * sign) * sin(angleRad);
-	newDirection.normalise();
+	// Determine which side the player is currently more towards
+	f32 rightDot = currentVel.dot(rightPerp);
+	f32 leftDot  = currentVel.dot(leftPerp);
 
-	// Set the player's velocity in this new direction.
-	player->mVelocity = newDirection * player->getMoveSpeed();
+	// Choose the perpendicular direction that matches the player's current side
+	Vector3f slideDir = (rightDot > leftDot) ? rightPerp : leftPerp;
+
+	// Add a forward component to the slide
+	// Mix 70% of the slide direction with 30% of the forward direction
+	const f32 slideWeight   = 0.7f;
+	const f32 forwardWeight = 0.3f;
+
+	Vector3f finalDir = (slideDir * slideWeight + toPlayer * forwardWeight);
+	finalDir.normalise();
+
+	// Set the new velocity
+	player->mVelocity = finalDir * (player->getMoveSpeed() * 0.5f);
+}
+
+void NaviGoHereState::handlePlayerChangeFix(Navi* player)
+{
+	static f32 forceTimer = 0.0f;
+
+	u32 playerIdx = gameSystem->mSection->mCurrentPlayerIndex;
+	// Only apply the change if we're the intended active player
+	if (player->mNaviIndex != playerIdx) {
+		return;
+	}
+
+	PlayCamera* currentCam = playerIdx == NAVIID_Olimar ? gameSystem->mSection->mOlimarCamera : gameSystem->mSection->mLouieCamera;
+	if (!currentCam) {
+		// God help us, no idea how this would happen, but let's not crash
+		return;
+	}
+
+	forceTimer += sys->mDeltaTime;
+
+	// Give it 0.5 seconds to change or we do it forcefully
+	if (forceTimer >= 0.5f) {
+		currentCam->mChangePlayerState = CAMCHANGE_None;
+		forceTimer                     = 0.0f;
+	}
 }
 
 bool NaviGoHereState::handleControlStick(Navi* player)
@@ -282,7 +309,7 @@ bool NaviGoHereState::handleControlStick(Navi* player)
 	if (gameSystem->isStoryMode()) {
 		Navi* activePlayer = naviMgr->getActiveNavi();
 		if (activePlayer != player) {
-			return true;
+			return false;
 		}
 
 		player->mSoundObj->mRappa.playRappa(true, player->mCStickPosition.x, player->mCStickPosition.z, player->mSoundObj);
@@ -321,7 +348,7 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 
 		// Compute an interpolation factor 't' based on the distance to the current waypoint.
 		// (Far away: t near 0, so use mostly primaryDir; close: t approaches 1, so blend in nextDir.)
-		float t = clamp(1.0f - (distanceToTarget / target->mRadius), 0.0f, 1.0f);
+		f32 t = clamp(1.0f - (distanceToTarget / target->mRadius), 0.0f, 1.0f);
 
 		// Linearly blend the two directions:
 		blendedDir = (primaryDir * (1.0f - t)) + nextDir * t;
@@ -335,18 +362,7 @@ void NaviGoHereState::navigateToWayPoint(Navi* player, Game::WayPoint* target)
 
 	// If we are still far enough away from the target, move toward it.
 	if (distanceToTarget >= target->mRadius) {
-		// Engage the control stick.
 		player->makeCStick(true);
-
-		// Smoothly rotate the facing direction toward the blended direction.
-		float desiredAngle = JMAAtan2Radian(blendedDir.x, blendedDir.z);
-		float angleDiff    = angDist(desiredAngle, player->mFaceDir);
-
-		// Gradually adjust the facing direction (0.1f is the smoothing factor).
-		player->mFaceDir += 0.1f * angleDiff;
-		player->mFaceDir = roundAng(player->mFaceDir);
-
-		// Set the target velocity in the blended direction (scaled by move speed).
 		player->mTargetVelocity = blendedDir * player->getMoveSpeed();
 		return;
 	}
@@ -393,10 +409,6 @@ bool NaviGoHereState::navigateToFinalPoint(Navi* player)
 	}
 
 	player->makeCStick(true);
-
-	player->mFaceDir += 0.1f * angDist(JMAAtan2Radian(direction.x, direction.z), player->mFaceDir);
-	player->mFaceDir = roundAng(player->mFaceDir);
-
 	player->mTargetVelocity = direction * player->getMoveSpeed();
 	return false;
 }
@@ -416,8 +428,7 @@ void NaviGoHereState::changeState(Navi* player, bool isWanted)
 void Navi::doDirectDraw(Graphics& gfx)
 {
 	return;
-	
-	// debug
+
 	if (getStateID() != NSID_GoHere) {
 		return;
 	}
@@ -440,8 +451,10 @@ bool Navi::canSwap()
 
 f32 Navi::getMoveSpeed()
 {
-	return (getOlimarData()->hasItem(OlimarData::ODII_RepugnantAppendage) ? naviMgr->mNaviParms->mNaviParms.mRushBootSpeed()
-	                                                                      : naviMgr->mNaviParms->mNaviParms.mMoveSpeed());
+	f32 speed = getOlimarData()->hasItem(OlimarData::ODII_RepugnantAppendage) ? naviMgr->mNaviParms->mNaviParms.mRushBootSpeed()
+	                                                                          : naviMgr->mNaviParms->mNaviParms.mMoveSpeed();
+
+	return speed;
 }
 
 void Navi::GoHereSuccess()

@@ -21,12 +21,11 @@ const bool cAllowMapRotation = false;
 
 void GoHereMapMenu::doCreate(JKRArchive* rarc)
 {
-	mUseWaterNodes     = false;
-	mCanStartPathfind  = false;
-	mFoundPath         = true;
-	mDestinationIndex  = -1;
-	mDesperatePathfind = false;
-	mPathfindState     = PATHFIND_INACTIVE;
+	mUseWaterNodes    = false;
+	mCanStartPathfind = false;
+	mFoundPath        = true;
+	mDestinationIndex = -1;
+	mPathfindState    = PATHFIND_INACTIVE;
 
 	og::newScreen::ObjSMenuMap::doCreate(rarc);
 
@@ -346,10 +345,9 @@ void GoHereMapMenu::OnPathfindDone()
 void GoHereMapMenu::initPathfinding()
 {
 	// Reset our pathfinding state
-	mStartIndex        = 0;
-	mDestinationIndex  = 0;
-	mDesperatePathfind = false;
-	mFoundPath         = false;
+	mStartIndex       = 0;
+	mDestinationIndex = 0;
+	mFoundPath        = false;
 	mPath.clear();
 
 	// First let's calculate if the player wants to go to a valid polygon
@@ -399,11 +397,7 @@ void GoHereMapMenu::initPathfinding()
 
 	JUT_ASSERT(endWP, "No end waypoint found!");
 	mDestinationIndex = endWP->mIndex;
-
-	OSReport("START WAYPOINT [%d] [%d] GOAL WAYPOINT [%d] [%d]\n", mStartIndex, startWP->mFlags, mDestinationIndex, endWP->mFlags);
-
-	mDesperatePathfind = false;
-	mPathfindState     = PATHFIND_IN_PROGRESS;
+	mPathfindState    = PATHFIND_IN_PROGRESS;
 }
 
 // Check on the pathfinder and update if done
@@ -418,37 +412,35 @@ void GoHereMapMenu::execPathfinding()
 	}
 
 	mPath.clear();
-	Drought::WaypointPathfinder::findPath(mDestinationIndex, mStartIndex, flag, mDesperatePathfind, mPath);
+
+	// Try end-to-start (works better for some cases)
+	Drought::WaypointPathfinder::findPath(mDestinationIndex, mStartIndex, flag, mPath);
 	if (!mPath.hasPath()) {
-		if (!mDesperatePathfind) {
-			// First try: we couldn't find a path, we're now desperate
-			mDesperatePathfind = true;
-		} else {
-			// Second try: we searched with desperation but nothing
-			mFoundPath         = false;
-			mPathfindState     = PATHFIND_FINISHED;
-			mDesperatePathfind = false;
+		// First try: no path, let's try the other way
+		Drought::WaypointPathfinder::findPath(mStartIndex, mDestinationIndex, flag, mPath);
+		if (!mPath.hasPath()) {
+			// Second try: we searched front and back, but nothing, damn
+			mFoundPath     = false;
+			mPathfindState = PATHFIND_FINISHED;
 			OnPathfindDone();
+			return;
 		}
-
-		return;
+	} else {
+		// First try: we found a path, let's check if the destination is reachable
+		mPath.reverse();
 	}
-
-	mDesperatePathfind = false;
 
 	// We aren't just done, we need to check if the final destination is reachable
 	if (validateDestinationReachable()) {
-		// We have a path, let's reverse it so we can follow it
-		mPath.reverse();
-		mFoundPath     = true;
-		mPathfindState = PATHFIND_FINISHED;
-		OnPathfindDone();
+		mFoundPath = true;
 	} else {
+		// The destination is not reachable, so we can't do this
+		mFoundPath = false;
 		mPath.clear();
-		mFoundPath     = false;
-		mPathfindState = PATHFIND_FINISHED;
-		OnPathfindDone();
 	}
+
+	mPathfindState = PATHFIND_FINISHED;
+	OnPathfindDone();
 }
 
 static bool checkSegment(const Vector3f& p0, const Vector3f& p1, f32 stepHeight, int maxDepth)
@@ -518,50 +510,40 @@ bool GoHereMapMenu::validateDestinationReachable()
 // draw the path of the Go-Here route on the 2D map
 void GoHereMapMenu::RenderPath(Graphics& gfx)
 {
-	if (mPathfindState != PATHFIND_FINISHED) {
+	if (mPathfindState != PATHFIND_FINISHED || !mCanStartPathfind || !mPath.hasPath()) {
 		return;
 	}
 
 	J2DPerspGraph* graf = &gfx.mPerspGraph;
 
-	const JUtility::TColor successCol = 0xffffffff; // white
-	const JUtility::TColor failureCol = 0xffaaaaff; // pinkish-red
+	// Red-ish for Olimar, Blue-ish for Louie
+	const JUtility::TColor successOlimarCol(0xFF, 0xCC, 0xCC, 0xAA);
+	const JUtility::TColor successLouieCol(0xCC, 0xCC, 0xFF, 0xAA);
 
 	const u8 oldWidth = graf->mLineWidth;
 
 	graf->setPort();
 	graf->setLineWidth(8);
-
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);
 
-	if (!mCanStartPathfind || !mPath.hasPath()) {
-		graf->setColor(failureCol);
-	} else {
-		graf->setColor(successCol);
+	Game::Navi* player = Game::naviMgr->getActiveNavi();
+	graf->setColor(player->getNaviID() == NAVIID_Olimar ? successOlimarCol : successLouieCol);
+
+	Vector3f playerPos = player->getPosition();
+	Vector3f previous  = playerPos;
+	graf->moveTo(GetPositionOnTex(playerPos));
+	for (u16 i = 0; i < mPath.mLength; i++) {
+		Vector3f current = Game::getWaypointAt(mPath.mWaypointList[i])->getPosition();
+		graf->lineTo(GetPositionOnTex(current));
+
+		previous = current;
 	}
-
-	Vector3f naviPos     = Game::naviMgr->getActiveNavi()->getPosition();
-	Vector3f previousPos = naviPos;
-
-	graf->moveTo(GetPositionOnTex(naviPos));
-	if (mPath.hasPath()) {
-		for (u16 i = 0; i < mPath.mLength; i++) {
-			Game::WayPoint* wp = Game::getWaypointAt(mPath.mWaypointList[i]);
-			Vector3f currPos   = wp->getPosition();
-
-			JGeometry::TVec2f point = GetPositionOnTex(currPos);
-
-			graf->lineTo(point);
-			previousPos = currPos;
-		}
-	} 
 
 	Vector2f goHerePtr = GetTargetPosition2D();
 	graf->lineTo(goHerePtr);
 
 	graf->setLineWidth(oldWidth);
-
 	graf->setPort();
 	GXSetZCompLoc(GX_TRUE);
 	GXSetZMode(GX_TRUE, GX_LESS, GX_FALSE);

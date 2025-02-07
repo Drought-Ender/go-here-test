@@ -227,7 +227,7 @@ Game::Navi* Brain::searchOrima()
 					searchRadius = distToPlayer;
 					targetPlayer = currentPlayer;
 
-				} else if (Game::gameSystem->mSection->mPrevNaviIdx == NAVIID_Olimar) {
+				} else if (Game::gameSystem->mSection->mCurrentPlayerIndex == NAVIID_Olimar) {
 					if (currentPlayer->mNaviIndex == NAVIID_Olimar) {
 						searchRadius = distToPlayer;
 						targetPlayer = currentPlayer;
